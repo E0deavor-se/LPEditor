@@ -1,0 +1,24 @@
+@using LPEditorApp.Models
+@using LPEditorApp.Services
+
+<div class="label-preset-picker">
+    <div class="label-preset-header">
+        <span class="label-preset-title">プリセット</span>
+        <span class="label-preset-sub">クリックで適用</span>
+    </div>
+    <div class="label-preset-grid">
+        @foreach (var preset in Presets)
+        {
+            <button type="button" class="label-preset-chip" @onclick="() => OnPresetSelected.InvokeAsync(preset)">
+                <span class="label-preset-name">@preset.Name</span>
+                <span class="label-preset-desc">@preset.Description</span>
+                <span class="label-preset-preview" style="@LabelStyleService.BuildInlineStyle(preset.Style)">Aa</span>
+            </button>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter] public IReadOnlyList<LabelStylePreset> Presets { get; set; } = Array.Empty<LabelStylePreset>();
+    [Parameter] public EventCallback<LabelStylePreset> OnPresetSelected { get; set; }
+}

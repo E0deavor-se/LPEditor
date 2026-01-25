@@ -1,0 +1,18 @@
+bin/
+obj/
+**/bin/
+**/obj/
+**/publish/
+**/publish-linux/
+**/publish-win-*/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+.vs/
+*.log
+*.zip# Build artifacts
+**/bin/
+**/obj/
+**/publish/
+**/publish-*/

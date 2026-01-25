@@ -1,0 +1,118 @@
+@using LPEditorApp.Models
+
+<div class="effects-panel">
+    <div class="effects-title">ページ全体エフェクト</div>
+
+    <div class="effects-card">
+        <div class="effects-card-header">
+            <label class="check"><input type="checkbox" @bind="Effects.Sparkle.Enabled" @bind:after="NotifyChanged" /> キラキラ</label>
+            <span class="effects-desc">上品な粒子</span>
+        </div>
+        <div class="effects-controls">
+            <div class="field">
+                <label>強さ</label>
+                <InputSelect class="text-option-select" @bind-Value="Effects.Sparkle.Intensity" @bind-Value:after="NotifyChanged">
+                    <option value="low">弱</option>
+                    <option value="mid">中</option>
+                    <option value="high">強</option>
+                </InputSelect>
+            </div>
+            <div class="field">
+                <label>色</label>
+                <input type="color" value="@Effects.Sparkle.Color" @oninput="OnSparkleColorChanged" />
+            </div>
+            <div class="field">
+                <label>密度</label>
+                <input class="text" type="number" @bind-value="Effects.Sparkle.Density" @bind-value:after="NotifyChanged" />
+            </div>
+            <div class="field">
+                <label>速度</label>
+                <input class="text" type="number" @bind-value="Effects.Sparkle.Speed" @bind-value:after="NotifyChanged" />
+            </div>
+        </div>
+    </div>
+
+    <div class="effects-card">
+        <div class="effects-card-header">
+            <label class="check"><input type="checkbox" @bind="Effects.Noise.Enabled" @bind:after="NotifyChanged" /> ノイズ</label>
+            <span class="effects-desc">薄いテクスチャ</span>
+        </div>
+        <div class="effects-controls">
+            <div class="field">
+                <label>強さ</label>
+                <InputSelect class="text-option-select" @bind-Value="Effects.Noise.Intensity" @bind-Value:after="NotifyChanged">
+                    <option value="low">弱</option>
+                    <option value="mid">中</option>
+                    <option value="high">強</option>
+                </InputSelect>
+            </div>
+            <div class="field">
+                <label>色</label>
+                <input type="color" value="@Effects.Noise.Color" @oninput="OnNoiseColorChanged" />
+            </div>
+        </div>
+    </div>
+
+    <div class="effects-card">
+        <div class="effects-card-header">
+            <label class="check"><input type="checkbox" @bind="Effects.GradientDrift.Enabled" @bind:after="NotifyChanged" /> ゆらぎ</label>
+            <span class="effects-desc">グラデの移動</span>
+        </div>
+        <div class="effects-controls">
+            <div class="field">
+                <label>強さ</label>
+                <InputSelect class="text-option-select" @bind-Value="Effects.GradientDrift.Intensity" @bind-Value:after="NotifyChanged">
+                    <option value="low">弱</option>
+                    <option value="mid">中</option>
+                    <option value="high">強</option>
+                </InputSelect>
+            </div>
+            <div class="field">
+                <label>色A</label>
+                <input type="color" value="@Effects.GradientDrift.ColorA" @oninput="OnGradientColorAChanged" />
+            </div>
+            <div class="field">
+                <label>色B</label>
+                <input type="color" value="@Effects.GradientDrift.ColorB" @oninput="OnGradientColorBChanged" />
+            </div>
+            <div class="field">
+                <label>速度</label>
+                <input class="text" type="number" @bind-value="Effects.GradientDrift.Speed" @bind-value:after="NotifyChanged" />
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter] public PageEffectsSetting Effects { get; set; } = new();
+    [Parameter] public EventCallback OnChanged { get; set; }
+
+    private void NotifyChanged()
+    {
+        _ = OnChanged.InvokeAsync();
+    }
+
+    private async Task OnSparkleColorChanged(ChangeEventArgs args)
+    {
+        Effects.Sparkle.Color = args.Value?.ToString() ?? "#ffffff";
+        await OnChanged.InvokeAsync();
+    }
+
+    private async Task OnNoiseColorChanged(ChangeEventArgs args)
+    {
+        Effects.Noise.Color = args.Value?.ToString() ?? "#ffffff";
+        await OnChanged.InvokeAsync();
+    }
+
+    private async Task OnGradientColorAChanged(ChangeEventArgs args)
+    {
+        Effects.GradientDrift.ColorA = args.Value?.ToString() ?? "#7c3aed";
+        await OnChanged.InvokeAsync();
+    }
+
+    private async Task OnGradientColorBChanged(ChangeEventArgs args)
+    {
+        Effects.GradientDrift.ColorB = args.Value?.ToString() ?? "#0ea5e9";
+        await OnChanged.InvokeAsync();
+    }
+}

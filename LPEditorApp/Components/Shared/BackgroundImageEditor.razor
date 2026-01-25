@@ -1,0 +1,42 @@
+@using Microsoft.AspNetCore.Components.Forms
+@using LPEditorApp.Models
+
+<div class="bg-image-editor">
+    <div class="field">
+        <label>画像URL</label>
+        <input class="text" placeholder="https://... または data:image/..." value="@Setting.ImageUrl" @oninput="OnUrlChanged" />
+    </div>
+    <div class="field">
+        <label>画像を選択</label>
+        <InputFile OnChange="OnFileSelected" accept="image/*" />
+        <div class="hint">選んだ画像は自動で埋め込みURLに変換されます。</div>
+    </div>
+</div>
+
+@code {
+    [Parameter] public BackgroundSetting Setting { get; set; } = new();
+    [Parameter] public EventCallback OnChanged { get; set; }
+
+    private async Task OnUrlChanged(ChangeEventArgs args)
+    {
+        Setting.ImageUrl = args.Value?.ToString() ?? string.Empty;
+        await OnChanged.InvokeAsync();
+    }
+
+    private async Task OnFileSelected(InputFileChangeEventArgs args)
+    {
+        var file = args.File;
+        if (file is null)
+        {
+            return;
+        }
+
+        await using var stream = file.OpenReadStream(8 * 1024 * 1024);
+        using var ms = new MemoryStream();
+        await stream.CopyToAsync(ms);
+        var base64 = Convert.ToBase64String(ms.ToArray());
+        var dataUrl = $"data:{file.ContentType};base64,{base64}";
+        Setting.ImageUrl = dataUrl;
+        await OnChanged.InvokeAsync();
+    }
+}

@@ -1,0 +1,191 @@
+@using LPEditorApp.Models
+@using LPEditorApp.Services
+
+<div class="bg-preset-picker">
+    <div class="bg-preset-header">
+        <div class="bg-preset-title">@Title</div>
+        <div class="bg-preset-sub">クリックで即適用</div>
+    </div>
+
+    <div class="bg-preset-tabs">
+        <button type="button" class="tab-btn @(IsCategory("all") ? "active" : "")" @onclick='() => SetCategory("all")'>すべて</button>
+        <button type="button" class="tab-btn @(IsCategory("gradient") ? "active" : "")" @onclick='() => SetCategory("gradient")'>グラデーション</button>
+        <button type="button" class="tab-btn @(IsCategory("pattern") ? "active" : "")" @onclick='() => SetCategory("pattern")'>パターン</button>
+        <button type="button" class="tab-btn @(IsCategory("solid") ? "active" : "")" @onclick='() => SetCategory("solid")'>単色</button>
+    </div>
+
+    <div class="bg-preset-grid">
+        <button type="button" class="bg-preset-card @(string.IsNullOrWhiteSpace(Selection.PresetKey) ? "is-selected" : "")" @onclick="() => SelectPreset(string.Empty)">
+            <div class="bg-preset-preview" style="background: #f8fafc"></div>
+            <div class="bg-preset-name">なし</div>
+            <div class="bg-preset-desc">現在の背景を解除</div>
+        </button>
+        @foreach (var preset in FilteredPresets)
+        {
+            <button type="button" class="bg-preset-card @(IsSelected(preset.Key) ? "is-selected" : "")" @onclick="() => SelectPreset(preset.Key)" @onmouseover="() => SetHover(preset.Key)">
+                <div class="bg-preset-preview" style="background: @GetPreviewStyle(preset.Key)"></div>
+                <div class="bg-preset-name">@preset.Label</div>
+                <div class="bg-preset-desc">@preset.Description</div>
+            </button>
+        }
+    </div>
+
+    @if (SelectedPreset is not null)
+    {
+        <AdvancedSettings Title="プリセットの詳細調整">
+            <div class="bg-preset-advanced">
+                @if (SelectedPreset.SupportsAngle)
+                {
+                    <div class="field">
+                        <label>角度</label>
+                        <input type="number" min="0" max="360" class="text" value="@GetAngleValue()" @oninput="OnAngleChanged" />
+                    </div>
+                }
+                @if (SelectedPreset.SupportsColors)
+                {
+                    <div class="field">
+                        <label>色A</label>
+                        <input type="color" value="@GetColorAValue()" @oninput="OnColorAChanged" />
+                    </div>
+                    <div class="field">
+                        <label>色B</label>
+                        <input type="color" value="@GetColorBValue()" @oninput="OnColorBChanged" />
+                    </div>
+                }
+                @if (SelectedPreset.SupportsOpacity)
+                {
+                    <div class="field">
+                        <label>透明度</label>
+                        <input type="number" min="0" max="1" step="0.05" class="text" value="@GetOpacityValue()" @oninput="OnOpacityChanged" />
+                    </div>
+                }
+                @if (SelectedPreset.SupportsDensity)
+                {
+                    <div class="field">
+                        <label>密度</label>
+                        <input type="number" min="0.5" max="2" step="0.1" class="text" value="@GetDensityValue()" @oninput="OnDensityChanged" />
+                    </div>
+                }
+            </div>
+        </AdvancedSettings>
+    }
+</div>
+
+@code {
+    [Parameter]
+    public BackgroundPresetSelection Selection { get; set; } = new();
+
+    [Parameter]
+    public string? Title { get; set; }
+
+    [Parameter]
+    public EventCallback OnChanged { get; set; }
+
+    private static readonly IReadOnlyList<BackgroundPresetDefinition> Presets = BackgroundPresetCatalog.All;
+    private string ActiveCategory = "all";
+    private string? HoveredKey;
+
+    private BackgroundPresetDefinition? SelectedPreset => BackgroundPresetCatalog.Find(Selection?.PresetKey ?? string.Empty);
+
+    protected override void OnParametersSet()
+    {
+        Selection ??= new BackgroundPresetSelection();
+    }
+
+    private void SetHover(string? key)
+    {
+        HoveredKey = key;
+    }
+
+    private async Task SelectPreset(string key)
+    {
+        Selection.PresetKey = key;
+        HoveredKey = null;
+        await OnChanged.InvokeAsync();
+    }
+
+    private bool IsCategory(string category) => string.Equals(ActiveCategory, category, StringComparison.OrdinalIgnoreCase);
+
+    private void SetCategory(string category)
+    {
+        ActiveCategory = category;
+    }
+
+    private IEnumerable<BackgroundPresetDefinition> FilteredPresets
+        => ActiveCategory switch
+        {
+            "gradient" => Presets.Where(preset => preset.Kind == BackgroundPresetKind.Gradient),
+            "pattern" => Presets.Where(preset => preset.Kind == BackgroundPresetKind.Pattern),
+            "solid" => Presets.Where(preset => preset.Kind == BackgroundPresetKind.Solid),
+            _ => Presets
+        };
+
+    private string GetPreviewStyle(string? key)
+    {
+        if (string.IsNullOrWhiteSpace(key))
+        {
+            return string.Empty;
+        }
+
+        var preset = BackgroundPresetCatalog.Find(key);
+        return preset is null ? string.Empty : BackgroundPresetCssBuilder.BuildPreviewValue(preset);
+    }
+
+    private bool IsSelected(string key) => string.Equals(Selection.PresetKey, key, StringComparison.OrdinalIgnoreCase);
+
+    private string GetAngleValue() => GetNumericValue(Selection.Angle, SelectedPreset?.DefaultAngle ?? 135);
+
+    private string GetOpacityValue() => GetNumericValue(Selection.Opacity, SelectedPreset?.DefaultOpacity ?? 1);
+
+    private string GetDensityValue() => GetNumericValue(Selection.Density, SelectedPreset?.DefaultDensity ?? 1);
+
+    private string GetColorAValue() => string.IsNullOrWhiteSpace(Selection.ColorA) ? SelectedPreset?.DefaultColorA ?? "#111827" : Selection.ColorA;
+
+    private string GetColorBValue() => string.IsNullOrWhiteSpace(Selection.ColorB) ? SelectedPreset?.DefaultColorB ?? "#ffffff" : Selection.ColorB;
+
+    private async Task OnAngleChanged(ChangeEventArgs args)
+    {
+        Selection.Angle = ParseDouble(args.Value?.ToString());
+        await OnChanged.InvokeAsync();
+    }
+
+    private async Task OnOpacityChanged(ChangeEventArgs args)
+    {
+        Selection.Opacity = ParseDouble(args.Value?.ToString());
+        await OnChanged.InvokeAsync();
+    }
+
+    private async Task OnDensityChanged(ChangeEventArgs args)
+    {
+        Selection.Density = ParseDouble(args.Value?.ToString());
+        await OnChanged.InvokeAsync();
+    }
+
+    private async Task OnColorAChanged(ChangeEventArgs args)
+    {
+        Selection.ColorA = args.Value?.ToString() ?? string.Empty;
+        await OnChanged.InvokeAsync();
+    }
+
+    private async Task OnColorBChanged(ChangeEventArgs args)
+    {
+        Selection.ColorB = args.Value?.ToString() ?? string.Empty;
+        await OnChanged.InvokeAsync();
+    }
+
+    private static double? ParseDouble(string? value)
+    {
+        if (double.TryParse(value, out var parsed))
+        {
+            return parsed;
+        }
+
+        return null;
+    }
+
+    private static string GetNumericValue(double? value, double fallback)
+    {
+        var resolved = value ?? fallback;
+        return resolved.ToString("0.###");
+    }
+}

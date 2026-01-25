@@ -1,0 +1,110 @@
+@using LPEditorApp.Models
+
+<div class="field">
+    <label>背景色</label>
+    <div class="bulk-style">
+        <input type="color" class="text-option-color" value="@GetColorPickerValue()" @oninput="OnColorPicked" />
+        <input class="text" placeholder="#RRGGBB or #RRGGBBAA" @bind-value="Background.Color" @bind-value:event="oninput" @bind-value:after="NotifyChanged" />
+    </div>
+</div>
+
+<div class="field">
+    <label>背景画像URL</label>
+    <input class="text" placeholder="https://... または data:image/..." @bind-value="Background.ImageUrl" @bind-value:event="oninput" @bind-value:after="NotifyChanged" />
+</div>
+
+<div class="field">
+    <label>repeat</label>
+    <InputSelect class="text-option-select" @bind-Value="Background.Repeat" @bind-Value:after="NotifyChanged">
+        <option value="repeat">repeat</option>
+        <option value="no-repeat">no-repeat</option>
+    </InputSelect>
+</div>
+
+<div class="field">
+    <label>position</label>
+    <InputSelect class="text-option-select" @bind-Value="Background.Position" @bind-Value:after="NotifyChanged">
+        <option value="center top">center top</option>
+        <option value="center center">center center</option>
+        <option value="custom">custom</option>
+    </InputSelect>
+    @if (string.Equals(Background.Position, "custom", StringComparison.OrdinalIgnoreCase))
+    {
+        <input class="text" placeholder="例: 50% 20%" @bind-value="Background.PositionCustom" @bind-value:event="oninput" @bind-value:after="NotifyChanged" />
+    }
+</div>
+
+<div class="field">
+    <label>size</label>
+    <InputSelect class="text-option-select" @bind-Value="Background.Size" @bind-Value:after="NotifyChanged">
+        <option value="cover">cover</option>
+        <option value="contain">contain</option>
+        <option value="custom">custom</option>
+    </InputSelect>
+    @if (string.Equals(Background.Size, "custom", StringComparison.OrdinalIgnoreCase))
+    {
+        <input class="text" placeholder="例: 1200px auto" @bind-value="Background.SizeCustom" @bind-value:event="oninput" @bind-value:after="NotifyChanged" />
+    }
+</div>
+
+<div class="field">
+    <label>attachment</label>
+    <InputSelect class="text-option-select" @bind-Value="Background.Attachment" @bind-Value:after="NotifyChanged">
+        <option value="scroll">scroll</option>
+        <option value="fixed">fixed</option>
+    </InputSelect>
+</div>
+
+<div class="field">
+    <label>セクションを透過</label>
+    <label class="check"><input type="checkbox" @bind="Background.TransparentSections" @bind:after="NotifyChanged" /> 透過する</label>
+</div>
+
+<BackgroundPresetPicker Title="背景プリセット" Selection="Background.Preset" OnChanged="NotifyChanged" />
+
+@code {
+    [Parameter]
+    public LpBackgroundModel Background { get; set; } = new();
+
+    [Parameter]
+    public EventCallback OnChanged { get; set; }
+
+    protected override void OnParametersSet()
+    {
+        Background ??= new LpBackgroundModel();
+        Background.Color ??= "transparent";
+        Background.Repeat = string.IsNullOrWhiteSpace(Background.Repeat) ? "repeat" : Background.Repeat;
+        Background.Position = string.IsNullOrWhiteSpace(Background.Position) ? "center top" : Background.Position;
+        Background.PositionCustom ??= string.Empty;
+        Background.Size = string.IsNullOrWhiteSpace(Background.Size) ? "cover" : Background.Size;
+        Background.SizeCustom ??= string.Empty;
+        Background.Attachment = string.IsNullOrWhiteSpace(Background.Attachment) ? "scroll" : Background.Attachment;
+        Background.ImageUrl ??= string.Empty;
+        Background.Preset ??= new BackgroundPresetSelection();
+    }
+
+    private string GetColorPickerValue()
+    {
+        var value = Background.Color ?? string.Empty;
+        if (value.StartsWith("#", StringComparison.Ordinal) && (value.Length == 7 || value.Length == 9))
+        {
+            return value.Length == 9 ? value.Substring(0, 7) : value;
+        }
+
+        return "#000000";
+    }
+
+    private async Task OnColorPicked(ChangeEventArgs e)
+    {
+        Background.Color = e?.Value?.ToString() ?? "transparent";
+        await NotifyChanged();
+    }
+
+    private async Task NotifyChanged()
+    {
+        if (OnChanged.HasDelegate)
+        {
+            await OnChanged.InvokeAsync();
+        }
+    }
+}

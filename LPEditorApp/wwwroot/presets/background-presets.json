@@ -1,0 +1,45 @@
+[
+  {
+    "key": "universal",
+    "label": "黄×白×薄ドット（汎用）",
+    "description": "読みやすい明るめ",
+    "pageBackground": {
+      "color": "#fffdf2",
+      "imageUrl": "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24'><circle cx='6' cy='6' r='2' fill='%23f1c75b' fill-opacity='0.35'/><circle cx='18' cy='18' r='2' fill='%23f1c75b' fill-opacity='0.35'/></svg>",
+      "repeat": "repeat",
+      "position": "center top",
+      "size": "custom",
+      "sizeCustom": "24px 24px",
+      "attachment": "scroll",
+      "transparentSections": false
+    }
+  },
+  {
+    "key": "luxury",
+    "label": "赤×金（豪華）",
+    "description": "高級感のある配色",
+    "pageBackground": {
+      "color": "#7a0d12",
+      "imageUrl": "",
+      "repeat": "no-repeat",
+      "position": "center top",
+      "size": "cover",
+      "attachment": "scroll",
+      "transparentSections": false
+    }
+  },
+  {
+    "key": "cool",
+    "label": "青×白（クール）",
+    "description": "爽やかなブルー",
+    "pageBackground": {
+      "color": "#e8f1ff",
+      "imageUrl": "",
+      "repeat": "repeat",
+      "position": "center top",
+      "size": "cover",
+      "attachment": "scroll",
+      "transparentSections": false
+    }
+  }
+]

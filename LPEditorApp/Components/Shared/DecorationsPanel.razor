@@ -1,0 +1,299 @@
+@using LPEditorApp.Models
+
+<div class="decor-panel">
+    <div class="decor-panel-header">
+        <div class="decor-panel-title">装飾レイヤー</div>
+        <div class="decor-panel-actions">
+            <button type="button" class="btn small" @onclick="AddLayer">追加</button>
+            <button type="button" class="btn small" @onclick="CopyLayers">コピー</button>
+            <button type="button" class="btn small" @onclick="PasteLayers" disabled="@(!HasClipboard)">貼り付け</button>
+            <button type="button" class="btn small" @onclick="ResetLayers">リセット</button>
+        </div>
+    </div>
+
+    <div class="decor-list">
+        @if (Style.Decorations.Count == 0)
+        {
+            <div class="text text-readonly">装飾はまだありません</div>
+        }
+        else
+        {
+            @for (var i = 0; i < Style.Decorations.Count; i++)
+            {
+                var layer = Style.Decorations[i];
+                <div class="decor-item @(SelectedLayer?.Id == layer.Id ? "is-selected" : "")">
+                    <button type="button" class="decor-item-main" @onclick="() => SelectLayer(layer)">
+                        <span class="decor-chip" style="background:@(string.IsNullOrWhiteSpace(layer.Color) ? "#1e1b4b" : layer.Color);"></span>
+                        <span class="decor-name">@GetTypeLabel(layer.Type)</span>
+                        <span class="decor-meta">@layer.Position / @layer.Layer</span>
+                    </button>
+                    <div class="decor-item-actions">
+                        <label class="check"><input type="checkbox" checked="@layer.Enabled" @onchange="e => ToggleEnabled(layer, e)" />表示</label>
+                        <button type="button" class="btn small" @onclick="() => MoveUp(i)">↑</button>
+                        <button type="button" class="btn small" @onclick="() => MoveDown(i)">↓</button>
+                        <button type="button" class="btn small danger" @onclick="() => RemoveLayer(layer)">削除</button>
+                    </div>
+                </div>
+            }
+        }
+    </div>
+
+    @if (SelectedLayer is not null)
+    {
+        <div class="decor-editor">
+            <div class="decor-editor-title">@GetTypeLabel(SelectedLayer.Type) を編集</div>
+            <div class="field">
+                <label>種類</label>
+                <InputSelect class="text-option-select" @bind-Value="SelectedLayer.Type" @bind-Value:after="NotifyChanged">
+                    <option value="ribbon">リボン/帯</option>
+                    <option value="badge">バッジ/タグ</option>
+                    <option value="divider">区切り線</option>
+                    <option value="pattern">背景パターン</option>
+                    <option value="shape">図形</option>
+                </InputSelect>
+            </div>
+            <div class="field">
+                <label>前後</label>
+                <InputSelect class="text-option-select" @bind-Value="SelectedLayer.Layer" @bind-Value:after="NotifyChanged">
+                    <option value="front">前面</option>
+                    <option value="back">背面</option>
+                </InputSelect>
+            </div>
+            <div class="field">
+                <label>位置</label>
+                <InputSelect class="text-option-select" @bind-Value="SelectedLayer.Position" @bind-Value:after="NotifyChanged">
+                    <option value="top">上</option>
+                    <option value="bottom">下</option>
+                    <option value="left">左</option>
+                    <option value="right">右</option>
+                    <option value="center">中央</option>
+                </InputSelect>
+            </div>
+            <div class="field">
+                <label>オフセット</label>
+                <div class="bulk-style">
+                    <input class="text" type="number" @bind-value="SelectedLayer.OffsetX" @bind-value:after="NotifyChanged" />
+                    <input class="text" type="number" @bind-value="SelectedLayer.OffsetY" @bind-value:after="NotifyChanged" />
+                </div>
+            </div>
+            <div class="field">
+                <label>サイズ</label>
+                <InputSelect class="text-option-select" @bind-Value="SelectedLayer.SizePreset" @bind-Value:after="NotifyChanged">
+                    <option value="s">S</option>
+                    <option value="m">M</option>
+                    <option value="l">L</option>
+                </InputSelect>
+            </div>
+            <div class="field">
+                <label>色</label>
+                <div class="bulk-style">
+                    <input type="color" value="@SelectedLayer.Color" @oninput="OnColorChanged" />
+                    <input class="text" value="@SelectedLayer.Color" @oninput="OnColorTextChanged" />
+                </div>
+            </div>
+            <div class="field">
+                <label>透明度</label>
+                <input type="range" min="0" max="100" step="1" value="@ResolveOpacity(SelectedLayer)" @oninput="OnOpacityChanged" />
+            </div>
+            <div class="field">
+                <label>ラベル</label>
+                <input class="text" @bind-value="SelectedLayer.Label" @bind-value:after="NotifyChanged" />
+            </div>
+            <div class="field">
+                <label>装飾アニメ</label>
+                <InputSelect class="text-option-select" @bind-Value="SelectedLayer.Animation.Preset" @bind-Value:after="NotifyChanged">
+                    <option value="none">なし</option>
+                    <option value="fade">フェード</option>
+                    <option value="slide-up">スライド(上)</option>
+                    <option value="slide-down">スライド(下)</option>
+                    <option value="slide-left">スライド(左)</option>
+                    <option value="slide-right">スライド(右)</option>
+                    <option value="zoom">ズーム</option>
+                    <option value="pop">ポップ</option>
+                </InputSelect>
+            </div>
+            <div class="field">
+                <label>表示タイミング</label>
+                <InputSelect class="text-option-select" @bind-Value="SelectedLayer.Animation.Trigger" @bind-Value:after="NotifyChanged">
+                    <option value="scroll">スクロールイン</option>
+                    <option value="load">表示時</option>
+                </InputSelect>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public SectionStyleModel Style { get; set; } = new();
+    [Parameter] public EventCallback OnChanged { get; set; }
+
+    private DecorationLayer? SelectedLayer;
+
+    private static List<DecorationLayer>? Clipboard;
+
+    private bool HasClipboard => Clipboard?.Count > 0;
+
+    private void AddLayer()
+    {
+        var layer = new DecorationLayer
+        {
+            Type = "ribbon",
+            Position = "top",
+            Layer = "front",
+            Color = "#1e1b4b",
+            OpacityPct = 100,
+            SizePreset = "m"
+        };
+        Style.Decorations.Add(layer);
+        SelectedLayer = layer;
+        _ = OnChanged.InvokeAsync();
+    }
+
+    private void NotifyChanged()
+    {
+        _ = OnChanged.InvokeAsync();
+    }
+
+    private void SelectLayer(DecorationLayer layer)
+    {
+        SelectedLayer = layer;
+    }
+
+    private void RemoveLayer(DecorationLayer layer)
+    {
+        Style.Decorations.Remove(layer);
+        if (SelectedLayer?.Id == layer.Id)
+        {
+            SelectedLayer = null;
+        }
+        _ = OnChanged.InvokeAsync();
+    }
+
+    private void MoveUp(int index)
+    {
+        if (index <= 0) return;
+        var temp = Style.Decorations[index - 1];
+        Style.Decorations[index - 1] = Style.Decorations[index];
+        Style.Decorations[index] = temp;
+        _ = OnChanged.InvokeAsync();
+    }
+
+    private void MoveDown(int index)
+    {
+        if (index >= Style.Decorations.Count - 1) return;
+        var temp = Style.Decorations[index + 1];
+        Style.Decorations[index + 1] = Style.Decorations[index];
+        Style.Decorations[index] = temp;
+        _ = OnChanged.InvokeAsync();
+    }
+
+    private void ToggleEnabled(DecorationLayer layer, ChangeEventArgs e)
+    {
+        if (e.Value is bool enabled)
+        {
+            layer.Enabled = enabled;
+        }
+        _ = OnChanged.InvokeAsync();
+    }
+
+    private void CopyLayers()
+    {
+        Clipboard = Style.Decorations.Select(layer => new DecorationLayer
+        {
+            Id = Guid.NewGuid(),
+            Type = layer.Type,
+            Enabled = layer.Enabled,
+            Layer = layer.Layer,
+            Position = layer.Position,
+            OffsetX = layer.OffsetX,
+            OffsetY = layer.OffsetY,
+            SizePreset = layer.SizePreset,
+            SizePx = layer.SizePx,
+            Color = layer.Color,
+            OpacityPct = layer.OpacityPct,
+            Label = layer.Label,
+            Animation = new DecorationAnimationSetting
+            {
+                Preset = layer.Animation.Preset,
+                DurationMs = layer.Animation.DurationMs,
+                DelayMs = layer.Animation.DelayMs,
+                Easing = layer.Animation.Easing,
+                Trigger = layer.Animation.Trigger,
+                Repeat = layer.Animation.Repeat
+            }
+        }).ToList();
+    }
+
+    private void PasteLayers()
+    {
+        if (Clipboard is null) return;
+        Style.Decorations = Clipboard.Select(layer => new DecorationLayer
+        {
+            Id = Guid.NewGuid(),
+            Type = layer.Type,
+            Enabled = layer.Enabled,
+            Layer = layer.Layer,
+            Position = layer.Position,
+            OffsetX = layer.OffsetX,
+            OffsetY = layer.OffsetY,
+            SizePreset = layer.SizePreset,
+            SizePx = layer.SizePx,
+            Color = layer.Color,
+            OpacityPct = layer.OpacityPct,
+            Label = layer.Label,
+            Animation = new DecorationAnimationSetting
+            {
+                Preset = layer.Animation.Preset,
+                DurationMs = layer.Animation.DurationMs,
+                DelayMs = layer.Animation.DelayMs,
+                Easing = layer.Animation.Easing,
+                Trigger = layer.Animation.Trigger,
+                Repeat = layer.Animation.Repeat
+            }
+        }).ToList();
+        _ = OnChanged.InvokeAsync();
+    }
+
+    private void ResetLayers()
+    {
+        Style.Decorations = new List<DecorationLayer>();
+        SelectedLayer = null;
+        _ = OnChanged.InvokeAsync();
+    }
+
+    private static string GetTypeLabel(string type) => type switch
+    {
+        "ribbon" => "リボン/帯",
+        "badge" => "バッジ",
+        "divider" => "区切り線",
+        "pattern" => "背景パターン",
+        "shape" => "図形",
+        _ => type
+    };
+
+    private static int ResolveOpacity(DecorationLayer layer) => Math.Clamp(layer.OpacityPct ?? 100, 0, 100);
+
+    private async Task OnColorChanged(ChangeEventArgs args)
+    {
+        if (SelectedLayer is null) return;
+        SelectedLayer.Color = args.Value?.ToString() ?? string.Empty;
+        await OnChanged.InvokeAsync();
+    }
+
+    private async Task OnColorTextChanged(ChangeEventArgs args)
+    {
+        if (SelectedLayer is null) return;
+        SelectedLayer.Color = args.Value?.ToString() ?? string.Empty;
+        await OnChanged.InvokeAsync();
+    }
+
+    private async Task OnOpacityChanged(ChangeEventArgs args)
+    {
+        if (SelectedLayer is null) return;
+        if (int.TryParse(args.Value?.ToString(), out var value))
+        {
+            SelectedLayer.OpacityPct = value;
+            await OnChanged.InvokeAsync();
+        }
+    }
+}

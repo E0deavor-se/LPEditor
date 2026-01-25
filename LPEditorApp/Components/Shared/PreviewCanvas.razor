@@ -1,0 +1,7 @@
+<iframe id="@FrameId" allow="geolocation" class="@CssClass" style="@Style"></iframe>
+
+@code {
+    [Parameter] public string FrameId { get; set; } = "previewFrame";
+    [Parameter] public string CssClass { get; set; } = string.Empty;
+    [Parameter] public string Style { get; set; } = string.Empty;
+}

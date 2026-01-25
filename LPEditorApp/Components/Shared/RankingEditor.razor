@@ -1,0 +1,773 @@
+@using LPEditorApp.Models
+@using System.Diagnostics
+
+<div class="ranking-editor">
+    <div class="ranking-block">
+        <div class="ranking-block__title">基本</div>
+        <div class="ranking-basic-stack">
+            <div class="field list-field">
+                <div class="list-row">
+                    <label>タイトル（固定）</label>
+                    <span class="badge fixed">固定</span>
+                </div>
+                <div class="list-row">
+                    <input class="text" placeholder="タイトル" value="@Ranking.TitleLines[0].Text" @oninput="e => UpdateTitleLine(0, e)" />
+                </div>
+                <div class="list-row">
+                    <div class="text-options">
+                        <InputSelect class="text-option-select" @bind-Value="TitleStyleFontFamily" @bind-Value:after="NotifyAfter">
+                            <option value="">フォント</option>
+                            @foreach (var font in FontFamilyOptions)
+                            {
+                                <option value="@font.Value">@font.Label</option>
+                            }
+                        </InputSelect>
+                        <InputSelect class="text-option-select" @bind-Value="TitleStyleFontSize" @bind-Value:after="NotifyAfter">
+                            <option value="">サイズ</option>
+                            @foreach (var size in FontSizeOptions)
+                            {
+                                <option value="@size">@($"{size}px")</option>
+                            }
+                        </InputSelect>
+                        <label class="check"><input type="checkbox" @bind="TitleStyleBold" @bind:after="NotifyAfter" /> 太字</label>
+                        <label class="check"><input type="checkbox" @bind="TitleStyleVisible" @bind:after="NotifyAfter" /> 表示</label>
+                        <input type="color" class="text-option-color" value="@GetColorValue(TitleStyleColor)" @onchange="e => UpdateTitleStyleColor(e)" />
+                        <InputSelect class="text-option-select" @bind-Value="TitleStyleAlign" @bind-Value:after="NotifyAfter">
+                            <option value="">中央</option>
+                            <option value="left">左</option>
+                            <option value="center">中央</option>
+                            <option value="right">右</option>
+                        </InputSelect>
+                    </div>
+                </div>
+            </div>
+            <div class="field list-field">
+                <div class="list-row">
+                    <label>サブタイトル（固定）</label>
+                    <span class="badge fixed">固定</span>
+                </div>
+                <div class="list-row">
+                    <input class="text" placeholder="サブタイトル" value="@Ranking.SubtitleLines[0].Text" @oninput="e => UpdateSubtitleLine(0, e)" />
+                </div>
+                <div class="list-row">
+                    <div class="text-options">
+                        <InputSelect class="text-option-select" @bind-Value="SubtitleStyleFontFamily" @bind-Value:after="NotifyAfter">
+                            <option value="">フォント</option>
+                            @foreach (var font in FontFamilyOptions)
+                            {
+                                <option value="@font.Value">@font.Label</option>
+                            }
+                        </InputSelect>
+                        <InputSelect class="text-option-select" @bind-Value="SubtitleStyleFontSize" @bind-Value:after="NotifyAfter">
+                            <option value="">サイズ</option>
+                            @foreach (var size in FontSizeOptions)
+                            {
+                                <option value="@size">@($"{size}px")</option>
+                            }
+                        </InputSelect>
+                        <label class="check"><input type="checkbox" @bind="SubtitleStyleBold" @bind:after="NotifyAfter" /> 太字</label>
+                        <label class="check"><input type="checkbox" @bind="SubtitleStyleVisible" @bind:after="NotifyAfter" /> 表示</label>
+                        <input type="color" class="text-option-color" value="@GetColorValue(SubtitleStyleColor)" @onchange="e => UpdateSubtitleStyleColor(e)" />
+                        <InputSelect class="text-option-select" @bind-Value="SubtitleStyleAlign" @bind-Value:after="NotifyAfter">
+                            <option value="">中央</option>
+                            <option value="left">左</option>
+                            <option value="center">中央</option>
+                            <option value="right">右</option>
+                        </InputSelect>
+                    </div>
+                </div>
+            </div>
+            <TextLinesEditor Title="追加テキスト（サブタイトル直下）"
+                             Items="Ranking.SubtitleUnderItems"
+                             AllowDelete="true"
+                             OnChanged="OnSubtitleUnderChanged"
+                             FontSizeOptions="FontSizeOptions"
+                             FontFamilyOptions="FontFamilyOptions"
+                             GetColorValue="GetColorValue" />
+            <TextLinesEditor Title="追加テキスト（表の下）"
+                             Items="Ranking.NotesItems"
+                             AllowDelete="true"
+                             OnChanged="OnNotesChanged"
+                             FontSizeOptions="FontSizeOptions"
+                             FontFamilyOptions="FontFamilyOptions"
+                             GetColorValue="GetColorValue" />
+        </div>
+    </div>
+
+    <div class="ranking-block">
+        <div class="ranking-block__title">見出し</div>
+        <div class="ranking-header-chips">
+            @for (var h = 0; h < _headerChips.Count; h++)
+            {
+                var headerIndex = h;
+                var chip = _headerChips[h];
+                <div class="chip-input" @key="chip.Id">
+                    <input class="chip-input__text" placeholder="見出し" value="@chip.Text" @oninput="e => UpdateHeaderText(headerIndex, e)" />
+                    <button type="button" class="chip-input__remove" @onclick="() => RemoveHeader(headerIndex)" disabled="@(Ranking.HeaderLabels.Count <= 2)">×</button>
+                </div>
+            }
+            <button type="button" class="chip-add" @onclick="AddHeader" disabled="@(Ranking.HeaderLabels.Count >= 3)">＋</button>
+        </div>
+    </div>
+
+    <div class="ranking-block">
+        <div class="ranking-block__title">行データ</div>
+        @{ var effectiveHeaderCount = Math.Min(3, Ranking.HeaderLabels.Count); }
+        <div class="ranking-row-list">
+            @for (var rowIndex = 0; rowIndex < Ranking.Rows.Count; rowIndex++)
+            {
+                var row = Ranking.Rows[rowIndex];
+                <div class="ranking-row-grid" @key="row">
+                    @if (effectiveHeaderCount >= 1)
+                    {
+                        <input class="text compact" placeholder="@GetHeaderLabel(0)" @bind-value="row.Rank" @bind-value:event="oninput" @bind-value:after="NotifyAfter" />
+                    }
+                    @if (effectiveHeaderCount >= 2)
+                    {
+                        <input class="text compact" placeholder="@GetHeaderLabel(1)" @bind-value="row.Amount" @bind-value:event="oninput" @bind-value:after="NotifyAfter" />
+                    }
+                    @if (effectiveHeaderCount >= 3)
+                    {
+                        <input class="text compact" placeholder="@GetHeaderLabel(2)" @bind-value="row.Items" @bind-value:event="oninput" @bind-value:after="NotifyAfter" />
+                    }
+                    <button type="button" class="btn small danger" @onclick="() => RemoveRowAt(rowIndex)">削除</button>
+                </div>
+            }
+            <button type="button" class="btn small" @onclick="AddRankingRow">行追加</button>
+        </div>
+    </div>
+
+    <details class="ranking-details">
+        <summary>詳細設定</summary>
+        <div class="ranking-details__body">
+            <details class="ranking-details-group" open>
+                <summary>表の見た目</summary>
+                <div class="compact-grid">
+                    <div class="compact-row">
+                        <span class="compact-label">表幅</span>
+                        <input type="range" min="60" max="100" step="1" @bind-value="Ranking.TableWidthPercent" @bind-value:event="oninput" @bind-value:after="NotifyAfter" />
+                        <span class="count">@(GetTableWidthPercent())%</span>
+                    </div>
+                    <div class="compact-row">
+                        <span class="compact-label">枠線</span>
+                        <InputSelect class="text-option-select" @bind-Value="Ranking.TableBorderWidth" @bind-Value:after="NotifyAfter">
+                            <option value="">標準</option>
+                            <option value="1">1px</option>
+                            <option value="2">2px</option>
+                            <option value="3">3px</option>
+                            <option value="4">4px</option>
+                        </InputSelect>
+                        <input type="color" @bind-value="Ranking.TableBorderColor" @bind-value:event="oninput" @bind-value:after="NotifyAfter" />
+                    </div>
+                    <div class="compact-row">
+                        <span class="compact-label">ストライプ</span>
+                        <input type="color" @bind-value="Ranking.TableStripeColor" @bind-value:event="oninput" @bind-value:after="NotifyAfter" />
+                    </div>
+                    <div class="compact-row">
+                        <span class="compact-label">王冠</span>
+                        <label class="check"><input type="checkbox" @bind="Ranking.ShowCrowns" @bind:after="NotifyAfter" /> 表示</label>
+                    </div>
+                </div>
+            </details>
+            <details class="ranking-details-group" open>
+                <summary>見出し</summary>
+                <div class="compact-grid">
+                    <div class="compact-row">
+                        <span class="compact-label">背景</span>
+                        <input type="color" @bind-value="Ranking.TableHeaderColor" @bind-value:event="oninput" @bind-value:after="NotifyAfter" />
+                    </div>
+                    <div class="compact-row">
+                        <span class="compact-label">文字</span>
+                        <input type="color" @bind-value="Ranking.TableHeaderTextColor" @bind-value:event="oninput" @bind-value:after="NotifyAfter" />
+                    </div>
+                </div>
+            </details>
+            <details class="ranking-details-group" open>
+                <summary>本文</summary>
+                <div class="compact-grid">
+                    <div class="compact-row">
+                        <span class="compact-label">文字色</span>
+                        <input type="color" @bind-value="Ranking.TableTextColor" @bind-value:event="oninput" @bind-value:after="NotifyAfter" />
+                    </div>
+                    <div class="compact-row">
+                        <span class="compact-label">太字</span>
+                        <label class="check"><input type="checkbox" @bind="Ranking.TableTextBold" @bind:after="NotifyAfter" /> 有効</label>
+                    </div>
+                </div>
+            </details>
+            <div class="field">
+                <label>左画像</label>
+                <div class="image-row">
+                    <input class="text" @bind-value="Ranking.ImageLeft" @bind-value:event="oninput" @bind-value:after="NotifyAfter" />
+                    <InputFile OnChange="OnImageLeftSelected" accept="image/*" />
+                </div>
+            </div>
+            <div class="field">
+                <label>右画像</label>
+                <div class="image-row">
+                    <input class="text" @bind-value="Ranking.ImageRight" @bind-value:event="oninput" @bind-value:after="NotifyAfter" />
+                    <InputFile OnChange="OnImageRightSelected" accept="image/*" />
+                </div>
+            </div>
+        </div>
+    </details>
+</div>
+
+@code {
+    [Parameter] public RankingSectionModel Ranking { get; set; } = new();
+    [Parameter] public int HeaderCount { get; set; }
+    [Parameter] public EventCallback OnAnyInputAfter { get; set; }
+    [Parameter] public EventCallback AddRankingHeader { get; set; }
+    [Parameter] public EventCallback AddRankingRow { get; set; }
+    [Parameter] public EventCallback<RankingRowModel> RemoveRankingRow { get; set; }
+    [Parameter] public EventCallback<InputFileChangeEventArgs> OnImageLeftSelected { get; set; }
+    [Parameter] public EventCallback<InputFileChangeEventArgs> OnImageRightSelected { get; set; }
+    [Parameter] public int[] FontSizeOptions { get; set; } = Array.Empty<int>();
+    [Parameter] public FontFamilyOption[] FontFamilyOptions { get; set; } = Array.Empty<FontFamilyOption>();
+    [Parameter] public Func<string?, string> GetColorValue { get; set; } = _ => "#d32f2f";
+
+
+    protected override void OnParametersSet()
+    {
+        if (!ReferenceEquals(_rankingRef, Ranking))
+        {
+            _rankingRef = Ranking;
+            _notesInitialized = false;
+            _subtitleUnderInitialized = false;
+        }
+        Ranking.FreeTexts ??= new List<StyledTextItem>();
+        Ranking.NotesItems ??= new List<StyledTextItem>();
+        Ranking.SubtitleUnderItems ??= new List<StyledTextItem>();
+        SyncNotesLists();
+        Ranking.HeaderLabels ??= new List<string>();
+        Ranking.TitleLines ??= new List<StyledTextItem>();
+        Ranking.SubtitleLines ??= new List<StyledTextItem>();
+        EnsureHeaderDefaults();
+        EnsureTitleSubtitleDefaults();
+        EnsureSingleLine(Ranking.TitleLines);
+        EnsureSingleLine(Ranking.SubtitleLines);
+        EnsureNotesDefaults();
+        EnsureSubtitleUnderDefaults();
+        EnsureStyledTextIds(Ranking.TitleLines);
+        EnsureStyledTextIds(Ranking.SubtitleLines);
+        EnsureStyledTextIds(Ranking.NotesItems);
+        EnsureStyledTextIds(Ranking.SubtitleUnderItems);
+        SyncHeaderChips();
+    }
+
+    private Task NotifyAfter()
+    {
+        return OnAnyInputAfter.InvokeAsync();
+    }
+
+    private void SyncNotesLists()
+    {
+        if (!_notesInitialized)
+        {
+            _notesCache = Ranking.NotesItems ?? new List<StyledTextItem>();
+            Ranking.NotesItems = _notesCache;
+            _notesInitialized = true;
+        }
+        else
+        {
+            Ranking.NotesItems = _notesCache;
+        }
+
+        if (!_subtitleUnderInitialized)
+        {
+            _subtitleUnderCache = Ranking.SubtitleUnderItems ?? new List<StyledTextItem>();
+            Ranking.SubtitleUnderItems = _subtitleUnderCache;
+            _subtitleUnderInitialized = true;
+        }
+        else
+        {
+            Ranking.SubtitleUnderItems = _subtitleUnderCache;
+        }
+    }
+
+    private async Task RemoveHeader(int index)
+    {
+        if (Ranking.HeaderLabels is null)
+        {
+            return;
+        }
+
+        if (Ranking.HeaderLabels.Count <= 2 || index < 0 || index >= Ranking.HeaderLabels.Count)
+        {
+            return;
+        }
+
+        Ranking.HeaderLabels.RemoveAt(index);
+        if (index < _headerChips.Count)
+        {
+            _headerChips.RemoveAt(index);
+        }
+        EnsureHeaderDefaults();
+        await NotifyAfter();
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task RemoveRowAt(int index)
+    {
+        if (index < 0 || index >= Ranking.Rows.Count)
+        {
+            return;
+        }
+
+        Ranking.Rows.RemoveAt(index);
+        await NotifyAfter();
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private void AddHeader()
+    {
+        EnsureHeaderDefaults();
+        if (Ranking.HeaderLabels.Count >= 3)
+        {
+            return;
+        }
+
+        Ranking.HeaderLabels.Add(string.Empty);
+        _headerChips.Add(new HeaderChip(string.Empty));
+        _ = NotifyAfter();
+    }
+
+    private void UpdateHeaderText(int index, ChangeEventArgs e)
+    {
+        if (index < 0 || index >= Ranking.HeaderLabels.Count)
+        {
+            return;
+        }
+
+        var value = e.Value?.ToString() ?? string.Empty;
+        Ranking.HeaderLabels[index] = value;
+        if (index < _headerChips.Count)
+        {
+            _headerChips[index].Text = value;
+        }
+        _ = NotifyAfter();
+    }
+
+    private void EnsureHeaderDefaults()
+    {
+        if (Ranking.HeaderLabels.Count >= 2)
+        {
+            return;
+        }
+
+        if (Ranking.HeaderLabels.Count == 0)
+        {
+            Ranking.HeaderLabels.Add("順位");
+            Ranking.HeaderLabels.Add("決済金額");
+            return;
+        }
+
+        Ranking.HeaderLabels.Add("決済金額");
+    }
+
+    private void SyncHeaderChips()
+    {
+        while (_headerChips.Count < Ranking.HeaderLabels.Count)
+        {
+            _headerChips.Add(new HeaderChip(string.Empty));
+        }
+
+        if (_headerChips.Count > Ranking.HeaderLabels.Count)
+        {
+            _headerChips.RemoveRange(Ranking.HeaderLabels.Count, _headerChips.Count - Ranking.HeaderLabels.Count);
+        }
+
+        for (var i = 0; i < Ranking.HeaderLabels.Count; i++)
+        {
+            _headerChips[i].Text = Ranking.HeaderLabels[i];
+        }
+    }
+
+    private void EnsureTitleSubtitleDefaults()
+    {
+        if (Ranking.TitleLines.Count == 0)
+        {
+            Ranking.TitleLines.Add(new StyledTextItem { Text = Ranking.Title ?? string.Empty, Bold = true, Align = "center" });
+        }
+
+        if (Ranking.SubtitleLines.Count == 0)
+        {
+            Ranking.SubtitleLines.Add(new StyledTextItem { Text = Ranking.Subtitle ?? string.Empty, Align = "center" });
+        }
+    }
+
+    private void EnsureSingleLine(List<StyledTextItem> lines)
+    {
+        if (lines.Count <= 1)
+        {
+            return;
+        }
+
+        lines.RemoveRange(1, lines.Count - 1);
+    }
+
+    private void EnsureNotesDefaults()
+    {
+        if (Ranking.NotesItems.Count == 0)
+        {
+            Ranking.NotesItems.Add(new StyledTextItem { Align = "center", Visible = true, Id = Guid.NewGuid() });
+        }
+    }
+
+    private void EnsureSubtitleUnderDefaults()
+    {
+        if (Ranking.SubtitleUnderItems.Count == 0)
+        {
+            Ranking.SubtitleUnderItems.Add(new StyledTextItem { Align = "center", Visible = true, Id = Guid.NewGuid() });
+        }
+    }
+
+    private int GetTableWidthPercent()
+    {
+        return Ranking.TableWidthPercent.GetValueOrDefault(86);
+    }
+
+    private string GetHeaderLabel(int index)
+    {
+        return index >= 0 && index < Ranking.HeaderLabels.Count
+            ? Ranking.HeaderLabels[index]
+            : string.Empty;
+    }
+
+    
+
+    private void AddTitleLine()
+    {
+        var style = GetLineStyle(Ranking.TitleLines);
+        Ranking.TitleLines.Add(CreateLineFromStyle(style));
+        _ = NotifyAfter();
+    }
+
+    private void AddSubtitleLine()
+    {
+        var style = GetLineStyle(Ranking.SubtitleLines);
+        Ranking.SubtitleLines.Add(CreateLineFromStyle(style));
+        _ = NotifyAfter();
+    }
+    private void UpdateTitleLine(int index, ChangeEventArgs e)
+    {
+        if (index < 0 || index >= Ranking.TitleLines.Count)
+        {
+            return;
+        }
+
+        Ranking.TitleLines[index].Text = e.Value?.ToString() ?? string.Empty;
+        _ = NotifyAfter();
+    }
+
+    private void RemoveTitleLineAt(int index)
+    {
+        if (Ranking.TitleLines.Count <= 1 || index < 0 || index >= Ranking.TitleLines.Count)
+        {
+            return;
+        }
+
+        Ranking.TitleLines.RemoveAt(index);
+        _ = NotifyAfter();
+    }
+
+    private void UpdateSubtitleLine(int index, ChangeEventArgs e)
+    {
+        if (index < 0 || index >= Ranking.SubtitleLines.Count)
+        {
+            return;
+        }
+
+        Ranking.SubtitleLines[index].Text = e.Value?.ToString() ?? string.Empty;
+        _ = NotifyAfter();
+    }
+
+    private void RemoveSubtitleLineAt(int index)
+    {
+        if (Ranking.SubtitleLines.Count <= 1 || index < 0 || index >= Ranking.SubtitleLines.Count)
+        {
+            return;
+        }
+
+        Ranking.SubtitleLines.RemoveAt(index);
+        _ = NotifyAfter();
+    }
+
+    private async Task OnNotesChanged()
+    {
+        LogNotes("[Editor]");
+        await NotifyAfter();
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task OnSubtitleUnderChanged()
+    {
+        Debug.WriteLine($"[Editor] SubtitleUnderItems={Ranking.SubtitleUnderItems?.Count} text={string.Join("|", (Ranking.SubtitleUnderItems ?? new List<StyledTextItem>()).Select(x => x.Text))}");
+        await NotifyAfter();
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private void LogNotes(string source)
+    {
+        Debug.WriteLine($"{source} NotesItems={Ranking.NotesItems?.Count} text={string.Join("|", (Ranking.NotesItems ?? new List<StyledTextItem>()).Select(x => x.Text))}");
+    }
+
+    private bool _notesInitialized;
+    private bool _subtitleUnderInitialized;
+    private List<StyledTextItem> _notesCache = new();
+    private List<StyledTextItem> _subtitleUnderCache = new();
+    private RankingSectionModel? _rankingRef;
+
+    private void EnsureStyledTextIds(List<StyledTextItem> items)
+    {
+        foreach (var item in items)
+        {
+            if (item.Id == Guid.Empty)
+            {
+                item.Id = Guid.NewGuid();
+            }
+        }
+    }
+
+    private IReadOnlyList<string> GetBlockLines(StyledTextItem item)
+    {
+        var text = item.Text ?? string.Empty;
+        var lines = text.Replace("\r\n", "\n", StringComparison.Ordinal)
+            .Split('\n')
+            .ToList();
+        if (lines.Count == 0)
+        {
+            lines.Add(string.Empty);
+        }
+
+        return lines;
+    }
+
+    private void UpdateBlockLine(StyledTextItem item, int index, ChangeEventArgs e)
+    {
+        var lines = GetBlockLines(item).ToList();
+        if (index < 0 || index >= lines.Count)
+        {
+            return;
+        }
+
+        lines[index] = e.Value?.ToString() ?? string.Empty;
+        item.Text = string.Join("\n", lines);
+        _ = NotifyAfter();
+    }
+
+    private void AddBlockLine(StyledTextItem item)
+    {
+        var lines = GetBlockLines(item).ToList();
+        lines.Add(string.Empty);
+        item.Text = string.Join("\n", lines);
+        _ = NotifyAfter();
+    }
+
+    private void RemoveBlockLine(StyledTextItem item, int index)
+    {
+        var lines = GetBlockLines(item).ToList();
+        if (lines.Count <= 1 || index < 0 || index >= lines.Count)
+        {
+            return;
+        }
+
+        lines.RemoveAt(index);
+        item.Text = string.Join("\n", lines);
+        _ = NotifyAfter();
+    }
+
+    private void UpdateBlockPosition(string position, int index, ChangeEventArgs e)
+    {
+        var next = e.Value?.ToString() ?? "top";
+        if (position == next)
+        {
+            return;
+        }
+
+        if (position == "top")
+        {
+            MoveBlockBetweenLists(Ranking.FreeTexts, Ranking.NotesItems, index);
+        }
+        else
+        {
+            MoveBlockBetweenLists(Ranking.NotesItems, Ranking.FreeTexts, index);
+        }
+    }
+
+    private void MoveBlockBetweenLists(List<StyledTextItem> source, List<StyledTextItem> target, int index)
+    {
+        if (index < 0 || index >= source.Count)
+        {
+            return;
+        }
+
+        var item = source[index];
+        source.RemoveAt(index);
+        target.Add(item);
+        _ = NotifyAfter();
+    }
+
+    private void MoveBlock(string position, int index, int direction)
+    {
+        var list = position == "top" ? Ranking.FreeTexts : Ranking.NotesItems;
+        var nextIndex = index + direction;
+        if (nextIndex < 0 || nextIndex >= list.Count)
+        {
+            return;
+        }
+
+        var item = list[index];
+        list.RemoveAt(index);
+        list.Insert(nextIndex, item);
+        _ = NotifyAfter();
+    }
+
+    private void RemoveBlock(string position, int index)
+    {
+        var list = position == "top" ? Ranking.FreeTexts : Ranking.NotesItems;
+        if (index < 0 || index >= list.Count)
+        {
+            return;
+        }
+
+        list.RemoveAt(index);
+        _ = NotifyAfter();
+    }
+
+    private TextLineStyle GetLineStyle(List<StyledTextItem> lines)
+    {
+        var item = lines.FirstOrDefault();
+        return new TextLineStyle
+        {
+            FontFamily = item?.FontFamily,
+            FontSize = item?.FontSize,
+            Bold = item?.Bold ?? false,
+            Visible = item?.Visible ?? true,
+            Color = item?.Color,
+            Align = string.IsNullOrWhiteSpace(item?.Align) ? "center" : item.Align
+        };
+    }
+
+    private StyledTextItem CreateLineFromStyle(TextLineStyle style)
+    {
+        return new StyledTextItem
+        {
+            FontFamily = style.FontFamily,
+            FontSize = style.FontSize,
+            Bold = style.Bold,
+            Visible = style.Visible,
+            Color = style.Color,
+            Align = style.Align
+        };
+    }
+
+    private void ApplyStyleToLines(List<StyledTextItem> lines, Action<StyledTextItem> apply)
+    {
+        foreach (var line in lines)
+        {
+            apply(line);
+        }
+        _ = NotifyAfter();
+    }
+
+    private string? TitleStyleFontFamily
+    {
+        get => GetLineStyle(Ranking.TitleLines).FontFamily;
+        set => ApplyStyleToLines(Ranking.TitleLines, line => line.FontFamily = value);
+    }
+
+    private int? TitleStyleFontSize
+    {
+        get => GetLineStyle(Ranking.TitleLines).FontSize;
+        set => ApplyStyleToLines(Ranking.TitleLines, line => line.FontSize = value);
+    }
+
+    private bool TitleStyleBold
+    {
+        get => GetLineStyle(Ranking.TitleLines).Bold;
+        set => ApplyStyleToLines(Ranking.TitleLines, line => line.Bold = value);
+    }
+
+    private bool TitleStyleVisible
+    {
+        get => GetLineStyle(Ranking.TitleLines).Visible;
+        set => ApplyStyleToLines(Ranking.TitleLines, line => line.Visible = value);
+    }
+
+    private string? TitleStyleAlign
+    {
+        get => GetLineStyle(Ranking.TitleLines).Align;
+        set => ApplyStyleToLines(Ranking.TitleLines, line => line.Align = value);
+    }
+
+    private string? TitleStyleColor => GetLineStyle(Ranking.TitleLines).Color;
+
+    private void UpdateTitleStyleColor(ChangeEventArgs e)
+    {
+        var value = e.Value?.ToString();
+        ApplyStyleToLines(Ranking.TitleLines, line => line.Color = value);
+    }
+
+    private string? SubtitleStyleFontFamily
+    {
+        get => GetLineStyle(Ranking.SubtitleLines).FontFamily;
+        set => ApplyStyleToLines(Ranking.SubtitleLines, line => line.FontFamily = value);
+    }
+
+    private int? SubtitleStyleFontSize
+    {
+        get => GetLineStyle(Ranking.SubtitleLines).FontSize;
+        set => ApplyStyleToLines(Ranking.SubtitleLines, line => line.FontSize = value);
+    }
+
+    private bool SubtitleStyleBold
+    {
+        get => GetLineStyle(Ranking.SubtitleLines).Bold;
+        set => ApplyStyleToLines(Ranking.SubtitleLines, line => line.Bold = value);
+    }
+
+    private bool SubtitleStyleVisible
+    {
+        get => GetLineStyle(Ranking.SubtitleLines).Visible;
+        set => ApplyStyleToLines(Ranking.SubtitleLines, line => line.Visible = value);
+    }
+
+    private string? SubtitleStyleAlign
+    {
+        get => GetLineStyle(Ranking.SubtitleLines).Align;
+        set => ApplyStyleToLines(Ranking.SubtitleLines, line => line.Align = value);
+    }
+
+    private string? SubtitleStyleColor => GetLineStyle(Ranking.SubtitleLines).Color;
+
+    private void UpdateSubtitleStyleColor(ChangeEventArgs e)
+    {
+        var value = e.Value?.ToString();
+        ApplyStyleToLines(Ranking.SubtitleLines, line => line.Color = value);
+    }
+
+    private sealed class TextLineStyle
+    {
+        public string? FontFamily { get; set; }
+        public int? FontSize { get; set; }
+        public bool Bold { get; set; }
+        public bool Visible { get; set; }
+        public string? Color { get; set; }
+        public string? Align { get; set; }
+    }
+
+    private sealed class HeaderChip
+    {
+        public HeaderChip(string text)
+        {
+            Id = Guid.NewGuid();
+            Text = text;
+        }
+
+        public Guid Id { get; }
+        public string Text { get; set; }
+    }
+
+    private readonly List<HeaderChip> _headerChips = new();
+}

@@ -1,0 +1,21 @@
+@using LPEditorApp.Services
+@using LPEditorApp.Models
+
+@if (Label is not null)
+{
+    <span class="preview-chip @SizeClass" style="@LabelStyleService.BuildInlineStyle(Label)">
+        @Label.Name
+    </span>
+}
+
+@code {
+    [Parameter] public StoreTargetLabelModel? Label { get; set; }
+    [Parameter] public string Size { get; set; } = "md";
+
+    private string SizeClass => Size switch
+    {
+        "sm" => "preview-chip-sm",
+        "lg" => "preview-chip-lg",
+        _ => "preview-chip-md"
+    };
+}

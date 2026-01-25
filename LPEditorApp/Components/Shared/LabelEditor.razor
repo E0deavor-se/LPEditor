@@ -1,0 +1,541 @@
+@using LPEditorApp.Models
+@using LPEditorApp.Services
+
+<div class="label-editor-panel">
+    @if (SelectedLabels.Count == 0)
+    {
+        <div class="label-editor-empty">
+            左の一覧からラベルを選択してください。
+        </div>
+    }
+    else if (SelectedLabels.Count == 1)
+    {
+        var label = SelectedLabels[0];
+        <div class="label-editor-header">
+            <div class="label-editor-preview">
+                <PreviewChip Label="label" Size="lg" />
+            </div>
+            <div class="label-editor-meta">
+                <div class="label-editor-title">@label.Name</div>
+                <div class="label-editor-key">キー: @label.Key</div>
+                <div class="label-editor-actions">
+                    <button type="button" class="btn small" @onclick="() => CopyStyle(label)">コピー</button>
+                    <button type="button" class="btn small" @onclick="PasteStyle" disabled="@(Clipboard is null)">ペースト</button>
+                    <button type="button" class="btn small" @onclick="() => ResetStyle(label)">リセット</button>
+                    <button type="button" class="btn small" @onclick="Undo" disabled="@(!CanUndo)">元に戻す</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="label-editor-body">
+            <div class="label-editor-field">
+                <label>表示名</label>
+                <input class="text" @bind-value="label.Name" @bind-value:event="oninput" @bind-value:after="() => UpdateLabel(label)" />
+            </div>
+
+            <LabelPresetPicker Presets="Presets" OnPresetSelected="preset => ApplyPresetToSelection(preset, LabelApplyTarget.All)" />
+
+            <div class="label-style-tabs">
+                <button type="button" class="tab-btn @(ActiveTab == "background" ? "active" : "")" @onclick="@(() => SetActiveTab("background"))">背景</button>
+                <button type="button" class="tab-btn @(ActiveTab == "border" ? "active" : "")" @onclick="@(() => SetActiveTab("border"))">枠線</button>
+                <button type="button" class="tab-btn @(ActiveTab == "text" ? "active" : "")" @onclick="@(() => SetActiveTab("text"))">文字</button>
+            </div>
+
+            @if (ActiveTab == "background")
+            {
+                @RenderColorSection(label, "背景色", label.BackgroundColor, label.BackgroundOpacity,
+                    color => SetColor(label, "background", color),
+                    opacity => SetOpacity(label, "background", opacity))
+            }
+            else if (ActiveTab == "border")
+            {
+                @RenderColorSection(label, "枠線色", label.BorderColor, label.BorderOpacity,
+                    color => SetColor(label, "border", color),
+                    opacity => SetOpacity(label, "border", opacity))
+
+                <div class="label-editor-field inline">
+                    <label>枠線太さ</label>
+                    <input type="number" min="0" max="8" step="1" class="text" value="@(label.BorderWidth ?? 1)" @oninput="e => SetBorderWidth(label, e.Value?.ToString())" />
+                    <span class="unit">px</span>
+                </div>
+            }
+            else if (ActiveTab == "text")
+            {
+                @RenderColorSection(label, "文字色", label.TextColor, label.TextOpacity,
+                    color => SetColor(label, "text", color),
+                    opacity => SetOpacity(label, "text", opacity))
+
+                <div class="label-editor-grid">
+                    <div class="label-editor-field inline">
+                        <label>文字サイズ</label>
+                        <input type="number" min="10" max="20" step="1" class="text" value="@(label.FontSize ?? 12)" @oninput="e => SetFontSize(label, e.Value?.ToString())" />
+                        <span class="unit">px</span>
+                    </div>
+                    <div class="label-editor-field inline">
+                        <label>太字</label>
+                        <label class="check"><input type="checkbox" checked="@(label.FontBold != false)" @onchange="e => SetFontBold(label, e)" /> 強調</label>
+                    </div>
+                </div>
+            }
+
+            @RenderWarnings(label)
+        </div>
+    }
+    else
+    {
+        <div class="label-editor-header">
+            <div class="label-editor-preview">
+                <div class="preview-chip-group">
+                    @foreach (var label in SelectedLabels)
+                    {
+                        <PreviewChip Label="label" Size="sm" />
+                    }
+                </div>
+            </div>
+            <div class="label-editor-meta">
+                <div class="label-editor-title">複数選択 (@SelectedLabels.Count 件)</div>
+                <div class="label-editor-actions">
+                    <button type="button" class="btn small" @onclick="() => ApplyPresetToSelection(SelectedPreset, LabelApplyTarget.All)" disabled="@(SelectedPreset is null)">プリセット適用</button>
+                    <button type="button" class="btn small" @onclick="ApplyBulk" disabled="!CanApplyBulk">一括適用</button>
+                    <button type="button" class="btn small" @onclick="Undo" disabled="@(!CanUndo)">元に戻す</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="label-editor-body">
+            <LabelPresetPicker Presets="Presets" OnPresetSelected="preset => SelectedPreset = preset" />
+
+            <div class="bulk-apply-panel">
+                <div class="bulk-apply-header">
+                    <span>適用対象</span>
+                    <div class="bulk-apply-toggle">
+                        <label class="check"><input type="checkbox" @bind="ApplyBackground" /> 背景</label>
+                        <label class="check"><input type="checkbox" @bind="ApplyBorder" /> 枠線</label>
+                        <label class="check"><input type="checkbox" @bind="ApplyText" /> 文字</label>
+                    </div>
+                </div>
+
+                <div class="label-style-tabs">
+                    <button type="button" class="tab-btn @(ActiveTab == "background" ? "active" : "")" @onclick="@(() => SetActiveTab("background"))">背景</button>
+                    <button type="button" class="tab-btn @(ActiveTab == "border" ? "active" : "")" @onclick="@(() => SetActiveTab("border"))">枠線</button>
+                    <button type="button" class="tab-btn @(ActiveTab == "text" ? "active" : "")" @onclick="@(() => SetActiveTab("text"))">文字</button>
+                </div>
+
+                @if (ActiveTab == "background")
+                {
+                    @RenderBulkColorSection("背景色", BulkStyle.BackgroundColor, BulkStyle.BackgroundOpacity,
+                        color => BulkStyle.BackgroundColor = color,
+                        opacity => BulkStyle.BackgroundOpacity = opacity)
+                }
+                else if (ActiveTab == "border")
+                {
+                    @RenderBulkColorSection("枠線色", BulkStyle.BorderColor, BulkStyle.BorderOpacity,
+                        color => BulkStyle.BorderColor = color,
+                        opacity => BulkStyle.BorderOpacity = opacity)
+
+                    <div class="label-editor-field inline">
+                        <label>枠線太さ</label>
+                        <input type="number" min="0" max="8" step="1" class="text" value="@BulkBorderWidth" @oninput="e => BulkBorderWidth = e.Value?.ToString()" placeholder="—" />
+                        <span class="unit">px</span>
+                    </div>
+                }
+                else if (ActiveTab == "text")
+                {
+                    @RenderBulkColorSection("文字色", BulkStyle.TextColor, BulkStyle.TextOpacity,
+                        color => BulkStyle.TextColor = color,
+                        opacity => BulkStyle.TextOpacity = opacity)
+
+                    <div class="label-editor-grid">
+                        <div class="label-editor-field inline">
+                            <label>文字サイズ</label>
+                            <input type="number" min="10" max="20" step="1" class="text" value="@BulkFontSize" @oninput="e => BulkFontSize = e.Value?.ToString()" placeholder="—" />
+                            <span class="unit">px</span>
+                        </div>
+                        <div class="label-editor-field inline">
+                            <label>太字</label>
+                            <InputSelect class="text-option-select" @bind-Value="BulkFontBold">
+                                <option value="mixed">混在</option>
+                                <option value="true">太字</option>
+                                <option value="false">標準</option>
+                            </InputSelect>
+                        </div>
+                    </div>
+                }
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public IReadOnlyList<StoreTargetLabelModel> SelectedLabels { get; set; } = Array.Empty<StoreTargetLabelModel>();
+    [Parameter] public IReadOnlyList<LabelStylePreset> Presets { get; set; } = Array.Empty<LabelStylePreset>();
+    [Parameter] public IReadOnlyList<string> RecentColors { get; set; } = Array.Empty<string>();
+    [Parameter] public EventCallback<string> OnColorUsed { get; set; }
+    [Parameter] public EventCallback OnChanged { get; set; }
+    [Parameter] public LabelStyleSnapshot? Clipboard { get; set; }
+    [Parameter] public EventCallback<LabelStyleSnapshot?> ClipboardChanged { get; set; }
+
+    private string ActiveTab = "background";
+    private bool ApplyBackground = true;
+    private bool ApplyBorder = true;
+    private bool ApplyText = true;
+    private LabelStyleSnapshot BulkStyle = new();
+    private string? BulkBorderWidth;
+    private string? BulkFontSize;
+    private string BulkFontBold = "mixed";
+    private LabelStylePreset? SelectedPreset;
+
+    private readonly Stack<Dictionary<string, LabelStyleSnapshot>> _undoStack = new();
+
+    private void SetActiveTab(string tab)
+    {
+        ActiveTab = tab;
+    }
+
+    protected override void OnParametersSet()
+    {
+        if (SelectedLabels.Count > 1)
+        {
+            BulkStyle = BuildBulkSnapshot();
+            BulkBorderWidth = BulkStyle.BorderWidth?.ToString();
+            BulkFontSize = BulkStyle.FontSize?.ToString();
+            BulkFontBold = BulkStyle.FontBold is null ? "mixed" : BulkStyle.FontBold.Value.ToString().ToLowerInvariant();
+        }
+    }
+
+    private LabelStyleSnapshot BuildBulkSnapshot()
+    {
+        return new LabelStyleSnapshot
+        {
+            BackgroundColor = GetCommonValue(label => label.BackgroundColor) ?? string.Empty,
+            BackgroundOpacity = GetCommonValue(label => label.BackgroundOpacity),
+            BorderColor = GetCommonValue(label => label.BorderColor) ?? string.Empty,
+            BorderOpacity = GetCommonValue(label => label.BorderOpacity),
+            BorderWidth = GetCommonValue(label => label.BorderWidth),
+            TextColor = GetCommonValue(label => label.TextColor) ?? string.Empty,
+            TextOpacity = GetCommonValue(label => label.TextOpacity),
+            FontSize = GetCommonValue(label => label.FontSize),
+            FontBold = GetCommonValue(label => label.FontBold)
+        };
+    }
+
+    private T? GetCommonValue<T>(Func<StoreTargetLabelModel, T?> selector)
+    {
+        var first = selector(SelectedLabels[0]);
+        foreach (var label in SelectedLabels.Skip(1))
+        {
+            if (!EqualityComparer<T?>.Default.Equals(first, selector(label)))
+            {
+                return default;
+            }
+        }
+        return first;
+    }
+
+    private bool CanUndo => _undoStack.Count > 0;
+
+    private async Task UpdateLabel(StoreTargetLabelModel label)
+    {
+        label.UpdatedAt = DateTime.UtcNow;
+        await OnChanged.InvokeAsync();
+    }
+
+    private RenderFragment RenderColorSection(StoreTargetLabelModel label, string title, string color, double? opacity, Func<string, Task> onColor, Func<double?, Task> onOpacity) =>
+        @<div class="label-style-section">
+            <div class="label-editor-field">
+                <label>@title</label>
+                <div class="color-row">
+                    <input type="color" value="@GetColorValue(color)" @onchange="async e => await onColor(e.Value?.ToString() ?? string.Empty)" />
+                    <input class="text" value="@color" @oninput="async e => await onColor(e.Value?.ToString() ?? string.Empty)" placeholder="#RRGGBB" />
+                </div>
+            </div>
+            <div class="label-editor-field">
+                <label>透明度</label>
+                <div class="opacity-row">
+                    <input type="range" min="0" max="100" step="1" value="@ToPercent(opacity)" @oninput="async e => await onOpacity(FromPercent(e.Value?.ToString()))" />
+                    <input type="number" min="0" max="100" step="1" class="text" value="@ToPercent(opacity)" @oninput="async e => await onOpacity(FromPercent(e.Value?.ToString()))" />
+                    <span class="unit">%</span>
+                </div>
+            </div>
+            @RenderColorSwatches(async color => await onColor(color))
+        </div>;
+
+    private RenderFragment RenderBulkColorSection(string title, string color, double? opacity, Action<string> onColor, Action<double?> onOpacity) =>
+        @<div class="label-style-section">
+            <div class="label-editor-field">
+                <label>@title</label>
+                <div class="color-row">
+                    <input type="color" value="@GetColorValue(color)" @onchange="e => onColor(e.Value?.ToString() ?? string.Empty)" />
+                    <input class="text" value="@color" @oninput="e => onColor(e.Value?.ToString() ?? string.Empty)" placeholder="—" />
+                </div>
+            </div>
+            <div class="label-editor-field">
+                <label>透明度</label>
+                <div class="opacity-row">
+                    <input type="range" min="0" max="100" step="1" value="@ToPercent(opacity)" @oninput="e => onOpacity(FromPercent(e.Value?.ToString()))" />
+                    <input type="number" min="0" max="100" step="1" class="text" value="@ToPercent(opacity)" @oninput="e => onOpacity(FromPercent(e.Value?.ToString()))" placeholder="—" />
+                    <span class="unit">%</span>
+                </div>
+            </div>
+            @RenderColorSwatches(async color =>
+            {
+                onColor(color);
+                await OnColorUsed.InvokeAsync(color);
+            })
+        </div>;
+
+    private RenderFragment RenderColorSwatches(Func<string, Task> onSelect) =>
+        @<div class="color-swatch-row">
+            <div class="color-swatch-group">
+                <span class="color-swatch-label">最近</span>
+                <div class="color-swatch-list">
+                    @foreach (var swatch in RecentColors)
+                    {
+                        <button type="button" class="color-swatch" style="background:@swatch" @onclick="async () => await onSelect(swatch)" title="@swatch"></button>
+                    }
+                </div>
+            </div>
+            <div class="color-swatch-group">
+                <span class="color-swatch-label">パレット</span>
+                <div class="color-swatch-list">
+                    @foreach (var swatch in PaletteColors)
+                    {
+                        <button type="button" class="color-swatch" style="background:@swatch" @onclick="async () => await onSelect(swatch)" title="@swatch"></button>
+                    }
+                </div>
+            </div>
+        </div>;
+
+    private RenderFragment RenderWarnings(StoreTargetLabelModel label) =>
+        @<div class="label-warnings">
+            @if (GetContrastWarning(label) is string contrastWarning)
+            {
+                <div class="warning-chip">@contrastWarning</div>
+            }
+            @if (GetOpacityWarning(label) is string opacityWarning)
+            {
+                <div class="warning-chip">@opacityWarning</div>
+            }
+        </div>;
+
+    private string? GetContrastWarning(StoreTargetLabelModel label)
+    {
+        var ratio = LabelStyleService.GetContrastRatio(label.TextColor, label.TextOpacity, label.BackgroundColor, label.BackgroundOpacity);
+        if (ratio > 0 && ratio < 4.5)
+        {
+            return $"コントラストが低めです (比率 {ratio:F1})";
+        }
+
+        return null;
+    }
+
+    private string? GetOpacityWarning(StoreTargetLabelModel label)
+    {
+        if ((label.BackgroundOpacity ?? 1) < 0.3)
+        {
+            return "背景がかなり透明です";
+        }
+        if ((label.TextOpacity ?? 1) < 0.6)
+        {
+            return "文字が薄く見える可能性があります";
+        }
+
+        return null;
+    }
+
+    private async Task SetColor(StoreTargetLabelModel label, string target, string value)
+    {
+        PushUndo();
+        switch (target)
+        {
+            case "background":
+                label.BackgroundColor = value;
+                break;
+            case "border":
+                label.BorderColor = value;
+                break;
+            case "text":
+                label.TextColor = value;
+                break;
+        }
+
+        label.UpdatedAt = DateTime.UtcNow;
+        await OnColorUsed.InvokeAsync(value);
+        await OnChanged.InvokeAsync();
+    }
+
+    private async Task SetOpacity(StoreTargetLabelModel label, string target, double? percent)
+    {
+        PushUndo();
+        var value = Math.Clamp(percent ?? 100, 0, 100) / 100d;
+        switch (target)
+        {
+            case "background":
+                label.BackgroundOpacity = value;
+                break;
+            case "border":
+                label.BorderOpacity = value;
+                break;
+            case "text":
+                label.TextOpacity = value;
+                break;
+        }
+
+        label.UpdatedAt = DateTime.UtcNow;
+        await OnChanged.InvokeAsync();
+    }
+
+    private async Task SetBorderWidth(StoreTargetLabelModel label, string? value)
+    {
+        PushUndo();
+        label.BorderWidth = int.TryParse(value, out var result) ? result : label.BorderWidth;
+        label.UpdatedAt = DateTime.UtcNow;
+        await OnChanged.InvokeAsync();
+    }
+
+    private async Task SetFontSize(StoreTargetLabelModel label, string? value)
+    {
+        PushUndo();
+        label.FontSize = int.TryParse(value, out var result) ? result : label.FontSize;
+        label.UpdatedAt = DateTime.UtcNow;
+        await OnChanged.InvokeAsync();
+    }
+
+    private async Task SetFontBold(StoreTargetLabelModel label, ChangeEventArgs e)
+    {
+        PushUndo();
+        label.FontBold = e?.Value is bool b ? b : label.FontBold;
+        label.UpdatedAt = DateTime.UtcNow;
+        await OnChanged.InvokeAsync();
+    }
+
+    private async Task ApplyPresetToSelection(LabelStylePreset? preset, LabelApplyTarget target)
+    {
+        if (preset is null)
+        {
+            return;
+        }
+
+        PushUndo();
+        foreach (var label in SelectedLabels)
+        {
+            LabelStyleService.ApplySnapshot(label, preset.Style, target);
+        }
+        await OnChanged.InvokeAsync();
+    }
+
+    private void PushUndo()
+    {
+        var snapshot = SelectedLabels.ToDictionary(label => label.Key, LabelStyleService.ToSnapshot, StringComparer.OrdinalIgnoreCase);
+        _undoStack.Push(snapshot);
+        if (_undoStack.Count > 20)
+        {
+            _undoStack.TrimExcess();
+        }
+    }
+
+    private async Task Undo()
+    {
+        if (!CanUndo)
+        {
+            return;
+        }
+
+        var previous = _undoStack.Pop();
+        foreach (var label in SelectedLabels)
+        {
+            if (previous.TryGetValue(label.Key, out var snapshot))
+            {
+                LabelStyleService.ApplySnapshot(label, snapshot, LabelApplyTarget.All);
+            }
+        }
+
+        await OnChanged.InvokeAsync();
+    }
+
+    private async Task ResetStyle(StoreTargetLabelModel label)
+    {
+        PushUndo();
+        LabelStyleService.ApplySnapshot(label, new LabelStyleSnapshot(), LabelApplyTarget.All);
+        await OnChanged.InvokeAsync();
+    }
+
+    private async Task CopyStyle(StoreTargetLabelModel label)
+    {
+        Clipboard = LabelStyleService.ToSnapshot(label);
+        await ClipboardChanged.InvokeAsync(Clipboard);
+    }
+
+    private async Task PasteStyle()
+    {
+        if (Clipboard is null)
+        {
+            return;
+        }
+
+        PushUndo();
+        foreach (var label in SelectedLabels)
+        {
+            LabelStyleService.ApplySnapshot(label, Clipboard, LabelApplyTarget.All);
+        }
+        await OnChanged.InvokeAsync();
+    }
+
+    private async Task ApplyBulk()
+    {
+        PushUndo();
+        var snapshot = new LabelStyleSnapshot
+        {
+            BackgroundColor = BulkStyle.BackgroundColor,
+            BackgroundOpacity = BulkStyle.BackgroundOpacity,
+            BorderColor = BulkStyle.BorderColor,
+            BorderOpacity = BulkStyle.BorderOpacity,
+            BorderWidth = int.TryParse(BulkBorderWidth, out var bw) ? bw : BulkStyle.BorderWidth,
+            TextColor = BulkStyle.TextColor,
+            TextOpacity = BulkStyle.TextOpacity,
+            FontSize = int.TryParse(BulkFontSize, out var fs) ? fs : BulkStyle.FontSize,
+            FontBold = BulkFontBold == "mixed" ? BulkStyle.FontBold : bool.Parse(BulkFontBold)
+        };
+
+        foreach (var label in SelectedLabels)
+        {
+            if (ApplyBackground)
+            {
+                LabelStyleService.ApplySnapshot(label, snapshot, LabelApplyTarget.Background);
+            }
+            if (ApplyBorder)
+            {
+                LabelStyleService.ApplySnapshot(label, snapshot, LabelApplyTarget.Border);
+            }
+            if (ApplyText)
+            {
+                LabelStyleService.ApplySnapshot(label, snapshot, LabelApplyTarget.Text);
+            }
+        }
+
+        await OnChanged.InvokeAsync();
+    }
+
+    private bool CanApplyBulk => ApplyBackground || ApplyBorder || ApplyText;
+
+    private static int ToPercent(double? opacity) => (int)Math.Round((opacity ?? 1) * 100);
+
+    private static double FromPercent(string? value)
+    {
+        if (!double.TryParse(value, out var parsed))
+        {
+            return 100;
+        }
+        return Math.Clamp(parsed, 0, 100);
+    }
+
+    private static string GetColorValue(string? color)
+    {
+        return string.IsNullOrWhiteSpace(color) ? "#d32f2f" : color;
+    }
+
+    private static readonly string[] PaletteColors =
+    {
+        "#0ea5e9", "#6366f1", "#f97316", "#f43f5e", "#22c55e", "#facc15", "#0f172a", "#64748b"
+    };
+}

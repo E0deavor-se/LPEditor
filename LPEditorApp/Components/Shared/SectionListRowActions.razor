@@ -1,0 +1,12 @@
+@using LPEditorApp.Models
+
+<div class="section-actions">
+    <button type="button" class="icon-btn" title="テキスト" @onclick='() => OnAction.InvokeAsync("text")'>📝</button>
+    <button type="button" class="icon-btn" title="装飾" @onclick='() => OnAction.InvokeAsync("decor")'>🎨</button>
+    <button type="button" class="icon-btn" title="背景" @onclick='() => OnAction.InvokeAsync("background")'>🖼</button>
+    <button type="button" class="icon-btn" title="表示切替" @onclick='() => OnAction.InvokeAsync("toggle")'>👁</button>
+</div>
+
+@code {
+    [Parameter] public EventCallback<string> OnAction { get; set; }
+}

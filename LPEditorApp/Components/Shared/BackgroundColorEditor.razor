@@ -1,0 +1,111 @@
+@using LPEditorApp.Models
+
+<div class="bg-color-editor">
+    <div class="bg-color-row">
+        <div class="bg-color-input">
+            <label>背景色</label>
+            <div class="bg-color-picker">
+                <input type="color" value="@ResolveColor()" @oninput="OnColorChanged" />
+                <input class="text" value="@ResolveColor()" @oninput="OnColorTextChanged" placeholder="#RRGGBB" />
+            </div>
+        </div>
+        <div class="bg-opacity-input">
+            <label>透明度</label>
+            <div class="bg-opacity-row">
+                <input type="range" min="0" max="100" step="1" value="@ResolveOpacity()" @oninput="OnOpacityChanged" />
+                <span class="bg-opacity-value">@ResolveOpacity()%</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="bg-color-swatches">
+        <div class="bg-color-swatch-title">最近使った色</div>
+        <div class="bg-color-swatch-row">
+            @if (_recentColors.Count == 0)
+            {
+                <span class="bg-color-empty">まだありません</span>
+            }
+            else
+            {
+                @foreach (var color in _recentColors)
+                {
+                    <button type="button" class="bg-swatch" style="background:@color" title="@color" @onclick="() => ApplySwatch(color)"></button>
+                }
+            }
+        </div>
+    </div>
+
+    <div class="bg-color-swatches">
+        <div class="bg-color-swatch-title">おすすめ</div>
+        <div class="bg-color-swatch-row">
+            @foreach (var color in RecommendedColors)
+            {
+                <button type="button" class="bg-swatch" style="background:@color" title="@color" @onclick="() => ApplySwatch(color)"></button>
+            }
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter] public BackgroundSetting Setting { get; set; } = new();
+    [Parameter] public EventCallback OnChanged { get; set; }
+
+    private readonly List<string> _recentColors = new();
+
+    private static readonly string[] RecommendedColors =
+    {
+        "#f8fafc", "#f1f5f9", "#e2e8f0", "#dbeafe",
+        "#fee2e2", "#fef3c7", "#dcfce7", "#ede9fe"
+    };
+
+    private string ResolveColor() => string.IsNullOrWhiteSpace(Setting.Color) ? "#ffffff" : Setting.Color;
+
+    private int ResolveOpacity() => (int)Math.Round(Math.Clamp(Setting.ColorOpacity ?? 1, 0, 1) * 100);
+
+    private async Task OnColorChanged(ChangeEventArgs args)
+    {
+        var value = args.Value?.ToString() ?? string.Empty;
+        Setting.Color = value;
+        AddRecentColor(value);
+        await OnChanged.InvokeAsync();
+    }
+
+    private async Task OnColorTextChanged(ChangeEventArgs args)
+    {
+        var value = args.Value?.ToString() ?? string.Empty;
+        Setting.Color = value;
+        AddRecentColor(value);
+        await OnChanged.InvokeAsync();
+    }
+
+    private async Task OnOpacityChanged(ChangeEventArgs args)
+    {
+        if (int.TryParse(args.Value?.ToString(), out var percent))
+        {
+            Setting.ColorOpacity = Math.Clamp(percent / 100d, 0, 1);
+            await OnChanged.InvokeAsync();
+        }
+    }
+
+    private async Task ApplySwatch(string color)
+    {
+        Setting.Color = color;
+        AddRecentColor(color);
+        await OnChanged.InvokeAsync();
+    }
+
+    private void AddRecentColor(string color)
+    {
+        if (string.IsNullOrWhiteSpace(color))
+        {
+            return;
+        }
+
+        _recentColors.RemoveAll(c => string.Equals(c, color, StringComparison.OrdinalIgnoreCase));
+        _recentColors.Insert(0, color);
+        if (_recentColors.Count > 8)
+        {
+            _recentColors.RemoveRange(8, _recentColors.Count - 8);
+        }
+    }
+}

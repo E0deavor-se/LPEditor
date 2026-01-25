@@ -1,0 +1,158 @@
+@using LPEditorApp.Models
+@using LPEditorApp.Services
+
+<div class="label-list-panel">
+    <div class="label-list-toolbar">
+        <input class="text label-search" placeholder="検索 (表示名 / キー)" @bind-value="SearchTerm" @bind-value:event="oninput" />
+        <div class="label-list-filters">
+            <InputSelect class="text-option-select" @bind-Value="StatusFilter">
+                <option value="all">すべて</option>
+                <option value="enabled">有効のみ</option>
+                <option value="disabled">無効のみ</option>
+            </InputSelect>
+            <InputSelect class="text-option-select" @bind-Value="ColorFilter">
+                <option value="all">色系統</option>
+                <option value="warm">暖色</option>
+                <option value="cool">寒色</option>
+                <option value="green">グリーン</option>
+                <option value="purple">パープル</option>
+                <option value="mono">モノクロ</option>
+                <option value="other">その他</option>
+            </InputSelect>
+            <InputSelect class="text-option-select" @bind-Value="SortMode">
+                <option value="name-asc">名前順</option>
+                <option value="name-desc">名前逆順</option>
+                <option value="updated-desc">更新順</option>
+                <option value="key-asc">キー順</option>
+            </InputSelect>
+        </div>
+    </div>
+
+    <div class="label-list">
+        @if (VisibleLabels.Count == 0)
+        {
+            <div class="text text-readonly">該当するラベルがありません</div>
+        }
+        else
+        {
+            @for (var i = 0; i < VisibleLabels.Count; i++)
+            {
+                var label = VisibleLabels[i];
+                var isSelected = SelectedKeys.Contains(label.Key);
+                <div class="label-list-card @(isSelected ? "is-selected" : "")" style="@BuildCardStyle(label)" @onclick="(e) => OnRowClicked(label, e, i)" tabindex="0">
+                    <div class="label-list-text">
+                        <div class="label-list-name">@label.Name</div>
+                        <div class="label-list-key">@label.Key</div>
+                    </div>
+                    <button type="button" class="label-status-pill @(label.IsEnabled ? "on" : "off")" @onclick:stopPropagation="true" @onclick="() => ToggleEnabled(label)">
+                        @(label.IsEnabled ? "有効" : "無効")
+                    </button>
+                </div>
+            }
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter] public List<StoreTargetLabelModel> Labels { get; set; } = new();
+    [Parameter] public HashSet<string> SelectedKeys { get; set; } = new(StringComparer.OrdinalIgnoreCase);
+    [Parameter] public EventCallback<HashSet<string>> SelectedKeysChanged { get; set; }
+    [Parameter] public EventCallback OnChanged { get; set; }
+
+    private string SearchTerm = string.Empty;
+    private string StatusFilter = "all";
+    private string ColorFilter = "all";
+    private string SortMode = "name-asc";
+    private int? _lastIndex;
+
+    private List<StoreTargetLabelModel> VisibleLabels => ApplyFilters().ToList();
+
+    private IEnumerable<StoreTargetLabelModel> ApplyFilters()
+    {
+        var query = Labels.AsEnumerable();
+
+        if (!string.IsNullOrWhiteSpace(SearchTerm))
+        {
+            var term = SearchTerm.Trim();
+            query = query.Where(label =>
+                label.Name.Contains(term, StringComparison.OrdinalIgnoreCase)
+                || label.Key.Contains(term, StringComparison.OrdinalIgnoreCase));
+        }
+
+        query = StatusFilter switch
+        {
+            "enabled" => query.Where(label => label.IsEnabled),
+            "disabled" => query.Where(label => !label.IsEnabled),
+            _ => query
+        };
+
+        if (ColorFilter != "all")
+        {
+            query = query.Where(label => LabelStyleService.GetColorFamily(label) == ColorFilter);
+        }
+
+        query = SortMode switch
+        {
+            "name-desc" => query.OrderByDescending(label => label.Name),
+            "updated-desc" => query.OrderByDescending(label => label.UpdatedAt ?? DateTime.MinValue),
+            "key-asc" => query.OrderBy(label => label.Key),
+            _ => query.OrderBy(label => label.Name)
+        };
+
+        return query;
+    }
+
+    private static string BuildCardStyle(StoreTargetLabelModel label)
+    {
+        var fallback = BuildFallbackColors(label.Key);
+        var bg = LabelStyleService.BuildColorWithOpacity(label.BackgroundColor, label.BackgroundOpacity, fallback.Background);
+        var border = LabelStyleService.BuildColorWithOpacity(label.BorderColor, label.BorderOpacity, fallback.Border);
+        return $"--label-card-bg:{bg};--label-card-border:{border};";
+    }
+
+    private static (string Background, string Border) BuildFallbackColors(string? key)
+    {
+        var hash = Math.Abs((key ?? string.Empty).GetHashCode());
+        var hue = hash % 360;
+        return ($"hsl({hue}, 90%, 92%)", $"hsl({hue}, 80%, 75%)");
+    }
+
+    private async Task OnRowClicked(StoreTargetLabelModel label, MouseEventArgs e, int index)
+    {
+        var next = new HashSet<string>(SelectedKeys, StringComparer.OrdinalIgnoreCase);
+
+        if (e.ShiftKey && _lastIndex.HasValue)
+        {
+            next.Clear();
+            var start = Math.Min(_lastIndex.Value, index);
+            var end = Math.Max(_lastIndex.Value, index);
+            for (var i = start; i <= end; i++)
+            {
+                next.Add(VisibleLabels[i].Key);
+            }
+        }
+        else if (e.CtrlKey)
+        {
+            if (!next.Add(label.Key))
+            {
+                next.Remove(label.Key);
+            }
+        }
+        else
+        {
+            next.Clear();
+            next.Add(label.Key);
+        }
+
+        _lastIndex = index;
+        SelectedKeys = next;
+        await SelectedKeysChanged.InvokeAsync(next);
+    }
+
+    private async Task ToggleEnabled(StoreTargetLabelModel label)
+    {
+        label.IsEnabled = !label.IsEnabled;
+        label.UpdatedAt = DateTime.UtcNow;
+        await OnChanged.InvokeAsync();
+    }
+}

@@ -1,0 +1,29 @@
+@using LPEditorApp.Models
+
+<div class="safety-panel">
+    <div class="safety-title">セーフティチェック</div>
+    @if (Issues.Count == 0)
+    {
+        <div class="text text-readonly">問題は見つかりませんでした。</div>
+    }
+    else
+    {
+        <div class="safety-list">
+            @foreach (var issue in Issues)
+            {
+                <div class="safety-item">
+                    <div class="safety-message">@issue.Message</div>
+                    @if (!string.IsNullOrWhiteSpace(issue.ActionLabel))
+                    {
+                        <button type="button" class="btn small" @onclick="() => OnFixRequested.InvokeAsync(issue)">@issue.ActionLabel</button>
+                    }
+                </div>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public IReadOnlyList<SafetyIssue> Issues { get; set; } = Array.Empty<SafetyIssue>();
+    [Parameter] public EventCallback<SafetyIssue> OnFixRequested { get; set; }
+}

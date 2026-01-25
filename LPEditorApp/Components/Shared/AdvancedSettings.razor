@@ -1,0 +1,21 @@
+<div class="bg-advanced">
+    <button type="button" class="bg-advanced-toggle @(IsOpen ? "open" : "")" @onclick="Toggle">
+        <span>@Title</span>
+        <span class="bg-advanced-icon">@(IsOpen ? "−" : "+")</span>
+    </button>
+    @if (IsOpen)
+    {
+        <div class="bg-advanced-body">
+            @ChildContent
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public string Title { get; set; } = "詳細設定";
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+
+    private bool IsOpen;
+
+    private void Toggle() => IsOpen = !IsOpen;
+}

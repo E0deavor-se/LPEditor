@@ -1,0 +1,52 @@
+<div class="bg-type-selector">
+    @if (string.Equals(Mode, "inherit", StringComparison.OrdinalIgnoreCase))
+    {
+        <div class="bg-type-hint">現在のセクションは未設定です。背景タイプを選ぶと反映されます。</div>
+    }
+    <div class="bg-type-grid">
+        <button type="button" class="bg-type-btn @(IsActive("solid") ? "is-active" : "")" @onclick='() => Select("solid")'>
+            <span class="bg-type-icon">🎨</span>
+            <span class="bg-type-label">単色</span>
+            <span class="bg-type-desc">1色でシンプルに</span>
+        </button>
+        <button type="button" class="bg-type-btn @(IsActive("gradient") ? "is-active" : "")" @onclick='() => Select("gradient")'>
+            <span class="bg-type-icon">🌈</span>
+            <span class="bg-type-label">グラデーション</span>
+            <span class="bg-type-desc">滑らかな変化</span>
+        </button>
+        <button type="button" class="bg-type-btn @(IsActive("image") ? "is-active" : "")" @onclick='() => Select("image")'>
+            <span class="bg-type-icon">🖼️</span>
+            <span class="bg-type-label">画像</span>
+            <span class="bg-type-desc">写真やパターン</span>
+        </button>
+        <button type="button" class="bg-type-btn @(IsActive("video") ? "is-active" : "")" @onclick='() => Select("video")'>
+            <span class="bg-type-icon">🎥</span>
+            <span class="bg-type-label">動画</span>
+            <span class="bg-type-desc">動きのある背景</span>
+        </button>
+        @if (ShowPreset)
+        {
+            <button type="button" class="bg-type-btn @(IsActive("preset") ? "is-active" : "")" @onclick='() => Select("preset")'>
+                <span class="bg-type-icon">✨</span>
+                <span class="bg-type-label">プリセット</span>
+                <span class="bg-type-desc">ワンクリック</span>
+            </button>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter] public string Mode { get; set; } = "color";
+    [Parameter] public bool ShowPreset { get; set; } = true;
+    [Parameter] public EventCallback<string> ModeChanged { get; set; }
+
+    private bool IsActive(string mode) => string.Equals(Mode, mode, StringComparison.OrdinalIgnoreCase);
+
+    private async Task Select(string mode)
+    {
+        if (!string.Equals(Mode, mode, StringComparison.OrdinalIgnoreCase))
+        {
+            await ModeChanged.InvokeAsync(mode);
+        }
+    }
+}

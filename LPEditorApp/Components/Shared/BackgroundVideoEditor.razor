@@ -1,0 +1,62 @@
+@using LPEditorApp.Models
+@using Microsoft.AspNetCore.Components.Forms
+
+<div class="bg-video-editor">
+    <div class="field">
+        <label>動画URL</label>
+        <input class="text" placeholder="https://... (mp4 / webm)" value="@Setting.VideoUrl" @oninput="OnVideoUrlChanged" />
+    </div>
+    <div class="field">
+        <label>ポスター画像URL（任意）</label>
+        <input class="text" placeholder="https://..." value="@Setting.VideoPoster" @oninput="OnPosterChanged" />
+    </div>
+    <div class="field">
+        <label>画像フォールバック（任意）</label>
+        <input class="text" placeholder="https://... または data:image/..." value="@Setting.ImageUrl" @oninput="OnFallbackChanged" />
+        <div class="hint">動画が再生できない場合はこの画像が使われます。</div>
+    </div>
+    <div class="field">
+        <label>ポスター画像を選択</label>
+        <InputFile OnChange="OnPosterFileSelected" accept="image/*" />
+    </div>
+</div>
+
+@code {
+    [Parameter] public BackgroundSetting Setting { get; set; } = new();
+    [Parameter] public EventCallback OnChanged { get; set; }
+
+    private async Task OnVideoUrlChanged(ChangeEventArgs args)
+    {
+        Setting.VideoUrl = args.Value?.ToString() ?? string.Empty;
+        await OnChanged.InvokeAsync();
+    }
+
+    private async Task OnPosterChanged(ChangeEventArgs args)
+    {
+        Setting.VideoPoster = args.Value?.ToString() ?? string.Empty;
+        await OnChanged.InvokeAsync();
+    }
+
+    private async Task OnFallbackChanged(ChangeEventArgs args)
+    {
+        Setting.ImageUrl = args.Value?.ToString() ?? string.Empty;
+        await OnChanged.InvokeAsync();
+    }
+
+    private async Task OnPosterFileSelected(InputFileChangeEventArgs args)
+    {
+        var file = args.File;
+        if (file is null)
+        {
+            return;
+        }
+
+        await using var stream = file.OpenReadStream(8 * 1024 * 1024);
+        using var ms = new MemoryStream();
+        await stream.CopyToAsync(ms);
+        var base64 = Convert.ToBase64String(ms.ToArray());
+        var dataUrl = $"data:{file.ContentType};base64,{base64}";
+        Setting.VideoPoster = dataUrl;
+        await OnChanged.InvokeAsync();
+    }
+}

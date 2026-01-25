@@ -1,0 +1,20 @@
+@using LPEditorApp.Models
+
+<div class="step-nav">
+    @foreach (var step in Steps)
+    {
+        <button type="button" class="step-item @(step.IsActive ? "is-active" : "") @(step.IsComplete ? "is-complete" : "")" @onclick="() => OnStepSelected.InvokeAsync(step.Id)">
+            <span class="step-index">@step.Index</span>
+            <span class="step-label">@step.Label</span>
+            @if (!step.IsComplete)
+            {
+                <span class="step-warning">●</span>
+            }
+        </button>
+    }
+</div>
+
+@code {
+    [Parameter] public IReadOnlyList<StepNavItem> Steps { get; set; } = Array.Empty<StepNavItem>();
+    [Parameter] public EventCallback<string> OnStepSelected { get; set; }
+}

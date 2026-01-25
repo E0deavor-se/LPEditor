@@ -1,0 +1,85 @@
+@using LPEditorApp.Models
+
+<div class="anim-panel">
+    <div class="anim-title">セクションアニメーション</div>
+    <div class="anim-grid">
+        @foreach (var preset in Presets)
+        {
+            <button type="button" class="anim-card @(IsActive(preset.Key) ? "is-selected" : "")" @onclick="() => SelectPreset(preset.Key)">
+                <div class="anim-card-name">@preset.Label</div>
+                <div class="anim-card-desc">@preset.Description</div>
+            </button>
+        }
+    </div>
+
+    <AdvancedSettings Title="詳細設定">
+        <div class="anim-advanced">
+            <div class="field">
+                <label>表示タイミング</label>
+                <InputSelect class="text-option-select" @bind-Value="Animation.Trigger" @bind-Value:after="NotifyChanged">
+                    <option value="scroll">スクロールイン</option>
+                    <option value="load">表示時</option>
+                </InputSelect>
+            </div>
+            <div class="field">
+                <label>継続時間</label>
+                <input class="text" type="number" @bind-value="Animation.Duration" @bind-value:after="NotifyChanged" />
+            </div>
+            <div class="field">
+                <label>遅延</label>
+                <input class="text" type="number" @bind-value="Animation.Delay" @bind-value:after="NotifyChanged" />
+            </div>
+            <div class="field">
+                <label>イージング</label>
+                <InputSelect class="text-option-select" @bind-Value="Animation.Easing" @bind-Value:after="NotifyChanged">
+                    <option value="ease">ease</option>
+                    <option value="ease-out">ease-out</option>
+                    <option value="ease-in">ease-in</option>
+                    <option value="ease-in-out">ease-in-out</option>
+                </InputSelect>
+            </div>
+            <div class="field">
+                <label>繰り返し</label>
+                <InputSelect class="text-option-select" @bind-Value="Animation.Repeat" @bind-Value:after="NotifyChanged">
+                    <option value="none">なし</option>
+                    <option value="once">1回</option>
+                    <option value="loop">ループ</option>
+                </InputSelect>
+            </div>
+        </div>
+    </AdvancedSettings>
+</div>
+
+@code {
+    [Parameter] public SectionAnimationModel Animation { get; set; } = new();
+    [Parameter] public EventCallback OnChanged { get; set; }
+
+    private static readonly (string Key, string Label, string Description)[] Presets =
+    {
+        ("none", "なし", "固定表示"),
+        ("fade", "フェード", "ふわっと表示"),
+        ("slide-up", "スライドアップ", "下からせり上がる"),
+        ("slide-down", "スライドダウン", "上から入る"),
+        ("slide-left", "スライド左", "右から入る"),
+        ("slide-right", "スライド右", "左から入る"),
+        ("zoom", "ズーム", "拡大しながら"),
+        ("pop", "ポップ", "軽いバウンス")
+    };
+
+    private bool IsActive(string key) => string.Equals(Animation.Type, key, StringComparison.OrdinalIgnoreCase);
+
+    private void NotifyChanged()
+    {
+        _ = OnChanged.InvokeAsync();
+    }
+
+    private async Task SelectPreset(string key)
+    {
+        Animation.Type = key;
+        if (string.Equals(key, "none", StringComparison.OrdinalIgnoreCase))
+        {
+            Animation.Repeat = "none";
+        }
+        await OnChanged.InvokeAsync();
+    }
+}

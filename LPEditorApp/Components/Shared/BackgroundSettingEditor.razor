@@ -1,0 +1,558 @@
+@using LPEditorApp.Models
+@using LPEditorApp.Services
+
+<div class="bg-editor">
+    <BackgroundPreview Setting="Setting"
+                       Title="@PreviewTitle"
+                       Subtitle="@PreviewSubtitle"
+                       PreviewLabel="@PreviewLabel"
+                       PreviewCaption="@PreviewCaption" />
+
+    <div class="bg-step">
+        <div class="bg-step-header">
+            <div class="bg-step-title">STEP 1</div>
+            <div class="bg-step-desc">背景タイプを選ぶ</div>
+        </div>
+        <BackgroundTypeSelector Mode="@Setting.SourceType" ModeChanged="OnModeChanged" ShowPreset="ShowPreset" />
+    </div>
+
+    <div class="bg-step">
+        <div class="bg-step-header">
+            <div class="bg-step-title">STEP 2</div>
+            <div class="bg-step-desc">選んだ背景を微調整する</div>
+        </div>
+
+        @if (IsMode("solid"))
+        {
+            <BackgroundColorEditor Setting="Setting" OnChanged="OnChanged" />
+        }
+        else if (IsMode("gradient"))
+        {
+            <div class="bg-gradient-editor">
+                <div class="bg-gradient-toggle">
+                    <button type="button" class="tab-btn @(Setting.GradientType == "linear" ? "active" : "")" @onclick='() => SetGradientType("linear")'>線形</button>
+                    <button type="button" class="tab-btn @(Setting.GradientType == "radial" ? "active" : "")" @onclick='() => SetGradientType("radial")'>放射</button>
+                </div>
+                <div class="bg-gradient-row">
+                    <div class="bg-gradient-color">
+                        <label>色A</label>
+                        <div class="bg-color-picker">
+                            <input type="color" value="@ResolveGradientColorA()" @oninput="OnGradientColorAChanged" />
+                            <input class="text" value="@ResolveGradientColorA()" @oninput="OnGradientColorATextChanged" />
+                        </div>
+                    </div>
+                    <div class="bg-gradient-color">
+                        <label>色B</label>
+                        <div class="bg-color-picker">
+                            <input type="color" value="@ResolveGradientColorB()" @oninput="OnGradientColorBChanged" />
+                            <input class="text" value="@ResolveGradientColorB()" @oninput="OnGradientColorBTextChanged" />
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-gradient-angle">
+                    <label>方向</label>
+                    <div class="bg-angle-row">
+                        <input type="range" min="0" max="360" step="1" value="@ResolveAngle()" @oninput="OnGradientAngleChanged" />
+                        <span class="bg-angle-value">@ResolveAngle()°</span>
+                    </div>
+                </div>
+                <div class="bg-opacity-input">
+                    <label>透明度</label>
+                    <div class="bg-opacity-row">
+                        <input type="range" min="0" max="100" step="1" value="@ResolveGradientOpacity()" @oninput="OnGradientOpacityChanged" />
+                        <span class="bg-opacity-value">@ResolveGradientOpacity()%</span>
+                    </div>
+                </div>
+            </div>
+        }
+        else if (IsMode("image"))
+        {
+            <BackgroundImageEditor Setting="Setting" OnChanged="OnImageChanged" />
+            <AdvancedSettings Title="画像の表示オプション">
+                <div class="bg-advanced-grid">
+                    <div class="field">
+                        <label>繰り返し</label>
+                        <InputSelect class="text-option-select" @bind-Value="Setting.Repeat" @bind-Value:after="OnSettingChanged">
+                            <option value="no-repeat">繰り返さない</option>
+                            <option value="repeat">繰り返す</option>
+                        </InputSelect>
+                    </div>
+                    <div class="field">
+                        <label>表示位置</label>
+                        <InputSelect class="text-option-select" @bind-Value="Setting.Position" @bind-Value:after="OnSettingChanged">
+                            <option value="center center">中央</option>
+                            <option value="center top">上</option>
+                            <option value="center bottom">下</option>
+                            <option value="left center">左</option>
+                            <option value="right center">右</option>
+                            <option value="custom">カスタム</option>
+                        </InputSelect>
+                        @if (string.Equals(Setting.Position, "custom", StringComparison.OrdinalIgnoreCase))
+                        {
+                            <input class="text" placeholder="例: 20% 40%" @bind-value="Setting.PositionCustom" @bind-value:event="oninput" @bind-value:after="OnSettingChanged" />
+                        }
+                    </div>
+                    <div class="field">
+                        <label>表示サイズ</label>
+                        <InputSelect class="text-option-select" @bind-Value="Setting.Size" @bind-Value:after="OnSettingChanged">
+                            <option value="cover">全体にフィット</option>
+                            <option value="contain">収める</option>
+                            <option value="auto">実寸</option>
+                            <option value="custom">カスタム</option>
+                        </InputSelect>
+                        @if (string.Equals(Setting.Size, "custom", StringComparison.OrdinalIgnoreCase))
+                        {
+                            <input class="text" placeholder="例: 1200px auto" @bind-value="Setting.SizeCustom" @bind-value:event="oninput" @bind-value:after="OnSettingChanged" />
+                        }
+                    </div>
+                    <div class="field">
+                        <label>スクロール</label>
+                        <InputSelect class="text-option-select" @bind-Value="Setting.Attachment" @bind-Value:after="OnSettingChanged">
+                            <option value="scroll">スクロール連動</option>
+                            <option value="fixed">固定背景</option>
+                        </InputSelect>
+                    </div>
+                </div>
+            </AdvancedSettings>
+            <AdvancedSettings Title="色調整">
+                <div class="bg-effects-grid">
+                    <div class="field">
+                        <label>色相</label>
+                        <div class="bg-slider-row">
+                            <input type="range" min="-180" max="180" step="1" value="@ResolveHue()" @oninput="OnHueChanged" />
+                            <span class="bg-slider-value">@ResolveHue()°</span>
+                        </div>
+                    </div>
+                    <div class="field">
+                        <label>彩度</label>
+                        <div class="bg-slider-row">
+                            <input type="range" min="0" max="200" step="1" value="@ResolveSaturation()" @oninput="OnSaturationChanged" />
+                            <span class="bg-slider-value">@ResolveSaturation()%</span>
+                        </div>
+                    </div>
+                    <div class="field">
+                        <label>明るさ</label>
+                        <div class="bg-slider-row">
+                            <input type="range" min="50" max="150" step="1" value="@ResolveBrightness()" @oninput="OnBrightnessChanged" />
+                            <span class="bg-slider-value">@ResolveBrightness()%</span>
+                        </div>
+                    </div>
+                    <div class="field">
+                        <label>コントラスト</label>
+                        <div class="bg-slider-row">
+                            <input type="range" min="50" max="150" step="1" value="@ResolveContrast()" @oninput="OnContrastChanged" />
+                            <span class="bg-slider-value">@ResolveContrast()%</span>
+                        </div>
+                    </div>
+                    <div class="field">
+                        <label>ぼかし</label>
+                        <div class="bg-slider-row">
+                            <input type="range" min="0" max="10" step="0.5" value="@ResolveBlur()" @oninput="OnBlurChanged" />
+                            <span class="bg-slider-value">@ResolveBlur()px</span>
+                        </div>
+                    </div>
+                </div>
+            </AdvancedSettings>
+            <AdvancedSettings Title="カラー被せ">
+                <div class="bg-overlay-grid">
+                    <div class="field">
+                        <label>色</label>
+                        <div class="bg-color-picker">
+                            <input type="color" value="@ResolveOverlayColor()" @oninput="OnOverlayColorChanged" />
+                            <input class="text" value="@ResolveOverlayColor()" @oninput="OnOverlayColorTextChanged" />
+                        </div>
+                    </div>
+                    <div class="field">
+                        <label>濃さ</label>
+                        <div class="bg-slider-row">
+                            <input type="range" min="0" max="80" step="1" value="@ResolveOverlayOpacity()" @oninput="OnOverlayOpacityChanged" />
+                            <span class="bg-slider-value">@ResolveOverlayOpacity()%</span>
+                        </div>
+                    </div>
+                    <div class="field">
+                        <label>合成方法</label>
+                        <InputSelect class="text-option-select" @bind-Value="Setting.Effects.Overlay.BlendMode" @bind-Value:after="OnSettingChanged">
+                            <option value="normal">標準</option>
+                            <option value="multiply">乗算</option>
+                            <option value="overlay">オーバーレイ</option>
+                            <option value="soft-light">ソフトライト</option>
+                        </InputSelect>
+                    </div>
+                </div>
+                <div class="bg-apply-actions">
+                    <button type="button" class="btn" @onclick="ResetEffects">リセット</button>
+                    <button type="button" class="btn" @onclick="RestoreSnapshot">元に戻す</button>
+                </div>
+            </AdvancedSettings>
+        }
+        else if (IsMode("video"))
+        {
+            <BackgroundVideoEditor Setting="Setting" OnChanged="OnVideoChanged" />
+            <AdvancedSettings Title="色調整">
+                <div class="bg-effects-grid">
+                    <div class="field">
+                        <label>色相</label>
+                        <div class="bg-slider-row">
+                            <input type="range" min="-180" max="180" step="1" value="@ResolveHue()" @oninput="OnHueChanged" />
+                            <span class="bg-slider-value">@ResolveHue()°</span>
+                        </div>
+                    </div>
+                    <div class="field">
+                        <label>彩度</label>
+                        <div class="bg-slider-row">
+                            <input type="range" min="0" max="200" step="1" value="@ResolveSaturation()" @oninput="OnSaturationChanged" />
+                            <span class="bg-slider-value">@ResolveSaturation()%</span>
+                        </div>
+                    </div>
+                    <div class="field">
+                        <label>明るさ</label>
+                        <div class="bg-slider-row">
+                            <input type="range" min="50" max="150" step="1" value="@ResolveBrightness()" @oninput="OnBrightnessChanged" />
+                            <span class="bg-slider-value">@ResolveBrightness()%</span>
+                        </div>
+                    </div>
+                    <div class="field">
+                        <label>コントラスト</label>
+                        <div class="bg-slider-row">
+                            <input type="range" min="50" max="150" step="1" value="@ResolveContrast()" @oninput="OnContrastChanged" />
+                            <span class="bg-slider-value">@ResolveContrast()%</span>
+                        </div>
+                    </div>
+                    <div class="field">
+                        <label>ぼかし</label>
+                        <div class="bg-slider-row">
+                            <input type="range" min="0" max="10" step="0.5" value="@ResolveBlur()" @oninput="OnBlurChanged" />
+                            <span class="bg-slider-value">@ResolveBlur()px</span>
+                        </div>
+                    </div>
+                </div>
+            </AdvancedSettings>
+            <AdvancedSettings Title="カラー被せ">
+                <div class="bg-overlay-grid">
+                    <div class="field">
+                        <label>色</label>
+                        <div class="bg-color-picker">
+                            <input type="color" value="@ResolveOverlayColor()" @oninput="OnOverlayColorChanged" />
+                            <input class="text" value="@ResolveOverlayColor()" @oninput="OnOverlayColorTextChanged" />
+                        </div>
+                    </div>
+                    <div class="field">
+                        <label>濃さ</label>
+                        <div class="bg-slider-row">
+                            <input type="range" min="0" max="80" step="1" value="@ResolveOverlayOpacity()" @oninput="OnOverlayOpacityChanged" />
+                            <span class="bg-slider-value">@ResolveOverlayOpacity()%</span>
+                        </div>
+                    </div>
+                    <div class="field">
+                        <label>合成方法</label>
+                        <InputSelect class="text-option-select" @bind-Value="Setting.Effects.Overlay.BlendMode" @bind-Value:after="OnSettingChanged">
+                            <option value="normal">標準</option>
+                            <option value="multiply">乗算</option>
+                            <option value="overlay">オーバーレイ</option>
+                            <option value="soft-light">ソフトライト</option>
+                        </InputSelect>
+                    </div>
+                </div>
+                <div class="bg-apply-actions">
+                    <button type="button" class="btn" @onclick="ResetEffects">リセット</button>
+                    <button type="button" class="btn" @onclick="RestoreSnapshot">元に戻す</button>
+                </div>
+            </AdvancedSettings>
+        }
+        else if (IsMode("preset") && ShowPreset)
+        {
+            <BackgroundPresetPicker Title="背景プリセット" Selection="Setting.Preset" OnChanged="OnPresetChanged" />
+            <button type="button" class="btn ghost" @onclick="ApplyPresetAsCustom">このプリセットをベースに編集する</button>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter] public BackgroundSetting Setting { get; set; } = new();
+    [Parameter] public EventCallback OnChanged { get; set; }
+
+    [Parameter] public string PreviewTitle { get; set; } = "ライブプレビュー";
+    [Parameter] public string? PreviewSubtitle { get; set; }
+    [Parameter] public string PreviewLabel { get; set; } = "セクション背景";
+    [Parameter] public string PreviewCaption { get; set; } = "変更は即時反映されます";
+    [Parameter] public bool ShowPreset { get; set; } = true;
+
+    private bool IsMode(string mode) => string.Equals(BackgroundRenderService.ResolveSourceType(Setting), mode, StringComparison.OrdinalIgnoreCase);
+
+    private BackgroundSetting? _snapshot;
+
+    private async Task OnModeChanged(string mode)
+    {
+        BackgroundSettingService.ApplyType(Setting, mode);
+        EnsureDefaultsForMode();
+        await OnChanged.InvokeAsync();
+    }
+
+    protected override void OnParametersSet()
+    {
+        if (!ShowPreset && string.Equals(Setting.Mode, "preset", StringComparison.OrdinalIgnoreCase))
+        {
+            BackgroundSettingService.ApplyType(Setting, "color");
+        }
+
+        _snapshot = CloneSetting(Setting);
+    }
+
+    private void EnsureDefaultsForMode()
+    {
+        if (IsMode("solid") && string.IsNullOrWhiteSpace(Setting.Color))
+        {
+            Setting.Color = "#ffffff";
+        }
+        if (IsMode("gradient"))
+        {
+            Setting.GradientColorA = string.IsNullOrWhiteSpace(Setting.GradientColorA) ? "#ffffff" : Setting.GradientColorA;
+            Setting.GradientColorB = string.IsNullOrWhiteSpace(Setting.GradientColorB) ? "#0f172a" : Setting.GradientColorB;
+        }
+        if (IsMode("image") && string.IsNullOrWhiteSpace(Setting.Repeat))
+        {
+            Setting.Repeat = "no-repeat";
+        }
+    }
+
+    private async Task SetGradientType(string type)
+    {
+        Setting.GradientType = type;
+        await OnChanged.InvokeAsync();
+    }
+
+    private string ResolveGradientColorA() => string.IsNullOrWhiteSpace(Setting.GradientColorA) ? "#ffffff" : Setting.GradientColorA;
+    private string ResolveGradientColorB() => string.IsNullOrWhiteSpace(Setting.GradientColorB) ? "#0f172a" : Setting.GradientColorB;
+    private int ResolveAngle() => (int)Math.Round(Math.Clamp(Setting.GradientAngle ?? 135, 0, 360));
+    private int ResolveGradientOpacity() => (int)Math.Round(Math.Clamp(Setting.GradientOpacity ?? 1, 0, 1) * 100);
+
+    private async Task OnGradientColorAChanged(ChangeEventArgs args)
+    {
+        Setting.GradientColorA = args.Value?.ToString() ?? string.Empty;
+        await OnChanged.InvokeAsync();
+    }
+
+    private async Task OnGradientColorATextChanged(ChangeEventArgs args)
+    {
+        Setting.GradientColorA = args.Value?.ToString() ?? string.Empty;
+        await OnChanged.InvokeAsync();
+    }
+
+    private async Task OnGradientColorBChanged(ChangeEventArgs args)
+    {
+        Setting.GradientColorB = args.Value?.ToString() ?? string.Empty;
+        await OnChanged.InvokeAsync();
+    }
+
+    private async Task OnGradientColorBTextChanged(ChangeEventArgs args)
+    {
+        Setting.GradientColorB = args.Value?.ToString() ?? string.Empty;
+        await OnChanged.InvokeAsync();
+    }
+
+    private async Task OnGradientAngleChanged(ChangeEventArgs args)
+    {
+        if (int.TryParse(args.Value?.ToString(), out var angle))
+        {
+            Setting.GradientAngle = Math.Clamp(angle, 0, 360);
+            await OnChanged.InvokeAsync();
+        }
+    }
+
+    private async Task OnGradientOpacityChanged(ChangeEventArgs args)
+    {
+        if (int.TryParse(args.Value?.ToString(), out var percent))
+        {
+            Setting.GradientOpacity = Math.Clamp(percent / 100d, 0, 1);
+            await OnChanged.InvokeAsync();
+        }
+    }
+
+    private async Task OnSettingChanged()
+    {
+        await OnChanged.InvokeAsync();
+    }
+
+    private async Task ApplyPresetAsCustom()
+    {
+        var preset = BackgroundPresetCatalog.Find(Setting.Preset?.PresetKey ?? string.Empty);
+        if (preset is null)
+        {
+            return;
+        }
+
+        if (preset.Kind == BackgroundPresetKind.Gradient)
+        {
+            BackgroundSettingService.ApplyType(Setting, "gradient");
+            Setting.GradientType = "linear";
+            Setting.GradientAngle = preset.DefaultAngle;
+            Setting.GradientColorA = preset.DefaultColorA;
+            Setting.GradientColorB = preset.DefaultColorB;
+            Setting.GradientOpacity = preset.DefaultOpacity;
+        }
+        else
+        {
+            BackgroundSettingService.ApplyType(Setting, "solid");
+            Setting.Color = string.IsNullOrWhiteSpace(preset.DefaultColorB) ? preset.DefaultColorA : preset.DefaultColorB;
+            Setting.ColorOpacity = preset.DefaultOpacity;
+        }
+
+        await OnChanged.InvokeAsync();
+    }
+
+    private async Task OnPresetChanged()
+    {
+        BackgroundSettingService.ApplyPreset(Setting);
+        await OnChanged.InvokeAsync();
+    }
+
+    private async Task OnImageChanged()
+    {
+        BackgroundSettingService.ApplyImage(Setting, Setting.ImageUrl);
+        await OnChanged.InvokeAsync();
+    }
+
+    private async Task OnVideoChanged()
+    {
+        BackgroundSettingService.ApplyVideo(Setting, Setting.VideoUrl);
+        await OnChanged.InvokeAsync();
+    }
+
+    private int ResolveHue() => (int)Math.Round(Math.Clamp(Setting.Effects.Hue ?? 0, -180, 180));
+    private int ResolveSaturation() => (int)Math.Round(Math.Clamp(Setting.Effects.Saturation ?? 100, 0, 200));
+    private int ResolveBrightness() => (int)Math.Round(Math.Clamp(Setting.Effects.Brightness ?? 100, 50, 150));
+    private int ResolveContrast() => (int)Math.Round(Math.Clamp(Setting.Effects.Contrast ?? 100, 50, 150));
+    private double ResolveBlur() => Math.Round(Math.Clamp(Setting.Effects.Blur ?? 0, 0, 10), 1);
+
+    private string ResolveOverlayColor() => string.IsNullOrWhiteSpace(Setting.Effects.Overlay.Color) ? "#000000" : Setting.Effects.Overlay.Color;
+    private int ResolveOverlayOpacity() => (int)Math.Round(Math.Clamp(Setting.Effects.Overlay.Opacity ?? 0, 0, 80));
+
+    private async Task OnHueChanged(ChangeEventArgs args)
+    {
+        if (int.TryParse(args.Value?.ToString(), out var value))
+        {
+            Setting.Effects.Hue = value;
+            await OnChanged.InvokeAsync();
+        }
+    }
+
+    private async Task OnSaturationChanged(ChangeEventArgs args)
+    {
+        if (int.TryParse(args.Value?.ToString(), out var value))
+        {
+            Setting.Effects.Saturation = value;
+            await OnChanged.InvokeAsync();
+        }
+    }
+
+    private async Task OnBrightnessChanged(ChangeEventArgs args)
+    {
+        if (int.TryParse(args.Value?.ToString(), out var value))
+        {
+            Setting.Effects.Brightness = value;
+            await OnChanged.InvokeAsync();
+        }
+    }
+
+    private async Task OnContrastChanged(ChangeEventArgs args)
+    {
+        if (int.TryParse(args.Value?.ToString(), out var value))
+        {
+            Setting.Effects.Contrast = value;
+            await OnChanged.InvokeAsync();
+        }
+    }
+
+    private async Task OnBlurChanged(ChangeEventArgs args)
+    {
+        if (double.TryParse(args.Value?.ToString(), out var value))
+        {
+            Setting.Effects.Blur = value;
+            await OnChanged.InvokeAsync();
+        }
+    }
+
+    private async Task OnOverlayColorChanged(ChangeEventArgs args)
+    {
+        Setting.Effects.Overlay.Color = args.Value?.ToString() ?? string.Empty;
+        await OnChanged.InvokeAsync();
+    }
+
+    private async Task OnOverlayColorTextChanged(ChangeEventArgs args)
+    {
+        Setting.Effects.Overlay.Color = args.Value?.ToString() ?? string.Empty;
+        await OnChanged.InvokeAsync();
+    }
+
+    private async Task OnOverlayOpacityChanged(ChangeEventArgs args)
+    {
+        if (int.TryParse(args.Value?.ToString(), out var value))
+        {
+            Setting.Effects.Overlay.Opacity = value;
+            await OnChanged.InvokeAsync();
+        }
+    }
+
+    private async Task ResetEffects()
+    {
+        Setting.Effects = new BackgroundEffects();
+        await OnChanged.InvokeAsync();
+    }
+
+    private async Task RestoreSnapshot()
+    {
+        if (_snapshot is null)
+        {
+            return;
+        }
+
+        CopySetting(_snapshot, Setting);
+        await OnChanged.InvokeAsync();
+    }
+
+    private static BackgroundSetting CloneSetting(BackgroundSetting source)
+    {
+        var clone = new BackgroundSetting();
+        CopySetting(source, clone);
+        return clone;
+    }
+
+    private static void CopySetting(BackgroundSetting source, BackgroundSetting target)
+    {
+        target.SourceType = source.SourceType;
+        target.Mode = source.Mode;
+        target.Color = source.Color;
+        target.ColorOpacity = source.ColorOpacity;
+        target.GradientType = source.GradientType;
+        target.GradientAngle = source.GradientAngle;
+        target.GradientColorA = source.GradientColorA;
+        target.GradientColorB = source.GradientColorB;
+        target.GradientOpacity = source.GradientOpacity;
+        target.ImageUrl = source.ImageUrl;
+        target.VideoUrl = source.VideoUrl;
+        target.VideoPoster = source.VideoPoster;
+        target.Repeat = source.Repeat;
+        target.Position = source.Position;
+        target.PositionCustom = source.PositionCustom;
+        target.Size = source.Size;
+        target.SizeCustom = source.SizeCustom;
+        target.Attachment = source.Attachment;
+        target.Preset = source.Preset ?? new BackgroundPresetSelection();
+        target.Effects = source.Effects is null
+            ? new BackgroundEffects()
+            : new BackgroundEffects
+            {
+                Hue = source.Effects.Hue,
+                Saturation = source.Effects.Saturation,
+                Brightness = source.Effects.Brightness,
+                Contrast = source.Effects.Contrast,
+                Blur = source.Effects.Blur,
+                Overlay = new BackgroundOverlay
+                {
+                    Color = source.Effects.Overlay.Color,
+                    Opacity = source.Effects.Overlay.Opacity,
+                    BlendMode = source.Effects.Overlay.BlendMode
+                }
+            };
+    }
+}

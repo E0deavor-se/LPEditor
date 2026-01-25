@@ -1,0 +1,51 @@
+@using LPEditorApp.Models
+@using LPEditorApp.Services
+
+<div class="bg-preview-card">
+    <div class="bg-preview-header">
+        <div class="bg-preview-title">@Title</div>
+        @if (!string.IsNullOrWhiteSpace(Subtitle))
+        {
+            <div class="bg-preview-sub">@Subtitle</div>
+        }
+    </div>
+    <div class="bg-preview-stage" style="@BackgroundStyleService.BuildInlineStyle(Setting, includeMediaImage: false)">
+        @if (BackgroundRenderService.UseMediaLayer(Setting))
+        {
+            if (IsVideoReady)
+            {
+                <video class="bg-media" autoplay muted loop playsinline poster="@VideoPoster" style="@FilterStyle">
+                    <source src="@VideoUrl" />
+                </video>
+            }
+            else if (IsImageReady)
+            {
+                <div class="bg-media bg-media-image" style="@MediaStyle @FilterStyle"></div>
+            }
+        }
+        <div class="bg-overlay" style="@OverlayStyle"></div>
+        <div class="bg-preview-overlay">
+            <div class="bg-preview-label">@PreviewLabel</div>
+            <div class="bg-preview-caption">@PreviewCaption</div>
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter] public BackgroundSetting Setting { get; set; } = new();
+    [Parameter] public string Title { get; set; } = "ライブプレビュー";
+    [Parameter] public string? Subtitle { get; set; }
+    [Parameter] public string PreviewLabel { get; set; } = "セクション背景";
+    [Parameter] public string PreviewCaption { get; set; } = "変更は即時反映されます";
+
+    private string MediaStyle => BackgroundRenderService.BuildMediaStyle(Setting);
+    private string FilterStyle => BackgroundRenderService.BuildFilterStyle(Setting.Effects ?? new BackgroundEffects());
+    private string OverlayStyle => BackgroundRenderService.BuildOverlayStyle(Setting.Effects ?? new BackgroundEffects());
+
+    private string VideoUrl => BackgroundRenderService.ResolveVideoUrl(Setting);
+    private string VideoPoster => BackgroundRenderService.ResolvePoster(Setting);
+    private string ImageUrl => BackgroundRenderService.ResolveImageFallback(Setting);
+
+    private bool IsVideoReady => !string.IsNullOrWhiteSpace(VideoUrl);
+    private bool IsImageReady => !string.IsNullOrWhiteSpace(ImageUrl);
+}

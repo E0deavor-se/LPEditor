@@ -1,0 +1,77 @@
+@using LPEditorApp.Models
+
+<div class="label-manager">
+    <div class="label-preview-strip">
+        <div class="label-preview-title">ライブプレビュー</div>
+        <div class="preview-chip-group">
+            @foreach (var label in PreviewLabels)
+            {
+                <PreviewChip Label="label" Size="sm" />
+            }
+        </div>
+    </div>
+
+    <div class="label-manager-body">
+        <LabelList Labels="Labels" SelectedKeys="SelectedKeys" SelectedKeysChanged="OnSelectionChanged" OnChanged="OnChanged" />
+        <LabelEditor SelectedLabels="SelectedLabelItems"
+                     Presets="Presets"
+                     RecentColors="RecentColors"
+                     OnColorUsed="OnColorUsed"
+                     Clipboard="Clipboard"
+                     ClipboardChanged="OnClipboardChanged"
+                     OnChanged="OnChanged" />
+    </div>
+</div>
+
+@code {
+    [Parameter] public List<StoreTargetLabelModel> Labels { get; set; } = new();
+    [Parameter] public EventCallback OnChanged { get; set; }
+
+    private HashSet<string> SelectedKeys { get; set; } = new(StringComparer.OrdinalIgnoreCase);
+    private LabelStyleSnapshot? Clipboard;
+    private readonly List<string> RecentColors = new();
+    private IReadOnlyList<LabelStylePreset> Presets => LabelStylePresetCatalog.Presets;
+
+    private IReadOnlyList<StoreTargetLabelModel> SelectedLabelItems =>
+        Labels.Where(label => SelectedKeys.Contains(label.Key)).ToList();
+
+    private IEnumerable<StoreTargetLabelModel> PreviewLabels =>
+        SelectedLabelItems.Count > 0 ? SelectedLabelItems : Labels.Take(12);
+
+    protected override void OnParametersSet()
+    {
+        if (SelectedKeys.Count == 0 && Labels.Count > 0)
+        {
+            SelectedKeys.Add(Labels[0].Key);
+        }
+    }
+
+    private async Task OnSelectionChanged(HashSet<string> keys)
+    {
+        SelectedKeys = keys;
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task OnColorUsed(string color)
+    {
+        if (string.IsNullOrWhiteSpace(color))
+        {
+            return;
+        }
+
+        RecentColors.RemoveAll(item => string.Equals(item, color, StringComparison.OrdinalIgnoreCase));
+        RecentColors.Insert(0, color);
+        if (RecentColors.Count > 5)
+        {
+            RecentColors.RemoveRange(5, RecentColors.Count - 5);
+        }
+
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task OnClipboardChanged(LabelStyleSnapshot? snapshot)
+    {
+        Clipboard = snapshot;
+        await InvokeAsync(StateHasChanged);
+    }
+}
