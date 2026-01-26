@@ -41,93 +41,7 @@ public class ZipExportService
 
             await using var zipStream = File.Create(outputZipPath);
             using var archive = new ZipArchive(zipStream, ZipArchiveMode.Create);
-
-            var html = await _previewService.GenerateHtmlAsync(template, content, imageOverrides, embedImages: false);
-            html = _jsReplacementService.ReplaceCountdownEnd(html, content.Campaign.CountdownEnd);
-            AddTextEntry(archive, "index.html", html);
-
-            foreach (var file in template.Files.Values)
-            {
-                if (!TryNormalizeZipPath(file.RelativePath, out var path))
-                {
-                    _logger.Warn($"ZIP出力: 無効なパスをスキップしました: {file.RelativePath}");
-                    continue;
-                }
-                if (content.DeletedImages.Any(item => string.Equals(item, path, StringComparison.OrdinalIgnoreCase)))
-                {
-                    continue;
-                }
-
-                if (TemplateProject.IsExcludedPath(path))
-                {
-                    continue;
-                }
-
-                if (path.Equals("index.html", StringComparison.OrdinalIgnoreCase))
-                {
-                    continue;
-                }
-
-                if (path.Equals("content.json", StringComparison.OrdinalIgnoreCase))
-                {
-                    continue;
-                }
-
-
-                if (IsTargetCss(path))
-                {
-                    var cssText = Encoding.UTF8.GetString(file.Data);
-                    cssText = EnsureEmphasisCss(cssText);
-                    AddTextEntry(archive, path, cssText);
-                    continue;
-                }
-
-                if (file.IsJs && path.StartsWith("shared/js/", StringComparison.OrdinalIgnoreCase))
-                {
-                    var jsText = Encoding.UTF8.GetString(file.Data);
-                    var replaced = _jsReplacementService.ReplaceCountdownEnd(jsText, content.Campaign.CountdownEnd);
-                    AddTextEntry(archive, path, replaced);
-                    continue;
-                }
-
-                if (file.IsImage)
-                {
-                    var data = file.Data;
-                    if (imageOverrides.TryGetValue(path, out var overrideBytes))
-                    {
-                        data = await _imageService.ResizePngAsync(overrideBytes, GetMaxWidth(path, content));
-                    }
-
-                    AddBinaryEntry(archive, path, data);
-                    continue;
-                }
-
-                AddBinaryEntry(archive, path, file.Data);
-            }
-
-            foreach (var overridePair in imageOverrides)
-            {
-                if (!TryNormalizeZipPath(overridePair.Key, out var path))
-                {
-                    _logger.Warn($"ZIP出力: 画像のパスが未設定のためスキップしました。");
-                    continue;
-                }
-                if (content.DeletedImages.Any(item => string.Equals(item, path, StringComparison.OrdinalIgnoreCase)))
-                {
-                    continue;
-                }
-                if (template.Files.ContainsKey(path))
-                {
-                    continue;
-                }
-
-                var resized = await _imageService.ResizePngAsync(overridePair.Value, GetMaxWidth(path, content));
-                AddBinaryEntry(archive, path, resized);
-            }
-
-            var json = JsonSerializer.Serialize(content, new JsonSerializerOptions { WriteIndented = true });
-            AddTextEntry(archive, "content.json", json);
-
+            await BuildArchiveAsync(archive, template, content, imageOverrides);
             _logger.Info($"ZIP出力完了: {outputZipPath}");
         }
         catch (Exception ex)
@@ -135,6 +49,120 @@ public class ZipExportService
             _logger.Error($"ZIP出力失敗: {ex.Message}");
             throw new ZipExportException("ZIP生成に失敗しました", ex);
         }
+    }
+
+    public async Task<byte[]> ExportBytesAsync(
+        TemplateProject template,
+        ContentModel content,
+        IDictionary<string, byte[]> imageOverrides)
+    {
+        try
+        {
+            using var ms = new MemoryStream();
+            using (var archive = new ZipArchive(ms, ZipArchiveMode.Create, leaveOpen: true))
+            {
+                await BuildArchiveAsync(archive, template, content, imageOverrides);
+            }
+
+            return ms.ToArray();
+        }
+        catch (Exception ex)
+        {
+            _logger.Error($"ZIP出力失敗: {ex.Message}");
+            throw new ZipExportException("ZIP生成に失敗しました", ex);
+        }
+    }
+
+    private async Task BuildArchiveAsync(
+        ZipArchive archive,
+        TemplateProject template,
+        ContentModel content,
+        IDictionary<string, byte[]> imageOverrides)
+    {
+        var html = await _previewService.GenerateHtmlAsync(template, content, imageOverrides, embedImages: false);
+        html = _jsReplacementService.ReplaceCountdownEnd(html, content.Campaign.CountdownEnd);
+        AddTextEntry(archive, "index.html", html);
+
+        foreach (var file in template.Files.Values)
+        {
+            if (!TryNormalizeZipPath(file.RelativePath, out var path))
+            {
+                _logger.Warn($"ZIP出力: 無効なパスをスキップしました: {file.RelativePath}");
+                continue;
+            }
+            if (content.DeletedImages.Any(item => string.Equals(item, path, StringComparison.OrdinalIgnoreCase)))
+            {
+                continue;
+            }
+
+            if (TemplateProject.IsExcludedPath(path))
+            {
+                continue;
+            }
+
+            if (path.Equals("index.html", StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            if (path.Equals("content.json", StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            if (IsTargetCss(path))
+            {
+                var cssText = Encoding.UTF8.GetString(file.Data);
+                cssText = EnsureEmphasisCss(cssText);
+                AddTextEntry(archive, path, cssText);
+                continue;
+            }
+
+            if (file.IsJs && path.StartsWith("shared/js/", StringComparison.OrdinalIgnoreCase))
+            {
+                var jsText = Encoding.UTF8.GetString(file.Data);
+                var replaced = _jsReplacementService.ReplaceCountdownEnd(jsText, content.Campaign.CountdownEnd);
+                AddTextEntry(archive, path, replaced);
+                continue;
+            }
+
+            if (file.IsImage)
+            {
+                var data = file.Data;
+                if (imageOverrides.TryGetValue(path, out var overrideBytes))
+                {
+                    data = await _imageService.ResizePngAsync(overrideBytes, GetMaxWidth(path, content));
+                }
+
+                AddBinaryEntry(archive, path, data);
+                continue;
+            }
+
+            AddBinaryEntry(archive, path, file.Data);
+        }
+
+        foreach (var overridePair in imageOverrides)
+        {
+            if (!TryNormalizeZipPath(overridePair.Key, out var path))
+            {
+                _logger.Warn($"ZIP出力: 画像のパスが未設定のためスキップしました。");
+                continue;
+            }
+            if (content.DeletedImages.Any(item => string.Equals(item, path, StringComparison.OrdinalIgnoreCase)))
+            {
+                continue;
+            }
+            if (template.Files.ContainsKey(path))
+            {
+                continue;
+            }
+
+            var resized = await _imageService.ResizePngAsync(overridePair.Value, GetMaxWidth(path, content));
+            AddBinaryEntry(archive, path, resized);
+        }
+
+        var json = JsonSerializer.Serialize(content, new JsonSerializerOptions { WriteIndented = true });
+        AddTextEntry(archive, "content.json", json);
     }
 
     private static string NormalizePath(string path) => path.Replace("\\", "/");

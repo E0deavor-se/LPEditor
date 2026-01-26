@@ -1763,7 +1763,7 @@
 		State.Error.Clear();
 		try
 		{
-			await ContentPersistService.SaveAsync(ContentSavePath, State.Content);
+			await SaveCurrentContentAsync();
 		}
 		catch (Exception ex)
 		{
@@ -1778,7 +1778,8 @@
 		{
 			if (IsImportMode && ImportProject is not null)
 			{
-				await LpImportService.ExportAsync(ImportProject, OutputZipPath);
+				var zipBytes = await LpImportService.ExportBytesAsync(ImportProject);
+				await SaveZipToUserAsync(zipBytes);
 				return;
 			}
 
@@ -1795,12 +1796,36 @@
 				return;
 			}
 
-			await ZipExportService.ExportAsync(State.Template, State.Content, State.ImageOverrides, OutputZipPath);
+			await SaveCurrentContentAsync();
+			var zipBytes = await ZipExportService.ExportBytesAsync(State.Template, State.Content, State.ImageOverrides);
+			await SaveZipToUserAsync(zipBytes);
 		}
 		catch (Exception ex)
 		{
 			State.Error.SetError("ZIP出力に失敗", ex.Message);
 		}
+	}
+
+	private async Task SaveCurrentContentAsync()
+	{
+		if (string.IsNullOrWhiteSpace(ContentSavePath))
+		{
+			throw new InvalidOperationException("content.json 保存パスが未設定です。");
+		}
+
+		await ContentPersistService.SaveAsync(ContentSavePath, State.Content);
+	}
+
+	private async Task SaveZipToUserAsync(byte[] zipBytes)
+	{
+		var suggestedName = GetSuggestedZipName();
+		await JS.InvokeVoidAsync("lpExport.saveZip", suggestedName, zipBytes);
+	}
+
+	private string GetSuggestedZipName()
+	{
+		var name = Path.GetFileName(OutputZipPath ?? string.Empty);
+		return string.IsNullOrWhiteSpace(name) ? "lp-output.zip" : name;
 	}
 
 	private async Task OnImageSelected(InputFileChangeEventArgs e, string targetPath)

@@ -145,10 +145,25 @@ public class LpImportService
             File.Delete(outputZipPath);
         }
 
-        var html = await BuildOutputHtmlAsync(project, logFailures: true);
-
         await using var zipStream = File.Create(outputZipPath);
         using var archive = new ZipArchive(zipStream, ZipArchiveMode.Create);
+        await BuildExportArchiveAsync(project, archive);
+    }
+
+    public async Task<byte[]> ExportBytesAsync(LpImportProject project)
+    {
+        using var ms = new MemoryStream();
+        using (var archive = new ZipArchive(ms, ZipArchiveMode.Create, leaveOpen: true))
+        {
+            await BuildExportArchiveAsync(project, archive);
+        }
+
+        return ms.ToArray();
+    }
+
+    private async Task BuildExportArchiveAsync(LpImportProject project, ZipArchive archive)
+    {
+        var html = await BuildOutputHtmlAsync(project, logFailures: true);
 
         foreach (var file in project.Files.Values)
         {

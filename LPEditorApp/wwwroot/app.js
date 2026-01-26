@@ -295,3 +295,47 @@ window.lpSplit = {
     preview.style.flex = `0 0 ${clamped}px`;
   }
 };
+
+window.lpExport = {
+  saveZip: async function (suggestedName, bytes) {
+    const safeName = suggestedName && suggestedName.trim() ? suggestedName.trim() : "lp-output.zip";
+    const data = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes || []);
+
+    try {
+      if (window.showSaveFilePicker) {
+        const handle = await window.showSaveFilePicker({
+          suggestedName: safeName,
+          types: [
+            {
+              description: "ZIP",
+              accept: { "application/zip": [".zip"] }
+            }
+          ]
+        });
+
+        const writable = await handle.createWritable();
+        await writable.write(data);
+        await writable.close();
+        return true;
+      }
+
+      const blob = new Blob([data], { type: "application/zip" });
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = safeName;
+      anchor.style.display = "none";
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      return true;
+    } catch (e) {
+      if (e && (e.name === "AbortError" || e.code === 20)) {
+        return false;
+      }
+      console.error("lpExport.saveZip failed", e);
+      throw e;
+    }
+  }
+};
