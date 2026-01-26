@@ -1778,8 +1778,8 @@
 		{
 			if (IsImportMode && ImportProject is not null)
 			{
-				var zipBytes = await LpImportService.ExportBytesAsync(ImportProject);
-				await SaveZipToUserAsync(zipBytes);
+				var importZipBytes = await LpImportService.ExportBytesAsync(ImportProject);
+				await SaveZipToUserAsync(importZipBytes);
 				return;
 			}
 
