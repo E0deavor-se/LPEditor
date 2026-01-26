@@ -1,0 +1,5 @@
+{
+    "appService.defaultWebAppToDeploy": "/subscriptions/f45d180e-90e0-472d-817b-a5938d50db1b/resourceGroups/rg-datadog-test/providers/Microsoft.Web/sites/LPEditor-Jhastine",
+    "appService.deploySubpath": "publish-linux"
+    
+}

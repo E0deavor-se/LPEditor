@@ -1,13 +1,14 @@
-name: Deploy LP Editor
+name: Deploy LPEditor to Azure Web App
 
 on:
   push:
-    branches:
-      - main
+    branches: [ "main" ]
+  workflow_dispatch:
 
 jobs:
-  deploy:
+  build-and-deploy:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -15,23 +16,20 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: 8.0.x
+          dotnet-version: "8.0.x"
+
+      - name: Restore
+        run: dotnet restore ./LPEditorApp/LPEditorApp.csproj
+
+      - name: Build
+        run: dotnet build ./LPEditorApp/LPEditorApp.csproj -c Release --no-restore
 
       - name: Publish
-        run: dotnet publish LPEditorApp/LPEditorApp.csproj -c Release -r linux-x64 --self-contained true /p:PublishSingleFile=true /p:PublishTrimmed=false -o ./publish-linux
+        run: dotnet publish ./LPEditorApp/LPEditorApp.csproj -c Release -o ./publish
 
-      - name: Setup SSH
-        uses: webfactory/ssh-agent@v0.9.0
+      - name: Deploy to Azure Web App
+        uses: azure/webapps-deploy@v3
         with:
-          ssh-private-key: ${{ secrets.VPS_SSH_KEY }}
-
-      - name: Add host key
-        run: |
-          mkdir -p ~/.ssh
-          ssh-keyscan -H ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts
-
-      - name: Deploy files
-        run: rsync -az --delete ./publish-linux/ ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:${{ secrets.VPS_PATH }}/
-
-      - name: Restart service
-        run: ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "sudo systemctl restart lp-editor"
+          app-name: "LPEditor-Jhastine"
+          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
+          package: ./publish
