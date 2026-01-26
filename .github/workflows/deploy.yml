@@ -3,7 +3,11 @@ name: Deploy LPEditor to Azure Web App
 on:
   push:
     branches: [ "main" ]
-  workflow_dispatch:
+
+env:
+  AZURE_WEBAPP_NAME: ${{ secrets.AZURE_WEBAPP_NAME }}
+  DOTNET_VERSION: "8.0.x"
+  PUBLISH_DIR: "publish-linux"
 
 jobs:
   build-and-deploy:
@@ -16,20 +20,23 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: "8.0.x"
+          dotnet-version: ${{ env.DOTNET_VERSION }}
 
       - name: Restore
         run: dotnet restore ./LPEditorApp/LPEditorApp.csproj
 
-      - name: Build
-        run: dotnet build ./LPEditorApp/LPEditorApp.csproj -c Release --no-restore
-
       - name: Publish
-        run: dotnet publish ./LPEditorApp/LPEditorApp.csproj -c Release -r linux-x64 --self-contained false -o ./publish-linux
+        run: |
+          dotnet publish ./LPEditorApp/LPEditorApp.csproj \
+            -c Release \
+            -r linux-x64 \
+            --self-contained false \
+            -o ${{ env.PUBLISH_DIR }}
 
-      - name: Deploy to Azure Web App
+      # ここが肝：publish 出力だけをデプロイ
+      - name: Deploy to Azure Web App (Zip Deploy)
         uses: azure/webapps-deploy@v3
         with:
-          app-name: ${{ secrets.AZURE_WEBAPP_NAME }}
+          app-name: ${{ env.AZURE_WEBAPP_NAME }}
           publish-profile: ${{ secrets.AZURE_PUBLISH_PROFILE }}
-          package: ./publish-linux
+          package: ${{ env.PUBLISH_DIR }}
