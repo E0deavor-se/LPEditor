@@ -921,34 +921,105 @@
 			</div>
 		</div>
 		<div class="preview-toolbar">
-			<button class="btn" type="button" @onclick="() => SetPreviewMode(false)">PC</button>
-			<button class="btn" type="button" @onclick="() => SetPreviewMode(true)">SP</button>
-			<button class="btn" type="button" @onclick="TogglePreviewModeAsync">完成プレビュー: @(PreviewMode == "final" ? "ON" : "OFF")</button>
-			<button class="btn" type="button" @onclick="() => ScrollPreviewToSectionAsync(SelectedSectionId)">選択セクションへ</button>
-			<InputSelect class="responsive-select" @bind-Value="SelectedResponsiveDevice" @bind-Value:after="OnResponsiveDeviceChanged">
-				<option value="">デバイス選択</option>
-				@foreach (var device in ResponsiveDevices)
+			<div class="toolbar-group">
+				<button class="toolbar-btn @(!State.PreviewIsMobile && !IsResponsivePreview ? "is-active" : "")" type="button" @onclick="() => SetPreviewMode(false)">
+					<span class="tool-icon" aria-hidden="true">
+						<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+							<rect x="3" y="4" width="18" height="12" rx="2"></rect>
+							<path d="M8 20h8"></path>
+							<path d="M12 16v4"></path>
+						</svg>
+					</span>
+					<span>PC</span>
+				</button>
+				<button class="toolbar-btn @(State.PreviewIsMobile && !IsResponsivePreview ? "is-active" : "")" type="button" @onclick="() => SetPreviewMode(true)">
+					<span class="tool-icon" aria-hidden="true">
+						<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+							<rect x="7" y="3" width="10" height="18" rx="2"></rect>
+							<circle cx="12" cy="17" r="1"></circle>
+						</svg>
+					</span>
+					<span>SP</span>
+				</button>
+			</div>
+			<div class="toolbar-group">
+				<button class="toolbar-btn @(PreviewMode == "final" ? "is-active" : "")" type="button" @onclick="TogglePreviewModeAsync">
+					<span class="tool-icon" aria-hidden="true">
+						<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+							<path d="M2 12s4-6 10-6 10 6 10 6-4 6-10 6-10-6-10-6z"></path>
+							<circle cx="12" cy="12" r="3"></circle>
+						</svg>
+					</span>
+					<span>完成プレビュー</span>
+					<span class="toolbar-badge">@(PreviewMode == "final" ? "ON" : "OFF")</span>
+				</button>
+				<button class="toolbar-btn" type="button" @onclick="() => ScrollPreviewToSectionAsync(SelectedSectionId)">
+					<span class="tool-icon" aria-hidden="true">
+						<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+							<circle cx="12" cy="12" r="8"></circle>
+							<circle cx="12" cy="12" r="3"></circle>
+							<path d="M12 2v3"></path>
+							<path d="M12 19v3"></path>
+							<path d="M2 12h3"></path>
+							<path d="M19 12h3"></path>
+						</svg>
+					</span>
+					<span>選択セクションへ</span>
+				</button>
+			</div>
+			<div class="toolbar-group">
+				<div class="toolbar-field">
+					<span class="tool-icon" aria-hidden="true">
+						<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+							<rect x="3" y="5" width="12" height="8" rx="2"></rect>
+							<rect x="15" y="9" width="6" height="10" rx="2"></rect>
+						</svg>
+					</span>
+					<InputSelect class="responsive-select" @bind-Value="SelectedResponsiveDevice" @bind-Value:after="OnResponsiveDeviceChanged">
+						<option value="">デバイス選択</option>
+						@foreach (var device in ResponsiveDevices)
+						{
+							<option value="@device.Key">@device.Label (@device.Width×@device.Height)</option>
+						}
+					</InputSelect>
+				</div>
+				@if (State.PreviewIsMobile || IsResponsivePreview)
 				{
-					<option value="@device.Key">@device.Label (@device.Width×@device.Height)</option>
+					<button class="toolbar-btn" type="button" @onclick="ToggleOrientation">
+						<span class="tool-icon" aria-hidden="true">
+							<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+								<path d="M4 4v6h6"></path>
+								<path d="M20 20v-6h-6"></path>
+								<path d="M5 19a7 7 0 0 0 12-4"></path>
+								<path d="M19 5a7 7 0 0 0-12 4"></path>
+							</svg>
+						</span>
+						<span>回転</span>
+						<span class="toolbar-badge">@(IsLandscape ? "横" : "縦")</span>
+					</button>
 				}
-			</InputSelect>
-			@if (State.PreviewIsMobile || IsResponsivePreview)
-			{
-				<button class="btn" type="button" @onclick="ToggleOrientation">回転 (@(IsLandscape ? "横" : "縦"))</button>
-			}
-			@if (IsResponsivePreview)
-			{
-				<InputSelect class="responsive-select" @bind-Value="ResponsiveDpr" @bind-Value:after="OnResponsiveDprChanged">
-					<option value="1">DPR 1</option>
-					<option value="1.5">DPR 1.5</option>
-					<option value="2">DPR 2</option>
-					<option value="2.5">DPR 2.5</option>
-					<option value="2.625">DPR 2.625</option>
-					<option value="3">DPR 3</option>
-					<option value="3.5">DPR 3.5</option>
-					<option value="4">DPR 4</option>
-				</InputSelect>
-			}
+				@if (IsResponsivePreview)
+				{
+					<div class="toolbar-field">
+						<span class="tool-icon" aria-hidden="true">
+							<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+								<circle cx="11" cy="11" r="6"></circle>
+								<path d="M21 21l-4.2-4.2"></path>
+							</svg>
+						</span>
+						<InputSelect class="responsive-select" @bind-Value="ResponsiveDpr" @bind-Value:after="OnResponsiveDprChanged">
+							<option value="1">DPR 1</option>
+							<option value="1.5">DPR 1.5</option>
+							<option value="2">DPR 2</option>
+							<option value="2.5">DPR 2.5</option>
+							<option value="2.625">DPR 2.625</option>
+							<option value="3">DPR 3</option>
+							<option value="3.5">DPR 3.5</option>
+							<option value="4">DPR 4</option>
+						</InputSelect>
+					</div>
+				}
+			</div>
 		</div>
 		<div id="previewFrameWrapper" class="preview-frame-wrapper @(IsResponsivePreview ? "is-responsive" : (State.PreviewIsMobile ? "is-mobile" : "is-pc"))" style="--responsive-width: @($"{EffectiveResponsiveWidth}px"); --responsive-height: @($"{EffectiveResponsiveHeight}px");">
 			<div class="preview-device @(IsResponsivePreview ? "responsive" : (State.PreviewIsMobile ? "mobile" : "pc"))">
