@@ -5,6 +5,10 @@ on:
     branches: [ "main" ]
   workflow_dispatch:
 
+concurrency:
+  group: lpeditor-deploy
+  cancel-in-progress: true
+
 env:
   DOTNET_VERSION: "8.0.x"
   PUBLISH_DIR: "publish-linux"
@@ -32,7 +36,7 @@ jobs:
         run: |
           dotnet publish ./LPEditorApp/LPEditorApp.csproj \
             -c Release \
-            -r linux-x64 \
+            --no-restore \
             --self-contained false \
             -o ${{ env.PUBLISH_DIR }}
 
@@ -41,14 +45,19 @@ jobs:
           ls -la ${{ env.PUBLISH_DIR }}
           test -f ${{ env.PUBLISH_DIR }}/LPEditorApp.dll
 
-      - name: Install zip
-        run: sudo apt-get update && sudo apt-get install -y zip
+      - name: Ensure zip is available
+        run: |
+          if ! command -v zip >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install -y zip
+          fi
 
       - name: Zip publish output
         run: |
           cd ${{ env.PUBLISH_DIR }}
           zip -r ../app.zip .
           cd ..
+          ls -lh ./app.zip
 
       - name: Deploy to Azure Web App (Zip Deploy)
         uses: azure/webapps-deploy@v3
