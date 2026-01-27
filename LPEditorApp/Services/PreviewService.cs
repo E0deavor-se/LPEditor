@@ -2533,6 +2533,7 @@ table.campaign_rank-box td.king .king-rank-text {
                 .forEach(function(card){ card.style.display = 'none'; });
 
             if (result) result.textContent = '該当件数：' + total + '件';
+            if (pageInfo) pageInfo.textContent = currentPage + ' / ' + totalPages;
             if (prev) prev.disabled = currentPage <= 1;
             if (next) next.disabled = currentPage >= totalPages;
         }
