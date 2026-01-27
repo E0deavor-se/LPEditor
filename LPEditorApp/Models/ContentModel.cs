@@ -666,11 +666,44 @@ public class CustomSectionModel
     [JsonPropertyName("additionalTextItems")]
     public List<StyledTextItem> AdditionalTextItems { get; set; } = new();
 
+    [JsonPropertyName("galleryMode")]
+    public string GalleryMode { get; set; } = "single";
+
+    [JsonPropertyName("images")]
+    public List<CustomSectionImageModel> Images { get; set; } = new();
+
+    [JsonPropertyName("galleryShowArrows")]
+    public bool GalleryShowArrows { get; set; } = true;
+
+    [JsonPropertyName("galleryShowDots")]
+    public bool GalleryShowDots { get; set; } = true;
+
+    [JsonPropertyName("galleryLoop")]
+    public bool GalleryLoop { get; set; } = true;
+
+    [JsonPropertyName("galleryAutoplay")]
+    public bool GalleryAutoplay { get; set; }
+
+    [JsonPropertyName("galleryIntervalMs")]
+    public int GalleryIntervalMs { get; set; } = 4000;
+
     [JsonPropertyName("fontFamily")]
     public string? FontFamily { get; set; }
 
     [JsonPropertyName("textAlign")]
     public string? TextAlign { get; set; }
+}
+
+public class CustomSectionImageModel
+{
+    [JsonPropertyName("src")]
+    public string Src { get; set; } = string.Empty;
+
+    [JsonPropertyName("alt")]
+    public string Alt { get; set; } = string.Empty;
+
+    [JsonPropertyName("link")]
+    public string Link { get; set; } = string.Empty;
 }
 
 public class ConditionsModel

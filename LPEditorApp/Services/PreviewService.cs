@@ -48,6 +48,8 @@ public class PreviewService
         EnsureRankingStyle(document, content);
         EnsureStoreSearchStyle(document, content);
         EnsureStoreSearchScript(document, content);
+        EnsureCustomSectionGalleryStyle(document, content);
+        EnsureCustomSectionGalleryScript(document, content);
         EnsureSectionSpacingStyle(document);
         EnsurePreviewHighlightStyle(document);
         EnsureDecoZIndexStyle(document);
@@ -2597,6 +2599,172 @@ table.campaign_rank-box td.king .king-rank-text {
                 head.AppendChild(script);
         }
 
+        private static void EnsureCustomSectionGalleryStyle(IDocument document, ContentModel content)
+        {
+            if (content.CustomSections is null || content.CustomSections.Count == 0)
+            {
+                return;
+            }
+
+            var head = document.Head;
+            if (head is null || document.QuerySelector("style[data-custom-gallery='true']") is not null)
+            {
+                return;
+            }
+
+            var style = document.CreateElement("style");
+            style.SetAttribute("data-custom-gallery", "true");
+            style.TextContent = @"
+    .custom-section-image img { width: 100%; border-radius: 12px; box-shadow: 0 10px 20px rgba(15, 23, 42, 0.12); }
+    .custom-gallery { margin: 12px 0; }
+    .custom-gallery--carousel { position: relative; overflow: hidden; border-radius: 14px; background: #f8fafc; border: 1px solid rgba(148, 163, 184, 0.35); }
+    .custom-gallery-track { display: flex; transition: transform 0.35s ease; }
+    .custom-gallery-slide { min-width: 100%; }
+    .custom-gallery-slide img { width: 100%; display: block; border-radius: 0; }
+    .custom-gallery-link { display: block; }
+    .custom-gallery-nav { position: absolute; top: 50%; transform: translateY(-50%); width: 36px; height: 36px; border-radius: 999px; border: 1px solid rgba(148, 163, 184, 0.5); background: rgba(255, 255, 255, 0.9); color: #0f172a; font-weight: 700; cursor: pointer; }
+    .custom-gallery-nav:disabled { opacity: 0.4; cursor: not-allowed; }
+    .custom-gallery-prev { left: 10px; }
+    .custom-gallery-next { right: 10px; }
+    .custom-gallery-dots { display: flex; justify-content: center; gap: 6px; padding: 8px 0 10px; background: #f8fafc; }
+    .custom-gallery-dot { width: 8px; height: 8px; border-radius: 999px; border: none; background: #cbd5e1; cursor: pointer; }
+    .custom-gallery-dot.is-active { background: #0f172a; }
+    .custom-gallery--grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+    .custom-gallery--grid .custom-gallery-item img { width: 100%; border-radius: 12px; border: 1px solid rgba(148, 163, 184, 0.35); background: #fff; }
+    @media (max-width: 768px) { .custom-gallery--grid { grid-template-columns: 1fr; } }
+";
+            head.AppendChild(style);
+        }
+
+        private static void EnsureCustomSectionGalleryScript(IDocument document, ContentModel content)
+        {
+            if (content.CustomSections is null || content.CustomSections.Count == 0)
+            {
+                return;
+            }
+
+            var head = document.Head;
+            if (head is null || document.QuerySelector("script[data-custom-gallery-script='true']") is not null)
+            {
+                return;
+            }
+
+            var script = document.CreateElement("script");
+            script.SetAttribute("data-custom-gallery-script", "true");
+            script.TextContent = @"
+    (function(){
+        function initCarousel(root){
+            var track = root.querySelector('.custom-gallery-track');
+            var slides = Array.prototype.slice.call(root.querySelectorAll('.custom-gallery-slide'));
+            if (!track || slides.length === 0) return;
+
+            var prev = root.querySelector('.custom-gallery-prev');
+            var next = root.querySelector('.custom-gallery-next');
+            var dots = root.querySelector('.custom-gallery-dots');
+
+            var showArrows = root.getAttribute('data-show-arrows') !== 'false';
+            var showDots = root.getAttribute('data-show-dots') !== 'false';
+            var loop = root.getAttribute('data-loop') !== 'false';
+            var autoplay = root.getAttribute('data-autoplay') === 'true';
+            var interval = parseInt(root.getAttribute('data-interval') || '4000', 10);
+            if (!Number.isFinite(interval) || interval < 1000) interval = 4000;
+
+            var index = 0;
+            var timer = null;
+
+            function renderDots(){
+                if (!dots) return;
+                dots.innerHTML = '';
+                slides.forEach(function(_, i){
+                    var btn = document.createElement('button');
+                    btn.type = 'button';
+                    btn.className = 'custom-gallery-dot' + (i === index ? ' is-active' : '');
+                    btn.setAttribute('data-dot', i);
+                    dots.appendChild(btn);
+                });
+            }
+
+            function update(){
+                track.style.transform = 'translateX(' + (-index * 100) + '%)';
+                if (dots){
+                    Array.prototype.slice.call(dots.querySelectorAll('.custom-gallery-dot')).forEach(function(dot, i){
+                        if (i === index) dot.classList.add('is-active');
+                        else dot.classList.remove('is-active');
+                    });
+                }
+                if (!loop){
+                    if (prev) prev.disabled = index <= 0;
+                    if (next) next.disabled = index >= slides.length - 1;
+                }
+            }
+
+            function go(nextIndex){
+                if (nextIndex < 0){
+                    if (!loop) return;
+                    nextIndex = slides.length - 1;
+                }
+                if (nextIndex >= slides.length){
+                    if (!loop) return;
+                    nextIndex = 0;
+                }
+                index = nextIndex;
+                update();
+            }
+
+            if (!showArrows){
+                if (prev) prev.style.display = 'none';
+                if (next) next.style.display = 'none';
+            }
+            if (!showDots && dots){
+                dots.style.display = 'none';
+            }
+
+            renderDots();
+            update();
+
+            if (prev) prev.addEventListener('click', function(){ go(index - 1); });
+            if (next) next.addEventListener('click', function(){ go(index + 1); });
+            if (dots){
+                dots.addEventListener('click', function(ev){
+                    var target = ev.target;
+                    if (!target || !target.getAttribute) return;
+                    var value = target.getAttribute('data-dot');
+                    if (value === null) return;
+                    var i = parseInt(value, 10);
+                    if (!Number.isFinite(i)) return;
+                    go(i);
+                });
+            }
+
+            function start(){
+                if (!autoplay || slides.length <= 1) return;
+                stop();
+                timer = setInterval(function(){ go(index + 1); }, interval);
+            }
+
+            function stop(){
+                if (timer) { clearInterval(timer); timer = null; }
+            }
+
+            root.addEventListener('mouseenter', stop);
+            root.addEventListener('mouseleave', start);
+            start();
+        }
+
+        function boot(){
+            document.querySelectorAll('.custom-gallery[data-carousel=""true""]').forEach(initCarousel);
+        }
+
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', boot);
+        } else {
+            boot();
+        }
+    })();
+";
+            head.AppendChild(script);
+        }
+
     private static void InsertAfter(IElement newElement, IElement? target)
     {
         if (target is null || target.ParentElement is null)
@@ -2972,13 +3140,7 @@ table.campaign_rank-box td.king .king-rank-text {
 		var title = WebUtility.HtmlEncode(section.Title ?? string.Empty);
 		var bodyHtml = RenderTextLines(section.BodyTextItems, "custom-section-body-lines");
 		var notesHtml = RenderTextLines(section.ImageNotesItems, "custom-section-notes");
-		var imageHtml = string.Empty;
-		if (!string.IsNullOrWhiteSpace(section.ImagePath) && !IsImageDeleted(content, section.ImagePath))
-		{
-			var imgSrc = ResolveImageUrl(section.ImagePath, template, overrides, embedImages);
-			var alt = WebUtility.HtmlEncode(section.ImageAlt ?? string.Empty);
-			imageHtml = $"<div class=\"custom-section-image\"><img src=\"{imgSrc}\" alt=\"{alt}\" /></div>";
-		}
+        var imageHtml = BuildCustomSectionGalleryHtml(section, content, template, overrides, embedImages);
 		var linkHtml = string.Empty;
 		if (!string.IsNullOrWhiteSpace(section.LinkUrl) && IsValidUrl(section.LinkUrl))
 		{
@@ -3003,6 +3165,126 @@ table.campaign_rank-box td.king .king-rank-text {
   </div>
 </section>";
 	}
+
+    private static string BuildCustomSectionGalleryHtml(
+        CustomSectionModel section,
+        ContentModel content,
+        TemplateProject template,
+        IDictionary<string, byte[]>? overrides,
+        bool embedImages)
+    {
+        var images = section.Images
+            .Where(img => img is not null && !string.IsNullOrWhiteSpace(img.Src))
+            .Where(img => !IsImageDeleted(content, img.Src))
+            .ToList();
+
+        if (images.Count == 0)
+        {
+            return BuildLegacyCustomImageHtml(section, content, template, overrides, embedImages);
+        }
+
+        var mode = NormalizeGalleryMode(section.GalleryMode);
+        return mode switch
+        {
+            "carousel" => BuildCustomCarouselHtml(section, images, template, overrides, embedImages),
+            "grid" => BuildCustomGridHtml(section, images, template, overrides, embedImages),
+            _ => BuildCustomSingleHtml(section, images, template, overrides, embedImages)
+        };
+    }
+
+    private static string BuildLegacyCustomImageHtml(
+        CustomSectionModel section,
+        ContentModel content,
+        TemplateProject template,
+        IDictionary<string, byte[]>? overrides,
+        bool embedImages)
+    {
+        if (string.IsNullOrWhiteSpace(section.ImagePath) || IsImageDeleted(content, section.ImagePath))
+        {
+            return string.Empty;
+        }
+
+        var imgSrc = ResolveImageUrl(section.ImagePath, template, overrides, embedImages);
+        var alt = WebUtility.HtmlEncode(section.ImageAlt ?? string.Empty);
+        return $"<div class=\"custom-section-image\"><img src=\"{imgSrc}\" alt=\"{alt}\" /></div>";
+    }
+
+    private static string BuildCustomSingleHtml(
+        CustomSectionModel section,
+        List<CustomSectionImageModel> images,
+        TemplateProject template,
+        IDictionary<string, byte[]>? overrides,
+        bool embedImages)
+    {
+        var first = images.First();
+        var imageTag = BuildCustomImageTag(section, first, template, overrides, embedImages);
+        return string.IsNullOrWhiteSpace(imageTag)
+            ? string.Empty
+            : $"<div class=\"custom-section-image\">{imageTag}</div>";
+    }
+
+    private static string BuildCustomCarouselHtml(
+        CustomSectionModel section,
+        List<CustomSectionImageModel> images,
+        TemplateProject template,
+        IDictionary<string, byte[]>? overrides,
+        bool embedImages)
+    {
+        var slides = string.Join("", images.Select(img => $"<div class=\"custom-gallery-slide\">{BuildCustomImageTag(section, img, template, overrides, embedImages)}</div>"));
+        var showArrows = section.GalleryShowArrows ? "true" : "false";
+        var showDots = section.GalleryShowDots ? "true" : "false";
+        var loop = section.GalleryLoop ? "true" : "false";
+        var autoplay = section.GalleryAutoplay ? "true" : "false";
+        var interval = Math.Max(1000, section.GalleryIntervalMs);
+
+                return $@"<div class=""custom-gallery custom-gallery--carousel"" data-carousel=""true"" data-show-arrows=""{showArrows}"" data-show-dots=""{showDots}"" data-loop=""{loop}"" data-autoplay=""{autoplay}"" data-interval=""{interval}"">
+    <div class=""custom-gallery-track"">{slides}</div>
+    <button type=""button"" class=""custom-gallery-nav custom-gallery-prev"" aria-label=""前へ"">‹</button>
+    <button type=""button"" class=""custom-gallery-nav custom-gallery-next"" aria-label=""次へ"">›</button>
+    <div class=""custom-gallery-dots""></div>
+</div>";
+    }
+
+    private static string BuildCustomGridHtml(
+        CustomSectionModel section,
+        List<CustomSectionImageModel> images,
+        TemplateProject template,
+        IDictionary<string, byte[]>? overrides,
+        bool embedImages)
+    {
+        var items = string.Join("", images.Select(img => $"<div class=\"custom-gallery-item\">{BuildCustomImageTag(section, img, template, overrides, embedImages)}</div>"));
+        return $"<div class=\"custom-gallery custom-gallery--grid\">{items}</div>";
+    }
+
+    private static string BuildCustomImageTag(
+        CustomSectionModel section,
+        CustomSectionImageModel image,
+        TemplateProject template,
+        IDictionary<string, byte[]>? overrides,
+        bool embedImages)
+    {
+        if (string.IsNullOrWhiteSpace(image.Src))
+        {
+            return string.Empty;
+        }
+
+        var src = ResolveImageUrl(image.Src, template, overrides, embedImages);
+        var altValue = string.IsNullOrWhiteSpace(image.Alt) ? section.ImageAlt : image.Alt;
+        var alt = WebUtility.HtmlEncode(altValue ?? string.Empty);
+        var imgTag = $"<img src=\"{src}\" alt=\"{alt}\" />";
+        if (!string.IsNullOrWhiteSpace(image.Link) && IsValidUrl(image.Link))
+        {
+            var url = WebUtility.HtmlEncode(image.Link);
+            return $"<a class=\"custom-gallery-link\" href=\"{url}\" target=\"_blank\" rel=\"noopener noreferrer\">{imgTag}</a>";
+        }
+
+        return imgTag;
+    }
+
+    private static string NormalizeGalleryMode(string? mode)
+    {
+        return string.IsNullOrWhiteSpace(mode) ? "single" : mode.Trim().ToLowerInvariant();
+    }
 
 	private static bool IsValidUrl(string? url)
 	{

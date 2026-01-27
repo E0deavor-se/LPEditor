@@ -838,6 +838,7 @@
 											}
 											else if (customSection is not null)
 											{
+												EnsureCustomSectionGalleryState(customSection);
 												<div class="field">
 													<label>セクションタイトル</label>
 													<input class="text" @bind-value="customSection.Title" @bind-value:event="oninput" />
@@ -855,16 +856,75 @@
 													                 GetColorValue="GetColorValue" />
 												</div>
 												<div class="field">
-													<label>画像</label>
+													<label>表示形式</label>
+													<InputSelect class="text-option-select" @bind-Value="customSection.GalleryMode" @bind-Value:after="OnAnyInputAfter">
+														<option value="single">単体</option>
+														<option value="carousel">カルーセル</option>
+														<option value="grid">グリッド</option>
+													</InputSelect>
+													<div class="hint">images が空の場合は imagePath を表示します。</div>
+												</div>
+												<div class="field">
+													<label>画像（単体 / 互換）</label>
 													<div class="image-row">
 														<input class="text" @bind-value="customSection.ImagePath" @bind-value:event="oninput" />
 														<InputFile OnChange="e => OnImageSelected(e, customSection.ImagePath)" accept="image/*" />
 													</div>
 												</div>
 												<div class="field">
-													<label>画像代替テキスト</label>
+													<label>画像代替テキスト（単体）</label>
 													<input class="text" @bind-value="customSection.ImageAlt" @bind-value:event="oninput" />
 												</div>
+												@if (IsGalleryMode(customSection, "carousel") || IsGalleryMode(customSection, "grid"))
+												{
+													<div class="field">
+														<label>画像ギャラリー</label>
+														<InputFile OnChange="e => OnCustomSectionImagesSelected(e, customSection)" accept="image/*" multiple />
+														<div class="hint">複数選択アップロードに対応しています。</div>
+													</div>
+													@if (customSection.Images.Count == 0)
+													{
+														<div class="text text-readonly">画像が未登録の場合は、単体画像が表示されます。</div>
+													}
+													else
+													{
+														<div class="gallery-editor">
+															@foreach (var image in customSection.Images)
+															{
+																<div class="gallery-item">
+																	<img class="thumb" src="@GetImagePreviewSrc(image.Src)" alt="@image.Alt" />
+																	<div class="gallery-fields">
+																		<label>src</label>
+																		<input class="text" @bind-value="image.Src" @bind-value:event="oninput" @bind-value:after="OnAnyInputAfter" />
+																		<label>alt</label>
+																		<input class="text" @bind-value="image.Alt" @bind-value:event="oninput" @bind-value:after="OnAnyInputAfter" />
+																		<label>link</label>
+																		<input class="text" @bind-value="image.Link" @bind-value:event="oninput" @bind-value:after="OnAnyInputAfter" placeholder="https://..." />
+																	</div>
+																	<div class="gallery-actions">
+																		<button type="button" class="btn small" @onclick="() => MoveCustomSectionImage(customSection, image, -1)">↑</button>
+																		<button type="button" class="btn small" @onclick="() => MoveCustomSectionImage(customSection, image, 1)">↓</button>
+																		<button type="button" class="btn small danger" @onclick="() => RemoveCustomSectionImage(customSection, image)">削除</button>
+																	</div>
+																</div>
+															}
+														</div>
+													}
+													<button type="button" class="btn small" @onclick="() => AddCustomSectionImage(customSection)">画像追加</button>
+													<details class="gallery-options">
+														<summary>オプション</summary>
+														<div class="field">
+															<label class="check"><input type="checkbox" @bind="customSection.GalleryShowArrows" @bind:after="OnAnyInputAfter" /> 矢印</label>
+															<label class="check"><input type="checkbox" @bind="customSection.GalleryShowDots" @bind:after="OnAnyInputAfter" /> ドット</label>
+															<label class="check"><input type="checkbox" @bind="customSection.GalleryLoop" @bind:after="OnAnyInputAfter" /> ループ</label>
+															<label class="check"><input type="checkbox" @bind="customSection.GalleryAutoplay" @bind:after="OnAnyInputAfter" /> 自動再生</label>
+														</div>
+														<div class="field">
+															<label>interval(ms)</label>
+															<input class="text" type="number" min="1000" step="500" @bind-value="customSection.GalleryIntervalMs" @bind-value:event="oninput" @bind-value:after="OnAnyInputAfter" />
+														</div>
+													</details>
+												}
 												<div class="field">
 													<label>画像下の注意事項</label>
 													<TextLinesEditor Title=""
@@ -2398,6 +2458,13 @@
 			Body = string.Empty,
 			ImagePath = $"images/{key}.png",
 			ImageAlt = string.Empty,
+			GalleryMode = "single",
+			Images = new List<CustomSectionImageModel>(),
+			GalleryShowArrows = true,
+			GalleryShowDots = true,
+			GalleryLoop = true,
+			GalleryAutoplay = false,
+			GalleryIntervalMs = 4000,
 			LinkUrl = string.Empty,
 			Notes = string.Empty,
 			BodyTextItems = new List<StyledTextItem>(),
@@ -2713,6 +2780,109 @@
 			.Where(group => !string.Equals(group.Key, section.Key, StringComparison.OrdinalIgnoreCase))
 			.ToList();
 		await UpdatePreviewAsync();
+	}
+
+	private void EnsureCustomSectionGalleryState(CustomSectionModel section)
+	{
+		section.Images ??= new List<CustomSectionImageModel>();
+		if (string.IsNullOrWhiteSpace(section.GalleryMode))
+		{
+			section.GalleryMode = "single";
+		}
+		if (section.GalleryIntervalMs <= 0)
+		{
+			section.GalleryIntervalMs = 4000;
+		}
+	}
+
+	private static bool IsGalleryMode(CustomSectionModel section, string mode)
+	{
+		return string.Equals(section.GalleryMode, mode, StringComparison.OrdinalIgnoreCase);
+	}
+
+	private async Task OnCustomSectionImagesSelected(InputFileChangeEventArgs e, CustomSectionModel section)
+	{
+		EnsureCustomSectionGalleryState(section);
+		State.Error.Clear();
+		try
+		{
+			foreach (var file in e.GetMultipleFiles())
+			{
+				using var ms = new MemoryStream();
+				await file.OpenReadStream(long.MaxValue).CopyToAsync(ms);
+				var bytes = ms.ToArray();
+				var ext = Path.GetExtension(file.Name).ToLowerInvariant();
+				var path = $"images/custom/{section.Key}/{Guid.NewGuid()}{ext}";
+				await SaveCustomSectionImageAsync(path, bytes);
+				section.Images.Add(new CustomSectionImageModel
+				{
+					Src = path,
+					Alt = string.Empty,
+					Link = string.Empty
+				});
+			}
+
+			await UpdatePreviewAsync();
+		}
+		catch (Exception ex)
+		{
+			State.Error.SetError("画像アップロードに失敗", ex.Message);
+		}
+	}
+
+	private async Task SaveCustomSectionImageAsync(string path, byte[] bytes)
+	{
+		var ext = Path.GetExtension(path).ToLowerInvariant();
+		if (ext == ".png")
+		{
+			var maxWidth = GetMaxWidth(path);
+			var resized = await ImageService.ResizePngAsync(bytes, maxWidth);
+			State.ImageOverrides[path] = resized;
+			UpdateImageMeta(path, resized);
+		}
+		else
+		{
+			State.ImageOverrides[path] = bytes;
+			UpdateImageMeta(path, bytes);
+		}
+
+		RemoveDeletedImage(path);
+	}
+
+	private void AddCustomSectionImage(CustomSectionModel section)
+	{
+		EnsureCustomSectionGalleryState(section);
+		section.Images.Add(new CustomSectionImageModel());
+		_ = UpdatePreviewAsync();
+	}
+
+	private void MoveCustomSectionImage(CustomSectionModel section, CustomSectionImageModel image, int direction)
+	{
+		var list = section.Images;
+		var index = list.IndexOf(image);
+		if (index < 0)
+		{
+			return;
+		}
+		var target = index + direction;
+		if (target < 0 || target >= list.Count)
+		{
+			return;
+		}
+		list.RemoveAt(index);
+		list.Insert(target, image);
+		_ = UpdatePreviewAsync();
+	}
+
+	private void RemoveCustomSectionImage(CustomSectionModel section, CustomSectionImageModel image)
+	{
+		if (!string.IsNullOrWhiteSpace(image.Src))
+		{
+			State.ImageOverrides.Remove(image.Src);
+			RemoveDeletedImage(image.Src);
+		}
+		section.Images.Remove(image);
+		_ = UpdatePreviewAsync();
 	}
 
 	private void EnsureSectionGroupKey(string key, params string[] insertAfterKeys)
