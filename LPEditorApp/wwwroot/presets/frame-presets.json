@@ -1,0 +1,394 @@
+[
+  {
+    "id": "simple-border",
+    "name": "シンプルボーダー",
+    "category": "simple",
+    "description": "白背景＋細枠＋丸み＋薄影",
+    "apply": {
+      "backgroundColor": "#ffffff",
+      "backgroundOpacity": 100,
+      "borderColor": "#e2e8f0",
+      "borderWidth": 1,
+      "borderStyle": "solid",
+      "borderRadius": 14,
+      "shadowLevel": "sm",
+      "paddingPreset": "normal",
+      "paddingX": 24,
+      "paddingY": 20
+    },
+    "preview": {
+      "backgroundColor": "#ffffff",
+      "backgroundOpacity": 100,
+      "borderColor": "#e2e8f0",
+      "borderWidth": 1,
+      "borderStyle": "solid",
+      "borderRadius": 14,
+      "shadowLevel": "sm"
+    }
+  },
+  {
+    "id": "bold-border",
+    "name": "ボールド枠",
+    "category": "emphasis",
+    "description": "太枠＋角丸でしっかり強調",
+    "apply": {
+      "backgroundColor": "#ffffff",
+      "backgroundOpacity": 100,
+      "borderColor": "#0f172a",
+      "borderWidth": 4,
+      "borderStyle": "solid",
+      "borderRadius": 12,
+      "shadowLevel": "off",
+      "paddingPreset": "normal",
+      "paddingX": 24,
+      "paddingY": 20
+    },
+    "preview": {
+      "backgroundColor": "#ffffff",
+      "borderColor": "#0f172a",
+      "borderWidth": 4,
+      "borderStyle": "solid",
+      "borderRadius": 12
+    }
+  },
+  {
+    "id": "double-line",
+    "name": "ダブルライン",
+    "category": "line",
+    "description": "2重線のクラシック枠",
+    "apply": {
+      "backgroundColor": "#ffffff",
+      "backgroundOpacity": 100,
+      "borderColor": "#334155",
+      "borderWidth": 3,
+      "borderStyle": "double",
+      "borderRadius": 10,
+      "shadowLevel": "off",
+      "paddingPreset": "normal",
+      "paddingX": 24,
+      "paddingY": 20
+    },
+    "preview": {
+      "backgroundColor": "#ffffff",
+      "borderColor": "#334155",
+      "borderWidth": 3,
+      "borderStyle": "double",
+      "borderRadius": 10
+    }
+  },
+  {
+    "id": "dashed",
+    "name": "ドットライン",
+    "category": "line",
+    "description": "軽やかな点線枠",
+    "apply": {
+      "backgroundColor": "#ffffff",
+      "backgroundOpacity": 100,
+      "borderColor": "#64748b",
+      "borderWidth": 2,
+      "borderStyle": "dashed",
+      "borderRadius": 12,
+      "shadowLevel": "off",
+      "paddingPreset": "normal",
+      "paddingX": 24,
+      "paddingY": 20
+    },
+    "preview": {
+      "backgroundColor": "#ffffff",
+      "borderColor": "#64748b",
+      "borderWidth": 2,
+      "borderStyle": "dashed",
+      "borderRadius": 12
+    }
+  },
+  {
+    "id": "left-accent",
+    "name": "左アクセント",
+    "category": "line",
+    "description": "左に太いアクセントライン",
+    "apply": {
+      "backgroundColor": "#ffffff",
+      "backgroundOpacity": 100,
+      "borderColor": "#3b82f6",
+      "borderWidth": 3,
+      "borderStyle": "solid",
+      "borderRadius": 12,
+      "shadowLevel": "sm",
+      "paddingPreset": "normal",
+      "paddingX": 24,
+      "paddingY": 20
+    },
+    "preview": {
+      "backgroundColor": "#ffffff",
+      "borderColor": "#3b82f6",
+      "borderWidth": 3,
+      "borderStyle": "solid",
+      "borderRadius": 12,
+      "shadowLevel": "sm"
+    }
+  },
+  {
+    "id": "top-accent",
+    "name": "上アクセント",
+    "category": "line",
+    "description": "上部に帯っぽいライン",
+    "apply": {
+      "backgroundColor": "#ffffff",
+      "backgroundOpacity": 100,
+      "borderColor": "#f59e0b",
+      "borderWidth": 3,
+      "borderStyle": "solid",
+      "borderRadius": 12,
+      "shadowLevel": "sm",
+      "paddingPreset": "normal",
+      "paddingX": 24,
+      "paddingY": 20
+    },
+    "preview": {
+      "backgroundColor": "#ffffff",
+      "borderColor": "#f59e0b",
+      "borderWidth": 3,
+      "borderStyle": "solid",
+      "borderRadius": 12,
+      "shadowLevel": "sm"
+    }
+  },
+  {
+    "id": "speech-note",
+    "name": "付箋ノート",
+    "category": "note",
+    "description": "角丸＋影＋柔らか背景",
+    "apply": {
+      "backgroundColor": "#fff7ed",
+      "backgroundOpacity": 100,
+      "borderColor": "#f59e0b",
+      "borderWidth": 2,
+      "borderStyle": "solid",
+      "borderRadius": 14,
+      "shadowLevel": "md",
+      "paddingPreset": "normal",
+      "paddingX": 24,
+      "paddingY": 20
+    },
+    "preview": {
+      "backgroundColor": "#fff7ed",
+      "borderColor": "#f59e0b",
+      "borderWidth": 2,
+      "borderStyle": "solid",
+      "borderRadius": 14,
+      "shadowLevel": "md"
+    }
+  },
+  {
+    "id": "glass",
+    "name": "ガラス",
+    "category": "emphasis",
+    "description": "半透明＋ライトシャドウ",
+    "apply": {
+      "backgroundColor": "#ffffff",
+      "backgroundOpacity": 60,
+      "borderColor": "#ffffff",
+      "borderWidth": 1,
+      "borderStyle": "solid",
+      "borderRadius": 16,
+      "shadowLevel": "md",
+      "paddingPreset": "normal",
+      "paddingX": 24,
+      "paddingY": 20
+    },
+    "preview": {
+      "backgroundColor": "#ffffff",
+      "backgroundOpacity": 70,
+      "borderColor": "#ffffff",
+      "borderWidth": 1,
+      "borderStyle": "solid",
+      "borderRadius": 16,
+      "shadowLevel": "md"
+    }
+  },
+  {
+    "id": "gradient-frame",
+    "name": "グラデ枠",
+    "category": "emphasis",
+    "description": "枠にグラデーション",
+    "apply": {
+      "backgroundColor": "#ffffff",
+      "backgroundOpacity": 100,
+      "borderColor": "#6366f1",
+      "borderWidth": 3,
+      "borderStyle": "solid",
+      "borderRadius": 16,
+      "shadowLevel": "sm",
+      "paddingPreset": "normal",
+      "paddingX": 24,
+      "paddingY": 20,
+      "borderGradientColorA": "#6366f1",
+      "borderGradientColorB": "#22d3ee",
+      "borderGradientAngle": 135
+    },
+    "preview": {
+      "backgroundColor": "#ffffff",
+      "borderWidth": 3,
+      "borderStyle": "solid",
+      "borderRadius": 16,
+      "shadowLevel": "sm",
+      "borderGradientColorA": "#6366f1",
+      "borderGradientColorB": "#22d3ee",
+      "borderGradientAngle": 135
+    }
+  },
+  {
+    "id": "inner-pad",
+    "name": "ゆったり余白",
+    "category": "simple",
+    "description": "余白強め＋罫線",
+    "apply": {
+      "backgroundColor": "#ffffff",
+      "backgroundOpacity": 100,
+      "borderColor": "#e5e7eb",
+      "borderWidth": 1,
+      "borderStyle": "solid",
+      "borderRadius": 12,
+      "shadowLevel": "off",
+      "paddingPreset": "custom",
+      "paddingX": 32,
+      "paddingY": 28
+    },
+    "preview": {
+      "backgroundColor": "#ffffff",
+      "borderColor": "#e5e7eb",
+      "borderWidth": 1,
+      "borderStyle": "solid",
+      "borderRadius": 12
+    }
+  },
+  {
+    "id": "headline-ribbon",
+    "name": "ヘッドラインリボン",
+    "category": "ribbon",
+    "description": "上にリボン風アクセント",
+    "apply": {
+      "backgroundColor": "#f8fafc",
+      "backgroundOpacity": 100,
+      "borderColor": "#0ea5e9",
+      "borderWidth": 2,
+      "borderStyle": "solid",
+      "borderRadius": 12,
+      "shadowLevel": "sm",
+      "paddingPreset": "normal",
+      "paddingX": 24,
+      "paddingY": 20
+    },
+    "preview": {
+      "backgroundColor": "#f8fafc",
+      "borderColor": "#0ea5e9",
+      "borderWidth": 2,
+      "borderStyle": "solid",
+      "borderRadius": 12,
+      "shadowLevel": "sm"
+    }
+  },
+  {
+    "id": "corner-tape",
+    "name": "コーナーテープ",
+    "category": "note",
+    "description": "角にテープ風のアクセント",
+    "apply": {
+      "backgroundColor": "#fef9c3",
+      "backgroundOpacity": 100,
+      "borderColor": "#f59e0b",
+      "borderWidth": 2,
+      "borderStyle": "solid",
+      "borderRadius": 12,
+      "shadowLevel": "sm",
+      "paddingPreset": "normal",
+      "paddingX": 24,
+      "paddingY": 20
+    },
+    "preview": {
+      "backgroundColor": "#fef9c3",
+      "borderColor": "#f59e0b",
+      "borderWidth": 2,
+      "borderStyle": "solid",
+      "borderRadius": 12,
+      "shadowLevel": "sm"
+    }
+  },
+  {
+    "id": "note-paper",
+    "name": "ノート紙",
+    "category": "note",
+    "description": "紙っぽい落ち着き",
+    "apply": {
+      "backgroundColor": "#fffdf7",
+      "backgroundOpacity": 100,
+      "borderColor": "#e2e8f0",
+      "borderWidth": 1,
+      "borderStyle": "solid",
+      "borderRadius": 10,
+      "shadowLevel": "sm",
+      "paddingPreset": "normal",
+      "paddingX": 24,
+      "paddingY": 20
+    },
+    "preview": {
+      "backgroundColor": "#fffdf7",
+      "borderColor": "#e2e8f0",
+      "borderWidth": 1,
+      "borderStyle": "solid",
+      "borderRadius": 10,
+      "shadowLevel": "sm"
+    }
+  },
+  {
+    "id": "soft-emphasis",
+    "name": "ソフト強調",
+    "category": "emphasis",
+    "description": "淡い背景＋影で目立たせる",
+    "apply": {
+      "backgroundColor": "#eef2ff",
+      "backgroundOpacity": 100,
+      "borderColor": "#6366f1",
+      "borderWidth": 2,
+      "borderStyle": "solid",
+      "borderRadius": 14,
+      "shadowLevel": "md",
+      "paddingPreset": "normal",
+      "paddingX": 24,
+      "paddingY": 20
+    },
+    "preview": {
+      "backgroundColor": "#eef2ff",
+      "borderColor": "#6366f1",
+      "borderWidth": 2,
+      "borderStyle": "solid",
+      "borderRadius": 14,
+      "shadowLevel": "md"
+    }
+  },
+  {
+    "id": "outline-quiet",
+    "name": "静かな枠",
+    "category": "simple",
+    "description": "薄枠＋影なしで落ち着き",
+    "apply": {
+      "backgroundColor": "#ffffff",
+      "backgroundOpacity": 100,
+      "borderColor": "#cbd5f5",
+      "borderWidth": 1,
+      "borderStyle": "solid",
+      "borderRadius": 8,
+      "shadowLevel": "off",
+      "paddingPreset": "normal",
+      "paddingX": 24,
+      "paddingY": 20
+    },
+    "preview": {
+      "backgroundColor": "#ffffff",
+      "borderColor": "#cbd5f5",
+      "borderWidth": 1,
+      "borderStyle": "solid",
+      "borderRadius": 8
+    }
+  }
+]

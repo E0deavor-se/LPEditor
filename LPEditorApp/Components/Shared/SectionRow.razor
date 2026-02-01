@@ -1,0 +1,61 @@
+@using LPEditorApp.Models
+
+<div class="sectionNav-rowWrapper item @(IsHidden ? "is-hidden" : "")" data-id="@Group.Key">
+    <div id="@RowId" class="sectionNav-row @(IsCurrent ? "is-current" : "") @(IsSelected ? "is-selected" : "") @(IsOpen ? "is-open" : "")" @onclick="OnSelect">
+        <div class="sectionNav-handle drag-handle" title="並び替え" @onclick:stopPropagation="true">⋮⋮</div>
+        <div class="sectionNav-icon" title="@IconLabel">@Icon</div>
+        <div class="sectionNav-main" @ondblclick="OnToggleOpen">
+            <div class="sectionNav-title">@Title</div>
+            <div class="sectionNav-sub">
+                <span>@SubText</span>
+                <span class="sectionNav-id">ID: @Group.Key</span>
+            </div>
+        </div>
+        <div class="sectionNav-actions" @onclick:stopPropagation="true">
+            <button type="button" class="sectionNav-btn sectionNav-expand @(IsOpen ? "is-open" : "")" title="@(IsOpen ? "詳細を閉じる" : "詳細を開く")" @onclick="OnToggleOpen" aria-expanded="@IsOpen">▾</button>
+            <label class="toggle-switch sectionNav-toggle">
+                <input type="checkbox" checked="@IsVisible" @onchange="OnToggleChanged" />
+                <span class="toggle-label">表示</span>
+            </label>
+            <button type="button" class="sectionNav-btn is-primary" title="編集" @onclick="OnEdit">📝</button>
+            <button type="button" class="sectionNav-btn" title="装飾" @onclick='() => OnQuickAction.InvokeAsync("decor")'>🎨</button>
+            <button type="button" class="sectionNav-btn" title="背景" @onclick='() => OnQuickAction.InvokeAsync("background")'>🖼</button>
+            <button type="button" class="sectionNav-btn" title="ジャンプ" @onclick='() => OnQuickAction.InvokeAsync("scroll")'>⤵</button>
+            <details class="sectionNav-menu">
+                <summary class="sectionNav-btn" title="メニュー">⋯</summary>
+                <div class="sectionNav-menuList">
+                    <button type="button" class="sectionNav-menuItem" @onclick="OnToggleOpen">@(IsOpen ? "詳細を閉じる" : "詳細を開く")</button>
+                    <button type="button" class="sectionNav-menuItem" @onclick='() => OnMenuAction.InvokeAsync("delete")'>削除</button>
+                </div>
+            </details>
+        </div>
+    </div>
+    @if (IsOpen && ChildContent is not null)
+    {
+        <div class="section-card-body">
+            @ChildContent
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public SectionGroupModel Group { get; set; } = new();
+    [Parameter] public string RowId { get; set; } = string.Empty;
+    [Parameter] public string Title { get; set; } = string.Empty;
+    [Parameter] public string SubText { get; set; } = string.Empty;
+    [Parameter] public string Icon { get; set; } = string.Empty;
+    [Parameter] public string IconLabel { get; set; } = string.Empty;
+    [Parameter] public bool IsCurrent { get; set; }
+    [Parameter] public bool IsSelected { get; set; }
+    [Parameter] public bool IsVisible { get; set; }
+    [Parameter] public bool IsOpen { get; set; }
+    [Parameter] public bool IsHidden { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+
+    [Parameter] public EventCallback OnSelect { get; set; }
+    [Parameter] public EventCallback OnEdit { get; set; }
+    [Parameter] public EventCallback<ChangeEventArgs> OnToggleChanged { get; set; }
+    [Parameter] public EventCallback OnToggleOpen { get; set; }
+    [Parameter] public EventCallback<string> OnQuickAction { get; set; }
+    [Parameter] public EventCallback<string> OnMenuAction { get; set; }
+}

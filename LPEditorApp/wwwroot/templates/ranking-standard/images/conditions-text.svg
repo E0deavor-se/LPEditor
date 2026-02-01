@@ -1,0 +1,4 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="360" height="120" viewBox="0 0 360 120">
+  <rect width="360" height="120" rx="12" fill="#f8fafc" />
+  <text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" font-size="16" fill="#64748b">条件説明</text>
+</svg>

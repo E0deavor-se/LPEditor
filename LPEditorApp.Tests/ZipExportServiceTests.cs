@@ -7,8 +7,6 @@ using System.Threading.Tasks;
 using LPEditorApp.Models;
 using LPEditorApp.Services;
 using LPEditorApp.Utils;
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.Formats.Png;
 using Xunit;
 
 namespace LPEditorApp.Tests;
@@ -79,9 +77,7 @@ public class ZipExportServiceTests
 
     private static byte[] CreatePng()
     {
-        using var image = new Image<SixLabors.ImageSharp.PixelFormats.Rgba32>(1, 1);
-        using var ms = new MemoryStream();
-        image.Save(ms, new PngEncoder());
-        return ms.ToArray();
+        return Convert.FromBase64String(
+            "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9YQn0u0AAAAASUVORK5CYII=");
     }
 }

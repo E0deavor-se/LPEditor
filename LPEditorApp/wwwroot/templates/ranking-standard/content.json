@@ -1,0 +1,416 @@
+{
+  "templateId": "ranking-standard",
+  "sectionsOrder": [
+    "countdown",
+    "campaignContent",
+    "couponPeriod",
+    "ranking",
+    "paymentHistory",
+    "couponNotes"
+  ],
+  "sectionGroups": [
+    {
+      "key": "countdown",
+      "displayName": "footer",
+      "anchorId": "footer",
+      "enabled": true
+    },
+    {
+      "key": "campaign-content",
+      "displayName": "campaign-content",
+      "anchorId": "campaign-content",
+      "enabled": true
+    },
+    {
+      "key": "coupon-period",
+      "displayName": "campaign-period",
+      "anchorId": "campaign-period",
+      "enabled": true
+    },
+    {
+      "key": "point-accrual-timing",
+      "displayName": "point-accrual-timing",
+      "anchorId": "point-accrual-timing",
+      "enabled": true
+    },
+    {
+      "key": "ranking",
+      "displayName": "ranking",
+      "anchorId": "ranking",
+      "enabled": true
+    },
+    {
+      "key": "payment-history",
+      "displayName": "payment-history-guide",
+      "anchorId": "payment-history-guide",
+      "enabled": true
+    },
+    {
+      "key": "coupon-notes",
+      "displayName": "notes",
+      "anchorId": "notes",
+      "enabled": true
+    }
+  ],
+  "meta": {
+    "pageTitle": "ランキングLP（プレースホルダー）",
+    "description": "ランキング向けテンプレートの説明文（プレースホルダー）"
+  },
+  "campaign": {
+    "startDate": "YYYY-MM-DD",
+    "endDate": "YYYY-MM-DD",
+    "countdownEnd": "YYYY-MM-DDT23:59:59",
+    "showCountdown": false,
+    "endedMessage": "フッター文言（プレースホルダー）",
+    "footerFontFamily": "",
+    "footerLines": [
+      {
+        "id": "00000000-0000-0000-0000-000000000001",
+        "text": "フッター文言（プレースホルダー）",
+        "visible": true,
+        "fontFamily": "",
+        "fontSize": 14,
+        "bold": false,
+        "color": "#334155",
+        "align": "center"
+      }
+    ]
+  },
+  "header": {
+    "logoImage": "images/logo.svg",
+    "logoAlt": "ロゴ（プレースホルダー）"
+  },
+  "hero": {
+    "imagePc": "images/hero-pc.svg",
+    "imageSp": "images/hero-sp.svg",
+    "alt": "メインビジュアル（プレースホルダー）"
+  },
+  "sections": {
+    "campaignContent": {
+      "enabled": true,
+      "title": "キャンペーン内容（プレースホルダー）",
+      "body": "ポイント還元の条件や対象についての説明文を入力してください。",
+      "notes": [
+        { "text": "注意事項（プレースホルダー）", "emphasis": false, "bold": false, "useColor": false, "color": "", "fontSize": 14 },
+        { "text": "対象外条件（プレースホルダー）", "emphasis": false, "bold": false, "useColor": false, "color": "", "fontSize": 14 }
+      ],
+      "fontFamily": "",
+      "textAlign": ""
+    },
+    "couponPeriod": {
+      "enabled": true,
+      "title": "キャンペーン期間（プレースホルダー）",
+      "text": "YYYY年MM月DD日〜YYYY年MM月DD日",
+      "inputMode": "manual",
+      "startDate": "YYYY-MM-DD",
+      "endDate": "YYYY-MM-DD",
+      "fontFamily": "",
+      "textAlign": ""
+    },
+    "storeSearch": {
+      "enabled": false,
+      "title": "キャンペーン対象店舗検索",
+      "noticeTitle": "⚠️ ご注意ください！",
+      "noticeItems": [],
+      "noticeLines": [],
+      "stores": [],
+      "targetLabels": [],
+      "fontFamily": "",
+      "textAlign": ""
+    },
+    "couponNotes": {
+      "enabled": true,
+      "title": "注意事項（プレースホルダー）",
+      "items": [
+        { "text": "※注意事項を入力してください。", "emphasis": false, "bold": false, "useColor": false, "color": "", "fontSize": 14 }
+      ],
+      "textLines": [
+        { "id": "00000000-0000-0000-0000-000000000002", "text": "※注意事項を入力してください。", "visible": true, "fontFamily": "", "fontSize": 14, "bold": false, "color": "#334155", "align": "left" }
+      ],
+      "fontFamily": "",
+      "textAlign": ""
+    },
+    "paymentHistory": {
+      "enabled": true,
+      "titleImage": "images/payment-history-title.svg",
+      "titleText": "決済履歴の確認方法（プレースホルダー）",
+      "titleAlt": "決済履歴の確認方法",
+      "titleFontSize": 28,
+      "titleColor": "#111827",
+      "titleBold": true,
+      "text": "決済履歴はアプリの取引履歴から確認できます。",
+      "textFontSize": 18,
+      "textColor": "#334155",
+      "textBold": false,
+      "importantText": "※店頭や問い合わせ窓口では確認できません。",
+      "importantFontSize": 16,
+      "importantColor": "#B91C1C",
+      "importantBold": true,
+      "image": "images/payment-history.svg",
+      "imageAlt": "決済履歴の確認イメージ",
+      "decoImage": "images/payment-history-deco.svg",
+      "decoAlt": "",
+      "fontFamily": "",
+      "textAlign": ""
+    },
+    "ranking": {
+      "enabled": true,
+      "title": "最新ランキングはこちら（プレースホルダー）",
+      "subtitle": "キャンペーン名（プレースホルダー）",
+      "campaignName": "キャンペーン名（プレースホルダー）",
+      "titleLines": [
+        { "id": "00000000-0000-0000-0000-000000000003", "text": "最新ランキングはこちら", "visible": true, "fontFamily": "", "fontSize": 22, "bold": true, "color": "#111827", "align": "center" }
+      ],
+      "subtitleLines": [
+        { "id": "00000000-0000-0000-0000-000000000004", "text": "キャンペーン名（プレースホルダー）", "visible": true, "fontFamily": "", "fontSize": 16, "bold": false, "color": "#334155", "align": "center" }
+      ],
+      "periodText": "YYYY/MM/DD〜YYYY/MM/DD",
+      "asOfText": "YYYY/MM/DD時点",
+      "imageLeft": "images/ranking-left.svg",
+      "imageRight": "images/ranking-right.svg",
+      "leftTopImage": { "src": "images/ranking-deco-left.svg", "alt": "", "visible": true },
+      "rightTopImage": { "src": "images/ranking-deco-right.svg", "alt": "", "visible": true },
+      "rankLabel": "順位",
+      "amountLabel": "決済金額",
+      "itemsLabel": "ポイント",
+      "headerLabels": ["順位", "決済金額", "ポイント"],
+      "tablePreset": "",
+      "tableBorderWidth": 1,
+      "tableHeaderColor": "#1E3A8A",
+      "tableHeaderTextColor": "#FFFFFF",
+      "tableBorderColor": "#E5E7EB",
+      "tableStripeColor": "#F8FAFC",
+      "tableTextColor": "#111827",
+      "tableTextBold": false,
+      "tableTextStrokeColor": "",
+      "tableWidthPercent": 90,
+      "tableFontFamily": "",
+      "showCrowns": true,
+      "periodLabel": "集計期間",
+      "showPeriodLabel": true,
+      "periodAlign": "center",
+      "asOfAlign": "center",
+      "tableNotes": "※ランキングは随時更新されます。",
+      "textAlign": "",
+      "rows": [
+        { "rank": "1", "amount": "000,000円", "items": "000ポイント" },
+        { "rank": "2", "amount": "000,000円", "items": "000ポイント" },
+        { "rank": "3", "amount": "000,000円", "items": "000ポイント" }
+      ],
+      "texts": [],
+      "freeTexts": [],
+      "notesItems": [
+        { "id": "00000000-0000-0000-0000-000000000005", "text": "※ランキングは参考値です。", "visible": true, "fontFamily": "", "fontSize": 14, "bold": false, "color": "#334155", "align": "left" }
+      ],
+      "subtitleUnderItems": [],
+      "fontFamily": "",
+      "titleStyle": { "fontSize": 22, "bold": true, "color": "#111827" },
+      "subtitleStyle": { "fontSize": 16, "bold": false, "color": "#334155" },
+      "periodStyle": { "fontSize": 14, "bold": false, "color": "#334155" },
+      "periodLabelStyle": { "fontSize": 14, "bold": true, "color": "#111827" },
+      "asOfStyle": { "fontSize": 14, "bold": false, "color": "#334155" },
+      "notesStyle": { "fontSize": 12, "bold": false, "color": "#475569" }
+    },
+    "conditions": {
+      "enabled": false,
+      "titleImage": "images/conditions-title.svg",
+      "textImage": "images/conditions-text.svg",
+      "deviceText": "",
+      "items": [],
+      "fontFamily": "",
+      "textAlign": ""
+    },
+    "contact": {
+      "enabled": false,
+      "title": "お問い合わせ",
+      "lead": "",
+      "buttons": [],
+      "officeHours": "",
+      "fontFamily": "",
+      "textAlign": ""
+    },
+    "banners": {
+      "enabled": false,
+      "main": { "image": "images/banner-main.svg", "url": "https://example.com" },
+      "magazine": { "image": "images/banner-magazine.svg", "url": "https://example.com" },
+      "fontFamily": "",
+      "textAlign": ""
+    }
+  },
+  "customSections": [
+    {
+      "key": "point-accrual-timing",
+      "title": "ポイント加算時期（プレースホルダー）",
+      "body": "",
+      "bodyTextItems": [
+        { "id": "00000000-0000-0000-0000-000000000006", "text": "ポイントは決済日から数日後に加算されます。", "visible": true, "fontFamily": "", "fontSize": 16, "bold": false, "color": "#334155", "align": "left" }
+      ],
+      "imagePath": "images/point-timing.svg",
+      "imageAlt": "ポイント加算時期",
+      "linkUrl": "",
+      "notes": "",
+      "imageNotesItems": [],
+      "additionalTextItems": [],
+      "galleryMode": "single",
+      "images": [],
+      "galleryShowArrows": true,
+      "galleryShowDots": true,
+      "galleryLoop": true,
+      "galleryAutoplay": false,
+      "galleryIntervalMs": 4000,
+      "fontFamily": "",
+      "textAlign": ""
+    }
+  ],
+  "deletedImages": [],
+  "campaignStyle": {
+    "boxColor": "#ffffff",
+    "headingColor": "#111827",
+    "headingBackgroundColor": "#EEF2FF",
+    "frameBorderColor": "#E5E7EB",
+    "textColor": "#111827",
+    "mvFooterBackgroundColor": "#EEF2FF",
+    "backgroundPreset": "",
+    "backgroundColorA": "",
+    "backgroundColorB": "",
+    "mobileAutoPadding": true,
+    "mobileAutoFont": true
+  },
+  "lpBackground": {
+    "sourceType": "solid",
+    "mode": "color",
+    "color": "#F8FAFC",
+    "colorOpacity": 1,
+    "gradientType": "linear",
+    "gradientAngle": 135,
+    "gradientColorA": "",
+    "gradientColorB": "",
+    "gradientOpacity": 1,
+    "imageUrl": "",
+    "videoUrl": "",
+    "videoPoster": "",
+    "repeat": "repeat",
+    "position": "center top",
+    "positionCustom": "",
+    "size": "cover",
+    "sizeCustom": "",
+    "attachment": "scroll",
+    "transparentSections": false,
+    "preset": {},
+    "effects": {}
+  },
+  "sectionBackgrounds": {},
+  "sectionStyles": {
+    "countdown": {
+      "background": { "sourceType": "solid", "mode": "color", "color": "#ffffff", "colorOpacity": 1, "gradientType": "linear", "gradientAngle": 135, "gradientColorA": "", "gradientColorB": "", "gradientOpacity": 1, "imageUrl": "", "videoUrl": "", "videoPoster": "", "repeat": "repeat", "position": "center top", "positionCustom": "", "size": "cover", "sizeCustom": "", "attachment": "scroll", "preset": {}, "effects": {} },
+      "borderColor": "#E5E7EB",
+      "borderWidth": 1,
+      "borderStyle": "solid",
+      "radius": 16,
+      "shadow": "0 6px 18px rgba(15, 23, 42, 0.08)",
+      "paddingTop": 20,
+      "paddingRight": 20,
+      "paddingBottom": 20,
+      "paddingLeft": 20,
+      "divider": { "enabled": false, "color": "", "thickness": null, "style": "solid", "marginTop": null, "marginBottom": null },
+      "decorations": [],
+      "sectionAnimation": { "type": "none", "duration": null, "delay": null, "easing": "ease", "once": true, "trigger": "scroll", "repeat": "none" }
+    },
+    "campaign-content": {
+      "background": { "sourceType": "solid", "mode": "color", "color": "#ffffff", "colorOpacity": 1, "gradientType": "linear", "gradientAngle": 135, "gradientColorA": "", "gradientColorB": "", "gradientOpacity": 1, "imageUrl": "", "videoUrl": "", "videoPoster": "", "repeat": "repeat", "position": "center top", "positionCustom": "", "size": "cover", "sizeCustom": "", "attachment": "scroll", "preset": {}, "effects": {} },
+      "borderColor": "#E5E7EB",
+      "borderWidth": 1,
+      "borderStyle": "solid",
+      "radius": 20,
+      "shadow": "0 8px 20px rgba(15, 23, 42, 0.08)",
+      "paddingTop": 28,
+      "paddingRight": 28,
+      "paddingBottom": 28,
+      "paddingLeft": 28,
+      "divider": { "enabled": false, "color": "", "thickness": null, "style": "solid", "marginTop": null, "marginBottom": null },
+      "decorations": [],
+      "sectionAnimation": { "type": "none", "duration": null, "delay": null, "easing": "ease", "once": true, "trigger": "scroll", "repeat": "none" }
+    },
+    "coupon-period": {
+      "background": { "sourceType": "solid", "mode": "color", "color": "#ffffff", "colorOpacity": 1, "gradientType": "linear", "gradientAngle": 135, "gradientColorA": "", "gradientColorB": "", "gradientOpacity": 1, "imageUrl": "", "videoUrl": "", "videoPoster": "", "repeat": "repeat", "position": "center top", "positionCustom": "", "size": "cover", "sizeCustom": "", "attachment": "scroll", "preset": {}, "effects": {} },
+      "borderColor": "#E5E7EB",
+      "borderWidth": 1,
+      "borderStyle": "solid",
+      "radius": 20,
+      "shadow": "0 8px 20px rgba(15, 23, 42, 0.08)",
+      "paddingTop": 24,
+      "paddingRight": 24,
+      "paddingBottom": 24,
+      "paddingLeft": 24,
+      "divider": { "enabled": false, "color": "", "thickness": null, "style": "solid", "marginTop": null, "marginBottom": null },
+      "decorations": [],
+      "sectionAnimation": { "type": "none", "duration": null, "delay": null, "easing": "ease", "once": true, "trigger": "scroll", "repeat": "none" }
+    },
+    "point-accrual-timing": {
+      "background": { "sourceType": "solid", "mode": "color", "color": "#ffffff", "colorOpacity": 1, "gradientType": "linear", "gradientAngle": 135, "gradientColorA": "", "gradientColorB": "", "gradientOpacity": 1, "imageUrl": "", "videoUrl": "", "videoPoster": "", "repeat": "repeat", "position": "center top", "positionCustom": "", "size": "cover", "sizeCustom": "", "attachment": "scroll", "preset": {}, "effects": {} },
+      "borderColor": "#E5E7EB",
+      "borderWidth": 1,
+      "borderStyle": "solid",
+      "radius": 20,
+      "shadow": "0 8px 20px rgba(15, 23, 42, 0.08)",
+      "paddingTop": 24,
+      "paddingRight": 24,
+      "paddingBottom": 24,
+      "paddingLeft": 24,
+      "divider": { "enabled": false, "color": "", "thickness": null, "style": "solid", "marginTop": null, "marginBottom": null },
+      "decorations": [],
+      "sectionAnimation": { "type": "none", "duration": null, "delay": null, "easing": "ease", "once": true, "trigger": "scroll", "repeat": "none" }
+    },
+    "ranking": {
+      "background": { "sourceType": "solid", "mode": "color", "color": "#ffffff", "colorOpacity": 1, "gradientType": "linear", "gradientAngle": 135, "gradientColorA": "", "gradientColorB": "", "gradientOpacity": 1, "imageUrl": "", "videoUrl": "", "videoPoster": "", "repeat": "repeat", "position": "center top", "positionCustom": "", "size": "cover", "sizeCustom": "", "attachment": "scroll", "preset": {}, "effects": {} },
+      "borderColor": "#E5E7EB",
+      "borderWidth": 1,
+      "borderStyle": "solid",
+      "radius": 20,
+      "shadow": "0 10px 24px rgba(15, 23, 42, 0.08)",
+      "paddingTop": 28,
+      "paddingRight": 28,
+      "paddingBottom": 28,
+      "paddingLeft": 28,
+      "divider": { "enabled": false, "color": "", "thickness": null, "style": "solid", "marginTop": null, "marginBottom": null },
+      "decorations": [],
+      "sectionAnimation": { "type": "none", "duration": null, "delay": null, "easing": "ease", "once": true, "trigger": "scroll", "repeat": "none" }
+    },
+    "payment-history": {
+      "background": { "sourceType": "solid", "mode": "color", "color": "#ffffff", "colorOpacity": 1, "gradientType": "linear", "gradientAngle": 135, "gradientColorA": "", "gradientColorB": "", "gradientOpacity": 1, "imageUrl": "", "videoUrl": "", "videoPoster": "", "repeat": "repeat", "position": "center top", "positionCustom": "", "size": "cover", "sizeCustom": "", "attachment": "scroll", "preset": {}, "effects": {} },
+      "borderColor": "#E5E7EB",
+      "borderWidth": 1,
+      "borderStyle": "solid",
+      "radius": 20,
+      "shadow": "0 8px 20px rgba(15, 23, 42, 0.08)",
+      "paddingTop": 24,
+      "paddingRight": 24,
+      "paddingBottom": 24,
+      "paddingLeft": 24,
+      "divider": { "enabled": false, "color": "", "thickness": null, "style": "solid", "marginTop": null, "marginBottom": null },
+      "decorations": [],
+      "sectionAnimation": { "type": "none", "duration": null, "delay": null, "easing": "ease", "once": true, "trigger": "scroll", "repeat": "none" }
+    },
+    "coupon-notes": {
+      "background": { "sourceType": "solid", "mode": "color", "color": "#ffffff", "colorOpacity": 1, "gradientType": "linear", "gradientAngle": 135, "gradientColorA": "", "gradientColorB": "", "gradientOpacity": 1, "imageUrl": "", "videoUrl": "", "videoPoster": "", "repeat": "repeat", "position": "center top", "positionCustom": "", "size": "cover", "sizeCustom": "", "attachment": "scroll", "preset": {}, "effects": {} },
+      "borderColor": "#E5E7EB",
+      "borderWidth": 1,
+      "borderStyle": "solid",
+      "radius": 20,
+      "shadow": "0 6px 18px rgba(15, 23, 42, 0.08)",
+      "paddingTop": 20,
+      "paddingRight": 20,
+      "paddingBottom": 20,
+      "paddingLeft": 20,
+      "divider": { "enabled": false, "color": "", "thickness": null, "style": "solid", "marginTop": null, "marginBottom": null },
+      "decorations": [],
+      "sectionAnimation": { "type": "none", "duration": null, "delay": null, "easing": "ease", "once": true, "trigger": "scroll", "repeat": "none" }
+    }
+  },
+  "sectionAnimations": {},
+  "pageEffects": {
+    "sparkle": { "enabled": false, "density": 0.25, "intensity": "subtle" },
+    "noise": { "enabled": false, "opacity": 0.08, "intensity": "subtle" },
+    "gradientDrift": { "enabled": false, "intensity": "subtle" }
+  }
+}

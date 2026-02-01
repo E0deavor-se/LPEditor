@@ -1,0 +1,14 @@
+<div class="ui-panel">
+    @if (!string.IsNullOrWhiteSpace(Title))
+    {
+        <div class="ui-panel__title">@Title</div>
+    }
+    <div class="ui-panel__body">
+        @ChildContent
+    </div>
+</div>
+
+@code {
+    [Parameter] public string? Title { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+}

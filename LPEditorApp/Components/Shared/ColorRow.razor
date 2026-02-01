@@ -1,0 +1,107 @@
+@using System.Text.RegularExpressions
+
+<div class="lp-color-row">
+    <label class="lp-color-label">@Label</label>
+    <div class="lp-color-controls">
+        <input class="lp-color-picker" type="color" value="@GetColorPickerValue()" @oninput="OnColorPicked" />
+        <input class="lp-color-input" placeholder="@Placeholder" value="@CurrentText" @oninput="OnTextChanged" />
+        @if (ShowOpacity)
+        {
+            <div class="lp-color-opacity">
+                <span>@OpacityLabel</span>
+                <input class="lp-color-opacity-range" type="range" min="0" max="1" step="0.01" value="@OpacityValue" @oninput="OnOpacityInput" />
+                <span class="lp-color-opacity-value">@OpacityPercent</span>
+            </div>
+        }
+    </div>
+    @if (!IsValid)
+    {
+        <div class="lp-field-error">@ErrorText</div>
+    }
+</div>
+
+@code {
+    private static readonly Regex HexRegex = new("^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$", RegexOptions.Compiled);
+
+    [Parameter] public string Label { get; set; } = string.Empty;
+    [Parameter] public string? Value { get; set; }
+    [Parameter] public string Placeholder { get; set; } = "#RRGGBB";
+    [Parameter] public bool ShowOpacity { get; set; }
+    [Parameter] public double? Opacity { get; set; }
+    [Parameter] public string OpacityLabel { get; set; } = "透明度";
+    [Parameter] public EventCallback<string?> ValueChanged { get; set; }
+    [Parameter] public EventCallback<double?> OpacityChanged { get; set; }
+
+    private string CurrentText { get; set; } = string.Empty;
+    private bool IsValid { get; set; } = true;
+    private string ErrorText { get; set; } = "";
+
+    protected override void OnParametersSet()
+    {
+        CurrentText = Value ?? string.Empty;
+    }
+
+    private string GetColorPickerValue()
+    {
+        return IsValidHex(Value) ? Value! : "#ffffff";
+    }
+
+    private async Task OnColorPicked(ChangeEventArgs e)
+    {
+        var next = e.Value?.ToString() ?? string.Empty;
+        await SetValueAsync(next);
+    }
+
+    private async Task OnTextChanged(ChangeEventArgs e)
+    {
+        var next = e.Value?.ToString() ?? string.Empty;
+        await SetValueAsync(next);
+    }
+
+    private async Task SetValueAsync(string next)
+    {
+        if (string.IsNullOrWhiteSpace(next))
+        {
+            IsValid = true;
+            ErrorText = string.Empty;
+            CurrentText = string.Empty;
+            await ValueChanged.InvokeAsync(null);
+            return;
+        }
+
+        if (!IsValidHex(next))
+        {
+            IsValid = false;
+            ErrorText = "カラーコードは #RGB または #RRGGBB 形式で入力してください。";
+            CurrentText = next;
+            return;
+        }
+
+        IsValid = true;
+        ErrorText = string.Empty;
+        CurrentText = next;
+        await ValueChanged.InvokeAsync(next);
+    }
+
+    private async Task OnOpacityInput(ChangeEventArgs e)
+    {
+        if (double.TryParse(e.Value?.ToString(), out var value))
+        {
+            var clamped = Math.Max(0, Math.Min(1, value));
+            await OpacityChanged.InvokeAsync(clamped);
+        }
+    }
+
+    private string OpacityValue => (Opacity ?? 1).ToString("0.00");
+    private string OpacityPercent => $"{Math.Round((Opacity ?? 1) * 100)}%";
+
+    private static bool IsValidHex(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return false;
+        }
+
+        return HexRegex.IsMatch(value.Trim());
+    }
+}

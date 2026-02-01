@@ -1,0 +1,97 @@
+@using Microsoft.AspNetCore.Components
+
+<div class="section-shell">
+    @if (ShowHeader)
+    {
+        <div class="section-shell__header">
+            <div class="section-shell__title">@Title</div>
+            <div class="section-shell__actions">
+                @if (ShowToggle)
+                {
+                    <UiToggle Label="表示" Value="Enabled" ValueChanged="OnEnabledChanged" />
+                }
+                <button type="button" class="btn small" @onclick="OnDuplicate" disabled="@(!DuplicateEnabled)">複製</button>
+                <button type="button" class="btn small danger" @onclick="OnDelete" disabled="@(!DeleteEnabled)">削除</button>
+            </div>
+        </div>
+    }
+
+    <div class="section-shell__tabs">
+        <button type="button" class="section-tab @(ActiveTab == "quick" ? "is-active" : "")" @onclick='() => SetTab("quick")'>@QuickLabel</button>
+        <button type="button" class="section-tab @(ActiveTab == "design" ? "is-active" : "")" @onclick='() => SetTab("design")'>@DesignLabel</button>
+        <button type="button" class="section-tab @(ActiveTab == "layout" ? "is-active" : "")" @onclick='() => SetTab("layout")'>@LayoutLabel</button>
+        <button type="button" class="section-tab @(ActiveTab == "detail" ? "is-active" : "")" @onclick='() => SetTab("detail")'>@DetailLabel</button>
+    </div>
+
+    <div class="section-shell__body">
+        @if (ActiveTab == "quick")
+        {
+            <div class="section-panel">
+                @Quick
+            </div>
+        }
+        else if (ActiveTab == "design")
+        {
+            <div class="section-panel">
+                @Design
+            </div>
+        }
+        else if (ActiveTab == "layout")
+        {
+            <div class="section-panel">
+                @Layout
+            </div>
+        }
+        else
+        {
+            <div class="section-panel">
+                @Detail
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter] public string Title { get; set; } = string.Empty;
+    [Parameter] public bool ShowHeader { get; set; } = true;
+    [Parameter] public bool ShowToggle { get; set; } = false;
+    [Parameter] public bool DuplicateEnabled { get; set; } = false;
+    [Parameter] public bool DeleteEnabled { get; set; } = false;
+    [Parameter] public bool Enabled { get; set; }
+    [Parameter] public string? TabKey { get; set; }
+    [Parameter] public EventCallback<bool> OnEnabledChanged { get; set; }
+    [Parameter] public EventCallback OnDuplicate { get; set; }
+    [Parameter] public EventCallback OnDelete { get; set; }
+
+    [Parameter] public RenderFragment? Quick { get; set; }
+    [Parameter] public RenderFragment? Design { get; set; }
+    [Parameter] public RenderFragment? Layout { get; set; }
+    [Parameter] public RenderFragment? Detail { get; set; }
+
+    [Parameter] public string QuickLabel { get; set; } = "クイック";
+    [Parameter] public string DesignLabel { get; set; } = "デザイン";
+    [Parameter] public string LayoutLabel { get; set; } = "レイアウト";
+    [Parameter] public string DetailLabel { get; set; } = "詳細";
+
+    private static readonly Dictionary<string, string> TabStateStore = new(StringComparer.OrdinalIgnoreCase);
+    private string ActiveTab = "design";
+
+    protected override void OnParametersSet()
+    {
+        var key = TabKey?.Trim();
+        if (!string.IsNullOrWhiteSpace(key) && TabStateStore.TryGetValue(key, out var stored))
+        {
+            ActiveTab = stored;
+        }
+    }
+
+    private void SetTab(string tab)
+    {
+        ActiveTab = tab;
+        var key = TabKey?.Trim();
+        if (!string.IsNullOrWhiteSpace(key))
+        {
+            TabStateStore[key] = tab;
+        }
+    }
+}

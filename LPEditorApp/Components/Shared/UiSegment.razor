@@ -1,0 +1,25 @@
+@typeparam TValue
+
+<div class="ui-segment">
+    @foreach (var option in Options)
+    {
+        var isActive = EqualityComparer<TValue>.Default.Equals(option.Value, Value);
+        <button type="button" class="ui-segment__item @(isActive ? "is-active" : "")" @onclick="() => OnSelect(option.Value)">
+            @option.Label
+        </button>
+    }
+</div>
+
+@code {
+    [Parameter] public TValue? Value { get; set; }
+    [Parameter] public EventCallback<TValue?> ValueChanged { get; set; }
+    [Parameter] public IReadOnlyList<UiSegmentOption<TValue>> Options { get; set; } = Array.Empty<UiSegmentOption<TValue>>();
+
+    private Task OnSelect(TValue? value)
+    {
+        Value = value;
+        return ValueChanged.InvokeAsync(value);
+    }
+
+    public record UiSegmentOption<T>(string Label, T? Value);
+}

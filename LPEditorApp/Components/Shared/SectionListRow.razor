@@ -1,0 +1,59 @@
+@using LPEditorApp.Models
+
+<div class="section-row item @(IsCurrent ? "is-current" : "") @(IsSelected ? "is-selected" : "")" data-id="@Group.Key" @onclick="OnSelect">
+    <div class="section-row__handle drag-handle" title="並び替え" @onclick:stopPropagation="true">⋮⋮</div>
+    <div class="section-row__icon" title="@IconLabel">@Icon</div>
+    <div class="section-row__main">
+        @if (IsEditing)
+        {
+            <input class="text section-row__titleEdit"
+                   value="@EditingName"
+                   @oninput="OnEditingInput"
+                   @onblur="OnCommitEdit"
+                   @onkeydown="OnNameKeydown"
+                   @onclick:stopPropagation="true" />
+        }
+        else
+        {
+            <div class="section-row__title" @ondblclick="OnBeginEdit">@Title</div>
+        }
+        @if (!string.IsNullOrWhiteSpace(SubInfo))
+        {
+            <div class="section-row__sub">@SubInfo</div>
+        }
+    </div>
+    <div class="section-row__right" @onclick:stopPropagation="true">
+        <SectionListRowActions OnAction="OnAction" />
+        <label class="toggle-switch section-row__toggle">
+            <input type="checkbox" checked="@IsVisible" @onchange="OnToggleChanged" />
+            <span class="toggle-label">表示</span>
+        </label>
+        <button type="button" class="accordion-toggle @(IsOpen ? "is-open" : "")" @onclick="OnToggleOpen">@(IsOpen ? "閉じる" : "開く")</button>
+        <button type="button" class="btn small danger" @onclick="OnRemove" disabled="@(!CanRemove)">削除</button>
+    </div>
+</div>
+
+@code {
+    [Parameter] public SectionGroupModel Group { get; set; } = new();
+    [Parameter] public string Title { get; set; } = string.Empty;
+    [Parameter] public string Icon { get; set; } = string.Empty;
+    [Parameter] public string IconLabel { get; set; } = string.Empty;
+    [Parameter] public string SubInfo { get; set; } = string.Empty;
+    [Parameter] public bool IsCurrent { get; set; }
+    [Parameter] public bool IsSelected { get; set; }
+    [Parameter] public bool IsEditing { get; set; }
+    [Parameter] public string EditingName { get; set; } = string.Empty;
+    [Parameter] public bool IsVisible { get; set; }
+    [Parameter] public bool IsOpen { get; set; }
+    [Parameter] public bool CanRemove { get; set; }
+
+    [Parameter] public EventCallback OnSelect { get; set; }
+    [Parameter] public EventCallback OnBeginEdit { get; set; }
+    [Parameter] public EventCallback OnCommitEdit { get; set; }
+    [Parameter] public EventCallback<KeyboardEventArgs> OnNameKeydown { get; set; }
+    [Parameter] public EventCallback<ChangeEventArgs> OnEditingInput { get; set; }
+    [Parameter] public EventCallback<string> OnAction { get; set; }
+    [Parameter] public EventCallback<ChangeEventArgs> OnToggleChanged { get; set; }
+    [Parameter] public EventCallback OnToggleOpen { get; set; }
+    [Parameter] public EventCallback OnRemove { get; set; }
+}

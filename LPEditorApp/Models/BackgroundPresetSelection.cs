@@ -7,6 +7,9 @@ public class BackgroundPresetSelection
     [JsonPropertyName("presetKey")]
     public string PresetKey { get; set; } = string.Empty;
 
+    [JsonPropertyName("cssClass")]
+    public string CssClass { get; set; } = string.Empty;
+
     [JsonPropertyName("angle")]
     public double? Angle { get; set; }
 
@@ -21,4 +24,7 @@ public class BackgroundPresetSelection
 
     [JsonPropertyName("density")]
     public double? Density { get; set; }
+
+    [JsonPropertyName("scale")]
+    public double? Scale { get; set; }
 }

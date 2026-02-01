@@ -14,8 +14,15 @@ public class PreviewService
         TemplateProject template,
         ContentModel content,
         IDictionary<string, byte[]>? imageOverrides,
-        bool embedImages)
+        bool embedImages,
+        bool includeDebugStamp = false,
+        string? editingSectionKey = null,
+        int? fixedViewportWidth = null,
+        bool applySpResetCss = false)
     {
+        var startedAt = DateTime.Now;
+        Debug.WriteLine($"[PreviewService] GenerateHtmlAsync start embedImages={embedImages} debug={includeDebugStamp} editing={editingSectionKey}");
+        Console.WriteLine($"[PreviewService] GenerateHtmlAsync start embedImages={embedImages} debug={includeDebugStamp} editing={editingSectionKey}");
         if (!template.Files.TryGetValue("index.html", out var indexFile))
         {
             indexFile = template.Files
@@ -33,7 +40,11 @@ public class PreviewService
         var document = await context.OpenAsync(req => req.Content(html));
 
         ApplyMeta(document, content);
-        EnsureViewportMeta(document);
+        EnsureViewportMeta(document, fixedViewportWidth);
+        if (applySpResetCss)
+        {
+            EnsureSpResetStyle(document);
+        }
         if (embedImages)
         {
             EnsureBaseHref(document, "/");
@@ -46,11 +57,17 @@ public class PreviewService
         ApplySectionTextAligns(document, content);
         EnsureCampaignEndedOverlay(document, content);
         EnsureRankingStyle(document, content);
+        EnsurePaymentHistoryStyle(document, content);
         EnsureStoreSearchStyle(document, content);
         EnsureStoreSearchScript(document, content);
+        EnsureCouponFlowStyle(document, content);
+        EnsureCouponFlowScript(document, content);
+        EnsureStickyTabsStyle(document, content);
+        EnsureStickyTabsScript(document, content);
         EnsureCustomSectionGalleryStyle(document, content);
         EnsureCustomSectionGalleryScript(document, content);
         EnsureSectionSpacingStyle(document);
+        EnsureTypographyScaleStyle(document, content);
         EnsurePreviewHighlightStyle(document);
         EnsureDecoZIndexStyle(document);
         EnsureDecoOverflowStyle(document);
@@ -64,9 +81,14 @@ public class PreviewService
         ApplyCampaignStyle(document, content);
         EnsureBackgroundImageOnPage(document, content);
         ApplySectionBackgrounds(document, content);
-        ApplySectionStyles(document, content);
+        ApplySectionStyles(document, content, editingSectionKey);
         ApplySectionDecorations(document, content);
         ApplySectionAnimations(document, content);
+        EnsureSectionBodyOnly(document, content);
+        RenderCommonFrame(document, content);
+        ApplyFrameAnimations(document, content);
+        EnsureFrameAnimationStyle(document);
+        EnsureFrameAnimationScript(document);
         EnsureSectionAnimationStyle(document);
         EnsureSectionAnimationScript(document);
         EnsureDecorationStyle(document);
@@ -76,7 +98,16 @@ public class PreviewService
         EnsurePageEffectsScript(document, content);
         ApplyPageEffects(document, content);
 
-        return document.DocumentElement.OuterHtml;
+        var output = document.DocumentElement.OuterHtml;
+        if (includeDebugStamp)
+        {
+            var stamp = startedAt.ToString("HH:mm:ss.fff");
+            output = $"<!-- {stamp} -->" + output;
+        }
+
+        Debug.WriteLine("[PreviewService] GenerateHtmlAsync end");
+        Console.WriteLine("[PreviewService] GenerateHtmlAsync end");
+        return output;
     }
 
     private static void EnsureMobileOptimizeStyle(IDocument document, ContentModel content)
@@ -163,6 +194,347 @@ public class PreviewService
         head.AppendChild(styleTag);
     }
 
+        private static void EnsureTypographyScaleStyle(IDocument document, ContentModel content)
+        {
+                var head = document.Head;
+                if (head is null)
+                {
+                        return;
+                }
+
+                var body = document.Body;
+                if (body is not null && !body.ClassList.Contains("lp-root"))
+                {
+                        body.ClassList.Add("lp-root");
+                }
+
+                if (document.QuerySelector("style[data-typography-scale='true']") is not null)
+                {
+                        return;
+                }
+
+                var styleTag = document.CreateElement("style");
+                styleTag.SetAttribute("data-typography-scale", "true");
+                styleTag.TextContent = @"
+.lp-root {
+    --lp-font-base: clamp(15px, 1.4vw, 18px);
+    --lp-font-h1: clamp(24px, 3.2vw, 36px);
+    --lp-font-h2: clamp(20px, 2.6vw, 30px);
+    --lp-font-h3: clamp(18px, 2.1vw, 26px);
+    --lp-font-note: clamp(12px, 1.1vw, 15px);
+    --lp-line: 1.7;
+}
+.lp-root { font-size: var(--lp-font-base); line-height: var(--lp-line); }
+.lp-root h1 { font-size: var(--lp-font-h1); line-height: 1.2; }
+.lp-root h2 { font-size: var(--lp-font-h2); line-height: 1.3; }
+.lp-root h3 { font-size: var(--lp-font-h3); line-height: 1.35; }
+.lp-root p, .lp-root li, .lp-root dt, .lp-root dd, .lp-root .campaign__text { font-size: var(--lp-font-base); }
+.lp-root small, .lp-root .note, .lp-root .campaign__small { font-size: var(--lp-font-note); }
+
+.lp-section[data-section-type='ranking'] {
+    --lp-font-ranking-th: clamp(16px, 2.2vw, 28px);
+    --lp-font-ranking-td: clamp(18px, 2.6vw, 32px);
+    --lp-font-ranking-num: clamp(16px, 2.4vw, 30px);
+}
+.lp-section[data-section-type='ranking'] .campaign__rank-box th { font-size: var(--lp-font-ranking-th); }
+.lp-section[data-section-type='ranking'] .campaign__rank-box td { font-size: var(--lp-font-ranking-td); }
+.lp-section[data-section-type='ranking'] .campaign__rank-box td.-number { font-size: var(--lp-font-ranking-num); }
+
+.coupon-flow-section .coupon-howto-inner {
+    --lp-font-coupon-note: clamp(13px, 1.2vw, 16px);
+    --lp-font-coupon-button: clamp(18px, 2.2vw, 26px);
+}
+.coupon-flow-section .note { font-size: var(--lp-font-coupon-note); }
+.coupon-flow-section .indent { font-size: var(--lp-font-coupon-note); }
+.coupon-flow-section .c-btn.-l { font-size: var(--lp-font-coupon-button); }
+";
+                head.AppendChild(styleTag);
+        }
+
+    private static void EnsureFrameBaseStyle(IDocument document)
+    {
+        var head = document.Head;
+        if (head is null)
+        {
+            return;
+        }
+
+        if (document.QuerySelector("style[data-frame-base='true']") is not null)
+        {
+            return;
+        }
+
+        var styleTag = document.CreateElement("style");
+        styleTag.SetAttribute("data-frame-base", "true");
+        styleTag.TextContent = @"
+.lp-section { width: 100%; }
+.lp-section-inner { width: 100%; display: flex; justify-content: center; }
+.lp-frame { width: 100%; box-sizing: border-box; position: relative; }
+.lp-frame-header { display: flex; align-items: center; justify-content: center; font-weight: 700; box-sizing: border-box; text-align: center; }
+.lp-frame-header[data-empty='true'] { display: none; }
+.lp-frame-title-img { max-width: 100%; max-height: 100%; object-fit: contain; }
+.lp-frame-body { width: 100%; box-sizing: border-box; position: relative; }
+.lp-frame-corner { position: absolute; pointer-events: none; width: 80px; height: 80px; max-width: 100%; max-height: 100%; object-fit: contain; }
+.lp-section[data-section-type='ranking'] .lp-frame[data-band-type='image'] .ranking-inner-title { display: none !important; }
+.lp-section[data-section-type='ranking'] .lp-frame[data-band-type='image'] .ranking-inner-title + * { margin-top: 8px !important; }
+";
+        head.AppendChild(styleTag);
+    }
+
+    private static void RenderCommonFrame(IDocument document, ContentModel content)
+    {
+        EnsureFrameBaseStyle(document);
+        EnsureFrameStructure(document, content);
+    }
+
+    private static void EnsureFrameStructure(IDocument document, ContentModel content)
+    {
+        var groups = document.QuerySelectorAll(".section-group[data-section]").ToList();
+        if (groups.Count == 0)
+        {
+            return;
+        }
+
+        foreach (var group in groups)
+        {
+            var rawKey = group.GetAttribute("data-section") ?? string.Empty;
+            if (string.IsNullOrWhiteSpace(rawKey))
+            {
+                continue;
+            }
+
+            var normalizedKey = NormalizeSectionKey(rawKey);
+            if (string.IsNullOrWhiteSpace(normalizedKey))
+            {
+                normalizedKey = rawKey;
+            }
+
+            if (string.Equals(normalizedKey, "ranking", StringComparison.OrdinalIgnoreCase))
+            {
+                group.SetAttribute("data-section-type", "ranking");
+            }
+
+            if (IsCommonFrameExcluded(normalizedKey))
+            {
+                continue;
+            }
+
+            var existingSection = group.QuerySelector(".lp-section") as IElement;
+            if (existingSection is not null)
+            {
+                if (string.Equals(normalizedKey, "ranking", StringComparison.OrdinalIgnoreCase))
+                {
+                    existingSection.SetAttribute("data-section-type", "ranking");
+                }
+                var existingHeader = existingSection.QuerySelector(".lp-frame-header") as IElement;
+                if (existingHeader is not null)
+                {
+                    var title = ResolveSectionTitle(content, normalizedKey, rawKey, group) ?? string.Empty;
+                    existingHeader.TextContent = title;
+                    if (string.IsNullOrWhiteSpace(title))
+                    {
+                        existingHeader.SetAttribute("data-empty", "true");
+                    }
+                    else
+                    {
+                        existingHeader.RemoveAttribute("data-empty");
+                    }
+                }
+
+                ApplyFrameStyle(existingSection, content, normalizedKey);
+                ApplyCornerDecorations(existingSection, content, normalizedKey);
+                ApplyRankingFrameHeaderImage(existingSection, normalizedKey);
+                EnsureRankingInnerTitleMarker(existingSection);
+                continue;
+            }
+
+            var section = document.CreateElement("section");
+            section.ClassList.Add("lp-section");
+            section.SetAttribute("data-section-id", normalizedKey);
+            if (string.Equals(normalizedKey, "ranking", StringComparison.OrdinalIgnoreCase))
+            {
+                section.SetAttribute("data-section-type", "ranking");
+            }
+
+            var inner = document.CreateElement("div");
+            inner.ClassList.Add("lp-section-inner");
+
+            var frame = document.CreateElement("div");
+            frame.ClassList.Add("lp-frame");
+            frame.SetAttribute("data-role", "frame");
+
+            var header = document.CreateElement("div");
+            header.ClassList.Add("lp-frame-header");
+            header.SetAttribute("data-role", "frame-header");
+            var headerTitle = ResolveSectionTitle(content, normalizedKey, rawKey, group) ?? string.Empty;
+            header.TextContent = headerTitle;
+            if (string.IsNullOrWhiteSpace(headerTitle))
+            {
+                header.SetAttribute("data-empty", "true");
+            }
+
+            var body = document.CreateElement("div");
+            body.ClassList.Add("lp-frame-body");
+            body.SetAttribute("data-role", "frame-body");
+
+            var children = group.ChildNodes.ToList();
+            foreach (var child in children)
+            {
+                body.AppendChild(child);
+            }
+
+            frame.AppendChild(header);
+            frame.AppendChild(body);
+            inner.AppendChild(frame);
+            section.AppendChild(inner);
+            group.AppendChild(section);
+
+            ApplyFrameStyleToElements(frame, header, body, ResolveFrameStyle(content, normalizedKey));
+            ApplyCornerDecorations(frame, ResolveFrameStyle(content, normalizedKey));
+            ApplyRankingFrameHeaderImage(section, normalizedKey);
+            EnsureRankingInnerTitleMarker(section);
+        }
+    }
+
+    private static void ApplyRankingFrameHeaderImage(IElement section, string normalizedKey)
+    {
+        if (!string.Equals(NormalizeSectionKey(normalizedKey), "ranking", StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        var frame = section.QuerySelector(".lp-frame") as IElement;
+        if (frame is not null)
+        {
+            frame.SetAttribute("data-band-type", "image");
+        }
+
+        var header = section.QuerySelector(".lp-frame-header") as IElement;
+        if (header is null)
+        {
+            return;
+        }
+
+        header.RemoveAttribute("data-empty");
+        header.TextContent = string.Empty;
+
+        var existing = header.QuerySelector("img[data-role='ranking-title']") as IElement;
+        if (existing is null)
+        {
+            existing = section.Owner?.CreateElement("img");
+            if (existing is null)
+            {
+                return;
+            }
+            existing.SetAttribute("data-role", "ranking-title");
+            existing.ClassList.Add("lp-frame-title-img");
+            header.AppendChild(existing);
+        }
+
+        existing.SetAttribute("src", "images/title-cp04.png");
+        existing.SetAttribute("alt", "ランキング");
+    }
+
+    private static void EnsureRankingInnerTitleMarker(IElement section)
+    {
+        if (section.QuerySelector("[data-section-type='ranking']") is null && !string.Equals(section.GetAttribute("data-section-type"), "ranking", StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        var title = section.QuerySelector(".rank-ref .campaign__rank-title") as IElement;
+        if (title is null)
+        {
+            return;
+        }
+
+        title.ClassList.Add("ranking-inner-title");
+        title.SetAttribute("data-inner-title", "true");
+    }
+
+    private static void EnsureSectionBodyOnly(IDocument document, ContentModel content)
+    {
+        foreach (var group in document.QuerySelectorAll(".section-group[data-section]").ToList())
+        {
+            var rawKey = group.GetAttribute("data-section") ?? string.Empty;
+            var normalizedKey = NormalizeSectionKey(rawKey);
+            if (IsCommonFrameExcluded(normalizedKey))
+            {
+                continue;
+            }
+
+            var blocks = group.QuerySelectorAll(".campaign__block").ToList();
+            var boxes = group.QuerySelectorAll(".campaign__box").ToList();
+            if (blocks.Count == 0 && boxes.Count == 0)
+            {
+                continue;
+            }
+
+            var nodes = new List<INode>();
+
+            if (blocks.Count > 0)
+            {
+                foreach (var block in blocks)
+                {
+                    var box = block.QuerySelector(".campaign__box") as IElement;
+                    if (box is not null)
+                    {
+                        foreach (var heading in box.QuerySelectorAll(".campaign__heading").ToList())
+                        {
+                            heading.Remove();
+                        }
+
+                        var bodyRoot = box.QuerySelector(".campaign__inner") ?? box;
+                        nodes.AddRange(bodyRoot.ChildNodes.ToList());
+
+                        foreach (var sibling in block.ChildNodes.ToList())
+                        {
+                            if (!ReferenceEquals(sibling, box))
+                            {
+                                nodes.Add(sibling);
+                            }
+                        }
+                    }
+                    else
+                    {
+                        nodes.AddRange(block.ChildNodes.ToList());
+                    }
+                }
+            }
+            else
+            {
+                foreach (var box in boxes)
+                {
+                    foreach (var heading in box.QuerySelectorAll(".campaign__heading").ToList())
+                    {
+                        heading.Remove();
+                    }
+
+                    var bodyRoot = box.QuerySelector(".campaign__inner") ?? box;
+                    nodes.AddRange(bodyRoot.ChildNodes.ToList());
+                }
+            }
+
+            if (nodes.Count == 0)
+            {
+                continue;
+            }
+
+            group.InnerHtml = string.Empty;
+            foreach (var node in nodes)
+            {
+                group.AppendChild(node);
+            }
+        }
+    }
+
+    private static bool IsCommonFrameExcluded(string? normalizedKey)
+    {
+        var key = NormalizeSectionKey(normalizedKey);
+        return string.Equals(key, "countdown", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(key, "conditionscontactbanners", StringComparison.OrdinalIgnoreCase);
+    }
+
     private static void EnsurePreviewHighlightStyle(IDocument document)
     {
         var head = document.Head;
@@ -182,6 +554,8 @@ public class PreviewService
 .lp-highlight { outline: 2px solid rgba(14,165,233,0.85); box-shadow: 0 0 0 4px rgba(14,165,233,0.18); transition: box-shadow 0.3s ease; }
 .lp-highlight-background { outline-color: rgba(249,115,22,0.85); box-shadow: 0 0 0 4px rgba(249,115,22,0.2); }
 .lp-highlight-decor { outline-color: rgba(99,102,241,0.85); box-shadow: 0 0 0 4px rgba(99,102,241,0.2); }
+.lp-highlight-design { outline-color: rgba(59,130,246,0.9); box-shadow: 0 0 0 4px rgba(59,130,246,0.25); }
+    .lp-editing { outline: 2px dashed rgba(14,116,144,0.9); outline-offset: 2px; box-shadow: 0 0 0 4px rgba(14,116,144,0.2); }
 .lp-final-mode [class*='guide'], .lp-final-mode .guide, .lp-final-mode .slot-guide { display: none !important; }
 ";
         head.AppendChild(styleTag);
@@ -254,365 +628,620 @@ img[class*='decoration'] { z-index: 50 !important; }
         head.AppendChild(styleTag);
     }
 
-        private static void EnsureBackgroundImageOnPage(IDocument document, ContentModel content)
+    private static void EnsureBackgroundImageOnPage(IDocument document, ContentModel content)
+    {
+        var head = document.Head;
+        var body = document.Body;
+        if (head is null || body is null)
+        {
+            return;
+        }
+
+        body.ClassList.Add("lp-page-bg");
+        var wrapper = EnsureBackgroundWrapper(document, content);
+
+        var background = content.LpBackground ?? new LpBackgroundModel();
+        var setting = BackgroundSettingMapper.FromPage(background);
+
+        var styleTag = document.QuerySelector("style[data-bg-transfer='true']") as IElement;
+        if (styleTag is null)
+        {
+            styleTag = document.CreateElement("style");
+            styleTag.SetAttribute("data-bg-transfer", "true");
+            head.AppendChild(styleTag);
+        }
+
+        var rules = new StringBuilder();
+        var includeMediaImage = !BackgroundRenderService.UseMediaLayer(setting);
+        var baseRule = BackgroundStyleService.BuildRule(setting, "html, body", includeMediaImage);
+        var wrapperRule = BackgroundStyleService.BuildRule(setting, ".lp-canvas, .page, .lp-wrapper, .l-wrapper", includeMediaImage);
+        if (!string.IsNullOrWhiteSpace(baseRule))
+        {
+            rules.AppendLine(baseRule);
+        }
+        if (!string.IsNullOrWhiteSpace(wrapperRule))
+        {
+            rules.AppendLine(wrapperRule);
+        }
+
+        if (IsPresetBackground(setting))
+        {
+            rules.AppendLine("html, body, .lp-canvas, .page, .lp-wrapper, .l-wrapper { background: transparent !important; }");
+        }
+
+        if (background.TransparentSections)
+        {
+            rules.AppendLine(".lp-canvas .section-group, .lp-canvas section, .lp-canvas .campaign__block, .lp-canvas .campaign__box, .lp-canvas .campaign__subBox, .lp-canvas .ranking-section, .lp-canvas .store-search-section .store-search-body { background: transparent !important; }");
+        }
+
+        styleTag.TextContent = rules.ToString();
+
+        if (IsPresetBackground(setting))
+        {
+            EnsurePresetBackgroundStyle(document);
+            EnsurePresetBackgroundLayer(document, setting.Preset);
+        }
+        else
+        {
+            RemovePresetBackgroundLayer(document);
+        }
+
+        ApplyPageBackgroundMediaLayers(document, wrapper, setting);
+    }
+
+        private static bool IsPresetBackground(BackgroundSetting setting)
+        {
+                var mode = BackgroundRenderService.ResolveSourceType(setting);
+                return mode == "preset" && !string.IsNullOrWhiteSpace(setting.Preset?.CssClass);
+        }
+
+        private static void EnsurePresetBackgroundLayer(IDocument document, BackgroundPresetSelection? preset)
+        {
+            if (preset is null)
+            {
+                return;
+            }
+
+            var wrapper = document.QuerySelector(".lp-canvas") as IElement ?? document.Body;
+            if (wrapper is null)
+            {
+                return;
+            }
+
+            var layer = document.QuerySelector(".lp-bg") as IElement;
+            if (layer is null)
+            {
+                layer = document.CreateElement("div");
+                layer.ClassList.Add("lp-bg");
+                wrapper.Prepend(layer);
+            }
+
+                foreach (var cls in layer.ClassList.Where(name => name.StartsWith("bg--", StringComparison.OrdinalIgnoreCase)).ToList())
+                {
+                        layer.ClassList.Remove(cls);
+                }
+
+                if (!string.IsNullOrWhiteSpace(preset.CssClass))
+                {
+                        layer.ClassList.Add(preset.CssClass);
+                }
+
+                var baseColor = string.IsNullOrWhiteSpace(preset.ColorA) ? "#f8fafc" : preset.ColorA;
+                var accentColor = string.IsNullOrWhiteSpace(preset.ColorB) ? "#cbd5f5" : preset.ColorB;
+                var opacity = Math.Clamp(preset.Opacity ?? 1, 0, 1).ToString("0.###", System.Globalization.CultureInfo.InvariantCulture);
+                var scale = Math.Clamp(preset.Scale ?? 1, 0.5, 2).ToString("0.###", System.Globalization.CultureInfo.InvariantCulture);
+
+                SetCssCustomProperty(layer, "--bg-base", baseColor);
+                SetCssCustomProperty(layer, "--bg-accent", accentColor);
+                SetCssCustomProperty(layer, "--bg-opacity", opacity);
+                SetCssCustomProperty(layer, "--bg-scale", scale);
+        }
+
+        private static void RemovePresetBackgroundLayer(IDocument document)
+        {
+                document.QuerySelector(".lp-bg")?.Remove();
+        }
+
+        private static void EnsurePresetBackgroundStyle(IDocument document)
         {
                 var head = document.Head;
-                var body = document.Body;
-                if (head is null || body is null)
+                if (head is null || document.QuerySelector("style[data-lp-bg-presets='true']") is not null)
                 {
                         return;
                 }
 
-                body.ClassList.Add("lp-page-bg");
-                var wrapper = EnsureBackgroundWrapper(document, content);
+                var styleTag = document.CreateElement("style");
+                styleTag.SetAttribute("data-lp-bg-presets", "true");
+                styleTag.TextContent = @"
+.lp-canvas { position: relative; min-height: 100vh; }
+.lp-canvas > * { position: relative; z-index: 1; }
+.lp-bg {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 0;
+    pointer-events: none;
+    background-color: var(--bg-base, #f8fafc);
+    background-repeat: repeat;
+    opacity: var(--bg-opacity, 1);
+}
 
-                var background = content.LpBackground ?? new LpBackgroundModel();
-                var setting = BackgroundSettingMapper.FromPage(background);
+.lp-bg.bg--paper-grid-1 {
+    background-image:
+        linear-gradient(var(--bg-accent) 1px, transparent 1px),
+        linear-gradient(90deg, var(--bg-accent) 1px, transparent 1px);
+    background-size: calc(24px * var(--bg-scale, 1)) calc(24px * var(--bg-scale, 1));
+}
 
-                var styleTag = document.QuerySelector("style[data-bg-transfer='true']") as IElement;
-                if (styleTag is null)
-                {
-                        styleTag = document.CreateElement("style");
-                        styleTag.SetAttribute("data-bg-transfer", "true");
-                        head.AppendChild(styleTag);
-                }
+.lp-bg.bg--paper-grid-2 {
+    background-image:
+        linear-gradient(var(--bg-accent) 2px, transparent 2px),
+        linear-gradient(90deg, var(--bg-accent) 2px, transparent 2px);
+    background-size: calc(32px * var(--bg-scale, 1)) calc(32px * var(--bg-scale, 1));
+}
 
-                var rules = new StringBuilder();
-                var includeMediaImage = !BackgroundRenderService.UseMediaLayer(setting);
-                var baseRule = BackgroundStyleService.BuildRule(setting, "html, body", includeMediaImage);
-                var wrapperRule = BackgroundStyleService.BuildRule(setting, ".lp-canvas, .page, .lp-wrapper, .l-wrapper", includeMediaImage);
-                if (!string.IsNullOrWhiteSpace(baseRule))
-                {
-                    rules.AppendLine(baseRule);
-                }
-                if (!string.IsNullOrWhiteSpace(wrapperRule))
-                {
-                    rules.AppendLine(wrapperRule);
-                }
+.lp-bg.bg--paper-cross {
+    background-image:
+        radial-gradient(circle, var(--bg-accent) 1.5px, transparent 1.6px),
+        radial-gradient(circle, var(--bg-accent) 1.5px, transparent 1.6px);
+    background-size: calc(20px * var(--bg-scale, 1)) calc(20px * var(--bg-scale, 1));
+    background-position: 0 0, calc(10px * var(--bg-scale, 1)) calc(10px * var(--bg-scale, 1));
+}
 
-                if (background.TransparentSections)
-                {
-                    rules.AppendLine(".lp-canvas .section-group, .lp-canvas section, .lp-canvas .campaign__block, .lp-canvas .campaign__box, .lp-canvas .campaign__subBox, .lp-canvas .ranking-section, .lp-canvas .store-search-section .store-search-body { background: transparent !important; }");
-                }
+.lp-bg.bg--dot-soft {
+    background-image: radial-gradient(circle, var(--bg-accent) 1.5px, transparent 1.6px);
+    background-size: calc(22px * var(--bg-scale, 1)) calc(22px * var(--bg-scale, 1));
+}
 
-                styleTag.TextContent = rules.ToString();
+.lp-bg.bg--dot-polka {
+    background-image: radial-gradient(circle, var(--bg-accent) 3px, transparent 3.2px);
+    background-size: calc(26px * var(--bg-scale, 1)) calc(26px * var(--bg-scale, 1));
+}
 
-                ApplyPageBackgroundMediaLayers(document, wrapper, setting);
+.lp-bg.bg--stripe-thin {
+    background-image: repeating-linear-gradient(
+        0deg,
+        var(--bg-accent) 0 1px,
+        transparent 1px 8px
+    );
+    background-size: 100% calc(10px * var(--bg-scale, 1));
+}
+
+.lp-bg.bg--stripe-bold {
+    background-image: repeating-linear-gradient(
+        0deg,
+        var(--bg-accent) 0 10px,
+        transparent 10px 22px
+    );
+    background-size: 100% calc(24px * var(--bg-scale, 1));
+}
+
+.lp-bg.bg--diagonal-1 {
+    background-image: repeating-linear-gradient(
+        45deg,
+        var(--bg-accent) 0 1px,
+        transparent 1px 10px
+    );
+    background-size: calc(20px * var(--bg-scale, 1)) calc(20px * var(--bg-scale, 1));
+}
+
+.lp-bg.bg--diagonal-2 {
+    background-image: repeating-linear-gradient(
+        135deg,
+        var(--bg-accent) 0 2px,
+        transparent 2px 14px
+    );
+    background-size: calc(24px * var(--bg-scale, 1)) calc(24px * var(--bg-scale, 1));
+}
+
+.lp-bg.bg--diagonal-3 {
+    background-image: repeating-linear-gradient(
+        60deg,
+        var(--bg-accent) 0 3px,
+        transparent 3px 18px
+    );
+    background-size: calc(28px * var(--bg-scale, 1)) calc(28px * var(--bg-scale, 1));
+}
+
+.lp-bg.bg--zigzag {
+    background-image:
+        linear-gradient(135deg, var(--bg-accent) 25%, transparent 25%),
+        linear-gradient(225deg, var(--bg-accent) 25%, transparent 25%),
+        linear-gradient(45deg, var(--bg-accent) 25%, transparent 25%),
+        linear-gradient(315deg, var(--bg-accent) 25%, transparent 25%);
+    background-position: 0 0, 0 0, calc(12px * var(--bg-scale, 1)) calc(12px * var(--bg-scale, 1)), calc(12px * var(--bg-scale, 1)) calc(12px * var(--bg-scale, 1));
+    background-size: calc(24px * var(--bg-scale, 1)) calc(24px * var(--bg-scale, 1));
+}
+
+.lp-bg.bg--zigzag-3d {
+    background-image:
+        linear-gradient(135deg, var(--bg-accent) 25%, transparent 25%),
+        linear-gradient(225deg, var(--bg-accent) 25%, transparent 25%);
+    background-size: calc(28px * var(--bg-scale, 1)) calc(28px * var(--bg-scale, 1));
+    background-position: 0 0, calc(14px * var(--bg-scale, 1)) calc(14px * var(--bg-scale, 1));
+}
+
+.lp-bg.bg--rhombus {
+    background-image:
+        linear-gradient(45deg, var(--bg-accent) 25%, transparent 25%),
+        linear-gradient(-45deg, var(--bg-accent) 25%, transparent 25%);
+    background-size: calc(26px * var(--bg-scale, 1)) calc(26px * var(--bg-scale, 1));
+    background-position: 0 0, calc(13px * var(--bg-scale, 1)) calc(13px * var(--bg-scale, 1));
+}
+
+.lp-bg.bg--triangle {
+    background-image:
+        linear-gradient(60deg, var(--bg-accent) 25%, transparent 25%),
+        linear-gradient(-60deg, var(--bg-accent) 25%, transparent 25%);
+    background-size: calc(28px * var(--bg-scale, 1)) calc(28px * var(--bg-scale, 1));
+    background-position: 0 0, calc(14px * var(--bg-scale, 1)) calc(14px * var(--bg-scale, 1));
+}
+
+.lp-bg.bg--isometric {
+    background-image:
+        linear-gradient(30deg, var(--bg-accent) 12%, transparent 12%),
+        linear-gradient(150deg, var(--bg-accent) 12%, transparent 12%),
+        linear-gradient(90deg, var(--bg-accent) 2px, transparent 2px);
+    background-size: calc(36px * var(--bg-scale, 1)) calc(36px * var(--bg-scale, 1));
+    background-position: 0 0, 0 0, 0 0;
+}
+
+.lp-bg.bg--wave {
+    background-image:
+        radial-gradient(circle at 0 50%, var(--bg-accent) 2px, transparent 2px),
+        radial-gradient(circle at 50% 50%, var(--bg-accent) 2px, transparent 2px);
+    background-size: calc(26px * var(--bg-scale, 1)) calc(20px * var(--bg-scale, 1));
+}
+
+.lp-bg.bg--moon {
+    background-image:
+        radial-gradient(circle at 30% 30%, var(--bg-accent) 6px, transparent 6px),
+        radial-gradient(circle at 70% 70%, var(--bg-accent) 6px, transparent 6px);
+    background-size: calc(40px * var(--bg-scale, 1)) calc(40px * var(--bg-scale, 1));
+}
+
+.lp-bg.bg--circle {
+    background-image: radial-gradient(circle, transparent 6px, var(--bg-accent) 6px 7px, transparent 7px);
+    background-size: calc(28px * var(--bg-scale, 1)) calc(28px * var(--bg-scale, 1));
+}
+
+.lp-bg.bg--box {
+    background-image:
+        linear-gradient(var(--bg-accent) 1px, transparent 1px),
+        linear-gradient(90deg, var(--bg-accent) 1px, transparent 1px);
+    background-size: calc(34px * var(--bg-scale, 1)) calc(34px * var(--bg-scale, 1));
+    background-position: calc(4px * var(--bg-scale, 1)) calc(4px * var(--bg-scale, 1));
+}
+
+.lp-bg.bg--cross {
+    background-image:
+        linear-gradient(90deg, transparent 46%, var(--bg-accent) 46% 54%, transparent 54%),
+        linear-gradient(transparent 46%, var(--bg-accent) 46% 54%, transparent 54%);
+    background-size: calc(24px * var(--bg-scale, 1)) calc(24px * var(--bg-scale, 1));
+}
+";
+                head.AppendChild(styleTag);
         }
 
-            private static void ApplyPageBackgroundMediaLayers(IDocument document, IElement wrapper, BackgroundSetting setting)
+    private static void ApplyPageBackgroundMediaLayers(IDocument document, IElement wrapper, BackgroundSetting setting)
+    {
+        var existing = wrapper.QuerySelector(".lp-bg-stage") as IElement;
+        if (!BackgroundRenderService.UseMediaLayer(setting))
+        {
+            existing?.Remove();
+            return;
+        }
+
+        var stage = existing ?? document.CreateElement("div");
+        stage.ClassList.Add("lp-bg-stage");
+        stage.SetAttribute("style", "position:fixed;inset:0;z-index:-1;overflow:hidden;");
+
+        var media = stage.QuerySelector(".lp-bg-media") as IElement;
+        var overlay = stage.QuerySelector(".lp-bg-overlay") as IElement;
+
+        if (media is null)
+        {
+            media = document.CreateElement("div");
+            media.ClassList.Add("lp-bg-media");
+            stage.AppendChild(media);
+        }
+
+        if (overlay is null)
+        {
+            overlay = document.CreateElement("div");
+            overlay.ClassList.Add("lp-bg-overlay");
+            stage.AppendChild(overlay);
+        }
+
+        var sourceType = BackgroundRenderService.ResolveSourceType(setting);
+        if (sourceType == "video" && !string.IsNullOrWhiteSpace(setting.VideoUrl))
+        {
+            var video = media.QuerySelector("video") as IElement;
+            if (video is null)
             {
-                var existing = wrapper.QuerySelector(".lp-bg-stage") as IElement;
-                if (!BackgroundRenderService.UseMediaLayer(setting))
+                foreach (var child in media.Children.ToList())
                 {
-                    existing?.Remove();
-                    return;
+                    child.Remove();
                 }
-
-                var stage = existing ?? document.CreateElement("div");
-                stage.ClassList.Add("lp-bg-stage");
-                stage.SetAttribute("style", "position:fixed;inset:0;z-index:-1;overflow:hidden;");
-
-                var media = stage.QuerySelector(".lp-bg-media") as IElement;
-                var overlay = stage.QuerySelector(".lp-bg-overlay") as IElement;
-
-                if (media is null)
-                {
-                    media = document.CreateElement("div");
-                    media.ClassList.Add("lp-bg-media");
-                    stage.AppendChild(media);
-                }
-
-                if (overlay is null)
-                {
-                    overlay = document.CreateElement("div");
-                    overlay.ClassList.Add("lp-bg-overlay");
-                    stage.AppendChild(overlay);
-                }
-
-                var sourceType = BackgroundRenderService.ResolveSourceType(setting);
-                if (sourceType == "video" && !string.IsNullOrWhiteSpace(setting.VideoUrl))
-                {
-                    var video = media.QuerySelector("video") as IElement;
-                    if (video is null)
-                    {
-                        foreach (var child in media.Children.ToList())
-                        {
-                            child.Remove();
-                        }
-                        video = document.CreateElement("video");
-                        video.SetAttribute("autoplay", string.Empty);
-                        video.SetAttribute("muted", string.Empty);
-                        video.SetAttribute("loop", string.Empty);
-                        video.SetAttribute("playsinline", string.Empty);
-                        media.AppendChild(video);
-                    }
-
-                    video.SetAttribute("style", "width:100%;height:100%;object-fit:cover;" + BackgroundRenderService.BuildFilterStyle(setting.Effects));
-                    video.SetAttribute("src", setting.VideoUrl);
-                    if (!string.IsNullOrWhiteSpace(setting.VideoPoster))
-                    {
-                        video.SetAttribute("poster", setting.VideoPoster);
-                    }
-                }
-                else
-                {
-                    foreach (var child in media.Children.ToList())
-                    {
-                        child.Remove();
-                    }
-                    media.SetAttribute("style", "position:absolute;inset:0;" + BackgroundRenderService.BuildMediaStyle(setting) + BackgroundRenderService.BuildFilterStyle(setting.Effects));
-                }
-
-                overlay.SetAttribute("style", "position:absolute;inset:0;" + BackgroundRenderService.BuildOverlayStyle(setting.Effects));
-
-                if (existing is null)
-                {
-                    wrapper.AppendChild(stage);
-                }
+                video = document.CreateElement("video");
+                video.SetAttribute("autoplay", string.Empty);
+                video.SetAttribute("muted", string.Empty);
+                video.SetAttribute("loop", string.Empty);
+                video.SetAttribute("playsinline", string.Empty);
+                media.AppendChild(video);
             }
 
-            private static void ApplySectionBackgrounds(IDocument document, ContentModel content)
+            video.SetAttribute("style", "width:100%;height:100%;object-fit:cover;" + BackgroundRenderService.BuildFilterStyle(setting.Effects));
+            video.SetAttribute("src", setting.VideoUrl);
+            if (!string.IsNullOrWhiteSpace(setting.VideoPoster))
             {
-                var head = document.Head;
-                if (head is null)
+                video.SetAttribute("poster", setting.VideoPoster);
+            }
+        }
+        else
+        {
+            foreach (var child in media.Children.ToList())
+            {
+                child.Remove();
+            }
+            media.SetAttribute("style", "position:absolute;inset:0;" + BackgroundRenderService.BuildMediaStyle(setting) + BackgroundRenderService.BuildFilterStyle(setting.Effects));
+        }
+
+        overlay.SetAttribute("style", "position:absolute;inset:0;" + BackgroundRenderService.BuildOverlayStyle(setting.Effects));
+
+        if (existing is null)
+        {
+            wrapper.AppendChild(stage);
+        }
+    }
+
+    private static void ApplySectionBackgrounds(IDocument document, ContentModel content)
+    {
+        var head = document.Head;
+        if (head is null)
+        {
+            return;
+        }
+
+        var styleTag = document.QuerySelector("style[data-section-bg='true']") as IElement;
+        if (styleTag is null)
+        {
+            styleTag = document.CreateElement("style");
+            styleTag.SetAttribute("data-section-bg", "true");
+            head.AppendChild(styleTag);
+        }
+
+        var rules = new StringBuilder();
+        rules.AppendLine("header, .header { background-color: #ffffff !important; background-image: none !important; }");
+        rules.AppendLine(".section-group[data-section='conditions-contact-banners'], section.conditions, .banner-head, a.banner, .magazine { background-color: #ffffff !important; }");
+        rules.AppendLine("section.contact { background-color: #000000 !important; background-image: none !important; }");
+        rules.AppendLine("@media (max-width: 768px) { .section-group[data-section='campaign-content'], .section-group[data-section='coupon-period'], .section-group[data-section='coupon-notes'], .section-group[data-section='ranking'], .section-group[data-section^='store-search'], .section-group.custom-section, .section-group[data-section='campaign-content'] section, .section-group[data-section='coupon-period'] section, .section-group[data-section='coupon-notes'] section, .section-group[data-section='ranking'] section, .section-group[data-section^='store-search'] section, .section-group.custom-section section, .section-group[data-section='campaign-content'] .l-page-contents, .section-group[data-section='coupon-period'] .l-page-contents, .section-group[data-section='coupon-notes'] .l-page-contents, .section-group[data-section='ranking'] .l-page-contents, .section-group[data-section^='store-search'] .l-page-contents, .section-group.custom-section .l-page-contents, .section-group[data-section='campaign-content'] .campaign__block, .section-group[data-section='coupon-period'] .campaign__block, .section-group[data-section='coupon-notes'] .campaign__block, .section-group[data-section='ranking'] .campaign__block, .section-group[data-section^='store-search'] .campaign__block, .section-group.custom-section .campaign__block { background-color: transparent !important; background-image: none !important; } }");
+
+        var keys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        if (content.SectionBackgrounds is not null)
+        {
+            foreach (var key in content.SectionBackgrounds.Keys)
+            {
+                if (!string.IsNullOrWhiteSpace(key))
                 {
-                    return;
-                }
-
-                var styleTag = document.QuerySelector("style[data-section-bg='true']") as IElement;
-                if (styleTag is null)
-                {
-                    styleTag = document.CreateElement("style");
-                    styleTag.SetAttribute("data-section-bg", "true");
-                    head.AppendChild(styleTag);
-                }
-
-                var rules = new StringBuilder();
-                rules.AppendLine("header, .header { background-color: #ffffff !important; background-image: none !important; }");
-                rules.AppendLine(".section-group[data-section='conditions-contact-banners'], section.conditions, .banner-head, a.banner, .magazine { background-color: #ffffff !important; }");
-                rules.AppendLine("section.contact { background-color: #000000 !important; background-image: none !important; }");
-                rules.AppendLine("@media (max-width: 768px) { .section-group[data-section='campaign-content'], .section-group[data-section='coupon-period'], .section-group[data-section='coupon-notes'], .section-group[data-section='ranking'], .section-group[data-section^='store-search'], .section-group.custom-section, .section-group[data-section='campaign-content'] section, .section-group[data-section='coupon-period'] section, .section-group[data-section='coupon-notes'] section, .section-group[data-section='ranking'] section, .section-group[data-section^='store-search'] section, .section-group.custom-section section, .section-group[data-section='campaign-content'] .l-page-contents, .section-group[data-section='coupon-period'] .l-page-contents, .section-group[data-section='coupon-notes'] .l-page-contents, .section-group[data-section='ranking'] .l-page-contents, .section-group[data-section^='store-search'] .l-page-contents, .section-group.custom-section .l-page-contents, .section-group[data-section='campaign-content'] .campaign__block, .section-group[data-section='coupon-period'] .campaign__block, .section-group[data-section='coupon-notes'] .campaign__block, .section-group[data-section='ranking'] .campaign__block, .section-group[data-section^='store-search'] .campaign__block, .section-group.custom-section .campaign__block { background-color: transparent !important; background-image: none !important; } }");
-
-                var keys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-                if (content.SectionBackgrounds is not null)
-                {
-                    foreach (var key in content.SectionBackgrounds.Keys)
-                    {
-                        if (!string.IsNullOrWhiteSpace(key))
-                        {
-                            keys.Add(key);
-                        }
-                    }
-                }
-                if (content.SectionStyles is not null)
-                {
-                    foreach (var key in content.SectionStyles.Keys)
-                    {
-                        if (!string.IsNullOrWhiteSpace(key))
-                        {
-                            keys.Add(key);
-                        }
-                    }
-                }
-
-                foreach (var group in document.QuerySelectorAll(".section-group[data-section]").ToList())
-                {
-                    var rawKey = group.GetAttribute("data-section");
-                    var normalizedKey = NormalizeSectionKey(rawKey);
-                    if (!string.IsNullOrWhiteSpace(normalizedKey))
-                    {
-                        group.SetAttribute("data-section-key", normalizedKey);
-                    }
-                }
-
-                foreach (var key in keys)
-                {
-                    if (!IsEditorManagedSectionKey(key, content))
-                    {
-                        continue;
-                    }
-
-                    var settings = ResolveSectionBackgroundSettings(content, key);
-                    if (settings is null)
-                    {
-                        continue;
-                    }
-
-                    var sectionKey = NormalizeSectionKey(key);
-                    var selector = $".lp-canvas .section-group[data-section-key='{sectionKey}'], .lp-canvas .section-group[data-section-key='{sectionKey}'] > section";
-                    var rule = BuildSectionBackgroundRule(settings, selector);
-                    if (!string.IsNullOrWhiteSpace(rule))
-                    {
-                        rules.AppendLine(rule);
-                    }
-                }
-
-                styleTag.TextContent = rules.ToString();
-
-                foreach (var group in document.QuerySelectorAll(".section-group[data-section]").ToList())
-                {
-                    var normalizedKey = NormalizeSectionKey(group.GetAttribute("data-section"));
-                    if (string.IsNullOrWhiteSpace(normalizedKey))
-                    {
-                        continue;
-                    }
-
-                    var section = group.Children.FirstOrDefault(child => string.Equals(child.TagName, "SECTION", StringComparison.OrdinalIgnoreCase));
-                    var settings = FindEditedBackgroundSettingsByNormalizedKey(content, normalizedKey);
-
-                    if (settings is null)
-                    {
-                        ClearInlineBackground(group);
-                        if (section is not null)
-                        {
-                            ClearInlineBackground(section);
-                        }
-                        continue;
-                    }
-
-                    ApplyInlineBackground(group, settings);
-                    if (section is not null)
-                    {
-                        ApplyInlineBackground(section, settings);
-                    }
+                    keys.Add(key);
                 }
             }
-
-            private static SectionBackgroundSettings? ResolveSectionBackgroundSettings(ContentModel content, string key)
+        }
+        if (content.SectionStyles is not null)
+        {
+            foreach (var key in content.SectionStyles.Keys)
             {
-                if (content.SectionStyles is not null
-                    && content.SectionStyles.TryGetValue(key, out var style)
-                    && style?.Background is not null
-                    && IsEditedSectionBackground(style.Background))
+                if (!string.IsNullOrWhiteSpace(key))
                 {
-                    return style.Background;
+                    keys.Add(key);
                 }
+            }
+        }
 
-                if (content.SectionBackgrounds is not null
-                    && content.SectionBackgrounds.TryGetValue(key, out var settings)
-                    && settings is not null
-                    && IsEditedSectionBackground(settings))
-                {
-                    return settings;
-                }
+        foreach (var group in document.QuerySelectorAll(".section-group[data-section]").ToList())
+        {
+            var rawKey = group.GetAttribute("data-section");
+            var normalizedKey = NormalizeSectionKey(rawKey);
+            if (!string.IsNullOrWhiteSpace(normalizedKey))
+            {
+                group.SetAttribute("data-section-key", normalizedKey);
+            }
+        }
 
-                return null;
+        foreach (var key in keys)
+        {
+            if (!IsEditorManagedSectionKey(key, content))
+            {
+                continue;
             }
 
-            private static SectionBackgroundSettings? FindEditedBackgroundSettingsByNormalizedKey(ContentModel content, string normalizedKey)
+            if (string.Equals(NormalizeSectionKey(key), "countdown", StringComparison.OrdinalIgnoreCase))
             {
-                if (content.SectionStyles is not null)
-                {
-                    foreach (var pair in content.SectionStyles)
-                    {
-                        if (NormalizeSectionKey(pair.Key) != normalizedKey)
-                        {
-                            continue;
-                        }
-
-                        var background = pair.Value?.Background;
-                        if (background is not null && IsEditedSectionBackground(background))
-                        {
-                            return background;
-                        }
-                    }
-                }
-
-                if (content.SectionBackgrounds is not null)
-                {
-                    foreach (var pair in content.SectionBackgrounds)
-                    {
-                        if (NormalizeSectionKey(pair.Key) != normalizedKey)
-                        {
-                            continue;
-                        }
-
-                        if (pair.Value is not null && IsEditedSectionBackground(pair.Value))
-                        {
-                            return pair.Value;
-                        }
-                    }
-                }
-
-                return null;
+                continue;
             }
 
-            private static void ApplyInlineBackground(IElement element, SectionBackgroundSettings settings)
+            var settings = ResolveSectionBackgroundSettings(content, key);
+            if (settings is null)
             {
-                var rules = BuildInlineBackgroundRules(settings);
-                if (rules.Count == 0)
-                {
-                    return;
-                }
-
-                var current = element.GetAttribute("style") ?? string.Empty;
-                var addition = string.Join(" ", rules);
-                if (!string.IsNullOrWhiteSpace(current) && !current.TrimEnd().EndsWith(";", StringComparison.Ordinal))
-                {
-                    current += ";";
-                }
-
-                element.SetAttribute("style", string.Concat(current, addition));
+                continue;
             }
 
-            private static void ClearInlineBackground(IElement element)
+            var sectionKey = NormalizeSectionKey(key);
+            var selector = $".lp-canvas .section-group[data-section-key='{sectionKey}'], .lp-canvas .section-group[data-section-key='{sectionKey}'] > section";
+            var rule = BuildSectionBackgroundRule(settings, selector);
+            if (!string.IsNullOrWhiteSpace(rule))
             {
-                var current = element.GetAttribute("style");
-                if (string.IsNullOrWhiteSpace(current))
-                {
-                    return;
-                }
+                rules.AppendLine(rule);
+            }
+        }
 
-                var cleaned = Regex.Replace(current, "(?i)background(-color|-image|-repeat|-position|-size|-attachment)?\\s*:[^;]+;?", string.Empty).Trim();
-                if (string.IsNullOrWhiteSpace(cleaned))
-                {
-                    element.RemoveAttribute("style");
-                    return;
-                }
+        styleTag.TextContent = rules.ToString();
 
-                element.SetAttribute("style", cleaned);
+        foreach (var group in document.QuerySelectorAll(".section-group[data-section]").ToList())
+        {
+            var normalizedKey = NormalizeSectionKey(group.GetAttribute("data-section"));
+            if (string.IsNullOrWhiteSpace(normalizedKey))
+            {
+                continue;
             }
 
-            private static List<string> BuildInlineBackgroundRules(SectionBackgroundSettings settings)
+            var section = group.Children.FirstOrDefault(child => string.Equals(child.TagName, "SECTION", StringComparison.OrdinalIgnoreCase));
+            var settings = FindEditedBackgroundSettingsByNormalizedKey(content, normalizedKey);
+
+            if (settings is null)
             {
-                var dto = BackgroundSettingMapper.FromSection(settings);
-                return BackgroundStyleService.BuildInlineRules(dto, includeImportant: true);
+                ClearInlineBackground(group);
+                if (section is not null)
+                {
+                    ClearInlineBackground(section);
+                }
+                continue;
             }
 
-            private static bool IsEditedSectionBackground(SectionBackgroundSettings settings)
+            ApplyInlineBackground(group, settings);
+            if (section is not null)
             {
-                var mode = settings.Mode?.Trim().ToLowerInvariant() ?? "inherit";
-                if (mode == "inherit")
-                {
-                    return false;
-                }
-
-                if (mode == "preset")
-                {
-                    return !string.IsNullOrWhiteSpace(settings.Preset?.PresetKey);
-                }
-
-                if (mode == "color")
-                {
-                    return !string.IsNullOrWhiteSpace(SanitizeCssColor(settings.Color));
-                }
-
-                if (mode == "gradient")
-                {
-                    return !string.IsNullOrWhiteSpace(SanitizeCssColor(settings.GradientColorA))
-                           && !string.IsNullOrWhiteSpace(SanitizeCssColor(settings.GradientColorB));
-                }
-
-                if (mode == "image")
-                {
-                    return !string.IsNullOrWhiteSpace(settings.ImageUrl);
-                }
-
-                return false;
+                ApplyInlineBackground(section, settings);
             }
+        }
+    }
 
-            private static void ApplySectionStyles(IDocument document, ContentModel content)
+    private static SectionBackgroundSettings? ResolveSectionBackgroundSettings(ContentModel content, string key)
+    {
+        if (content.SectionStyles is not null
+            && content.SectionStyles.TryGetValue(key, out var style)
+            && style?.Background is not null
+            && IsEditedSectionBackground(style.Background))
+        {
+            return style.Background;
+        }
+
+        if (content.SectionBackgrounds is not null
+            && content.SectionBackgrounds.TryGetValue(key, out var settings)
+            && settings is not null
+            && IsEditedSectionBackground(settings))
+        {
+            return settings;
+        }
+
+        return null;
+    }
+
+    private static SectionBackgroundSettings? FindEditedBackgroundSettingsByNormalizedKey(ContentModel content, string normalizedKey)
+    {
+        if (content.SectionStyles is not null)
+        {
+            foreach (var pair in content.SectionStyles)
+            {
+                if (NormalizeSectionKey(pair.Key) != normalizedKey)
+                {
+                    continue;
+                }
+
+                var background = pair.Value?.Background;
+                if (background is not null && IsEditedSectionBackground(background))
+                {
+                    return background;
+                }
+            }
+        }
+
+        if (content.SectionBackgrounds is not null)
+        {
+            foreach (var pair in content.SectionBackgrounds)
+            {
+                if (NormalizeSectionKey(pair.Key) != normalizedKey)
+                {
+                    continue;
+                }
+
+                if (pair.Value is not null && IsEditedSectionBackground(pair.Value))
+                {
+                    return pair.Value;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    private static void ApplyInlineBackground(IElement element, SectionBackgroundSettings settings)
+    {
+        var rules = BuildInlineBackgroundRules(settings);
+        if (rules.Count == 0)
+        {
+            return;
+        }
+
+        var current = element.GetAttribute("style") ?? string.Empty;
+        var addition = string.Join(" ", rules);
+        if (!string.IsNullOrWhiteSpace(current) && !current.TrimEnd().EndsWith(";", StringComparison.Ordinal))
+        {
+            current += ";";
+        }
+
+        element.SetAttribute("style", string.Concat(current, addition));
+    }
+
+    private static void ClearInlineBackground(IElement element)
+    {
+        var current = element.GetAttribute("style");
+        if (string.IsNullOrWhiteSpace(current))
+        {
+            return;
+        }
+
+        var cleaned = Regex.Replace(current, "(?i)background(-color|-image|-repeat|-position|-size|-attachment)?\\s*:[^;]+;?", string.Empty).Trim();
+        if (string.IsNullOrWhiteSpace(cleaned))
+        {
+            element.RemoveAttribute("style");
+            return;
+        }
+
+        element.SetAttribute("style", cleaned);
+    }
+
+    private static List<string> BuildInlineBackgroundRules(SectionBackgroundSettings settings)
+    {
+        var dto = BackgroundSettingMapper.FromSection(settings);
+        return BackgroundStyleService.BuildInlineRules(dto, includeImportant: true);
+    }
+
+    private static bool IsEditedSectionBackground(SectionBackgroundSettings settings)
+    {
+        var mode = settings.Mode?.Trim().ToLowerInvariant() ?? "inherit";
+        if (mode == "inherit")
+        {
+            return false;
+        }
+
+        if (mode == "preset")
+        {
+            return !string.IsNullOrWhiteSpace(settings.Preset?.PresetKey);
+        }
+
+        if (mode == "color")
+        {
+            return !string.IsNullOrWhiteSpace(SanitizeCssColor(settings.Color));
+        }
+
+        if (mode == "gradient")
+        {
+            return !string.IsNullOrWhiteSpace(SanitizeCssColor(settings.GradientColorA))
+                   && !string.IsNullOrWhiteSpace(SanitizeCssColor(settings.GradientColorB));
+        }
+
+        if (mode == "image")
+        {
+            return !string.IsNullOrWhiteSpace(settings.ImageUrl);
+        }
+
+        return false;
+    }
+
+            private static void ApplySectionStyles(IDocument document, ContentModel content, string? editingSectionKey)
             {
                 var head = document.Head;
                 if (head is null)
@@ -629,11 +1258,63 @@ img[class*='decoration'] { z-index: 50 !important; }
                 }
 
                 var rules = new StringBuilder();
+                var needsFadeIn = false;
 
+                var normalizedEditingKey = NormalizeSectionKey(editingSectionKey);
                 foreach (var group in document.QuerySelectorAll(".section-group[data-section]").ToList())
                 {
                     var key = group.GetAttribute("data-section");
-                    if (string.IsNullOrWhiteSpace(key) || !IsEditorManagedSectionKey(key, content))
+                    if (string.IsNullOrWhiteSpace(key))
+                    {
+                        continue;
+                    }
+
+                    var normalizedKey = NormalizeSectionKey(key);
+                    if (!string.IsNullOrWhiteSpace(normalizedKey))
+                    {
+                        group.SetAttribute("data-section-id", normalizedKey);
+                        group.SetAttribute("data-section-key", normalizedKey);
+                    }
+
+                    var section = group.Children.FirstOrDefault(child => string.Equals(child.TagName, "SECTION", StringComparison.OrdinalIgnoreCase));
+                    if (section is not null && !string.IsNullOrWhiteSpace(normalizedKey))
+                    {
+                        section.SetAttribute("data-section-id", normalizedKey);
+                    }
+
+                    group.ClassList.Add("lp-section-frame");
+                    if (section is not null)
+                    {
+                        section.ClassList.Add("lp-section-frame");
+                    }
+
+                    var isEditing = !string.IsNullOrWhiteSpace(normalizedEditingKey)
+                        && string.Equals(normalizedKey, normalizedEditingKey, StringComparison.OrdinalIgnoreCase);
+                    if (isEditing)
+                    {
+                        group.ClassList.Add("lp-editing");
+                        group.SetAttribute("data-editing", "true");
+                        if (section is not null)
+                        {
+                            section.ClassList.Add("lp-editing");
+                        }
+                    }
+                    else
+                    {
+                        group.ClassList.Remove("lp-editing");
+                        group.RemoveAttribute("data-editing");
+                        if (section is not null)
+                        {
+                            section.ClassList.Remove("lp-editing");
+                        }
+                    }
+
+                    if (!IsEditorManagedSectionKey(key, content))
+                    {
+                        continue;
+                    }
+
+                    if (string.Equals(normalizedKey, "countdown", StringComparison.OrdinalIgnoreCase))
                     {
                         continue;
                     }
@@ -644,11 +1325,32 @@ img[class*='decoration'] { z-index: 50 !important; }
                         continue;
                     }
 
-                    var selector = $".lp-content-wrap .section-group[data-section='{key}']";
+                    var selector = string.IsNullOrWhiteSpace(normalizedKey)
+                        ? $".lp-canvas .section-group[data-section='{key}']"
+                        : $".lp-canvas .section-group[data-section-id='{normalizedKey}']";
                     var rule = BuildSectionStyleRule(style, selector);
                     if (!string.IsNullOrWhiteSpace(rule))
                     {
                         rules.AppendLine(rule);
+                    }
+
+                    var overlayRule = BuildSectionDesignOverlayRule(style, selector);
+                    if (!string.IsNullOrWhiteSpace(overlayRule))
+                    {
+                        rules.AppendLine(overlayRule);
+                        rules.AppendLine(BuildSectionDesignContentRule(selector));
+                    }
+
+                    if (style.Design is not null
+                        && string.Equals(style.Design.Animation, "fadein", StringComparison.OrdinalIgnoreCase))
+                    {
+                        needsFadeIn = true;
+                    }
+
+                    var inlineStyle = BuildSectionStyleInline(style);
+                    if (!string.IsNullOrWhiteSpace(inlineStyle))
+                    {
+                        AppendInlineStyle(group, inlineStyle);
                     }
 
                     if (style.Divider is not null && style.Divider.Enabled)
@@ -662,7 +1364,133 @@ img[class*='decoration'] { z-index: 50 !important; }
                     }
                 }
 
+                if (needsFadeIn)
+                {
+                    rules.AppendLine("@keyframes lp-section-fadein { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }");
+                }
+
                 styleTag.TextContent = rules.ToString();
+            }
+
+            private static string BuildSectionStyleInline(SectionStyleModel style)
+            {
+                var rules = new List<string>();
+                var design = style.Design;
+                var hasDesign = design is not null;
+                if (hasDesign)
+                {
+                    var background = BuildDesignBackground(design!);
+                    if (!string.IsNullOrWhiteSpace(background))
+                    {
+                        rules.Add($"background: {background}");
+                    }
+                    if (string.Equals(design!.Type, "image", StringComparison.OrdinalIgnoreCase))
+                    {
+                        rules.Add("background-size: cover");
+                        rules.Add("background-repeat: no-repeat");
+                        rules.Add("background-position: center");
+                    }
+                    if (design.BorderRadius is > 0)
+                    {
+                        rules.Add($"border-radius: {design.BorderRadius}px");
+                    }
+                    var (paddingX, paddingY) = ResolveDesignPadding(design);
+                    if (paddingY is > 0)
+                    {
+                        rules.Add($"padding-top: {paddingY}px");
+                        rules.Add($"padding-bottom: {paddingY}px");
+                    }
+                    if (paddingX is > 0)
+                    {
+                        rules.Add($"padding-left: {paddingX}px");
+                        rules.Add($"padding-right: {paddingX}px");
+                    }
+                    if (design.MarginBottom is >= 0)
+                    {
+                        rules.Add($"margin-bottom: {design.MarginBottom}px");
+                    }
+                    if (design.BorderWidth is > 0)
+                    {
+                        var borderColor = SanitizeCssColor(design.BorderColor) ?? "#e5e7eb";
+                        var borderWidth = design.BorderWidth.Value;
+                        rules.Add($"border: {borderWidth}px solid {borderColor}");
+                    }
+                    var shadow = ResolveSectionShadow(design.ShadowLevel ?? "off");
+                    if (design.AccentLineEnabled)
+                    {
+                        var accentColor = SanitizeCssColor(design.AccentColor) ?? "#4f46e5";
+                        var accentHeight = design.AccentHeight is > 0 ? design.AccentHeight.Value : 4;
+                        var accentShadow = $"inset 0 {accentHeight}px 0 0 {accentColor}";
+                        shadow = string.IsNullOrWhiteSpace(shadow) ? accentShadow : $"{shadow}, {accentShadow}";
+                    }
+                    if (!string.IsNullOrWhiteSpace(shadow))
+                    {
+                        rules.Add($"box-shadow: {shadow}");
+                    }
+                    if (string.Equals(design.Animation, "fadein", StringComparison.OrdinalIgnoreCase))
+                    {
+                        rules.Add("animation: lp-section-fadein 0.6s ease");
+                    }
+                    if (RequiresOverlay(design))
+                    {
+                        rules.Add("position: relative");
+                        rules.Add("overflow: hidden");
+                    }
+                }
+                else
+                {
+                    var borderColor = SanitizeCssColor(style.BorderColor);
+                    if (!string.IsNullOrWhiteSpace(borderColor))
+                    {
+                        var borderWidth = style.BorderWidth is > 0 ? style.BorderWidth.Value : 1;
+                        var borderStyle = string.IsNullOrWhiteSpace(style.BorderStyle) ? "solid" : style.BorderStyle;
+                        rules.Add($"border: {borderWidth}px {borderStyle} {borderColor}");
+                    }
+                    if (style.Radius is > 0)
+                    {
+                        rules.Add($"border-radius: {style.Radius}px");
+                    }
+                    var shadow = ResolveSectionShadow(style.Shadow);
+                    if (!string.IsNullOrWhiteSpace(shadow))
+                    {
+                        rules.Add($"box-shadow: {shadow}");
+                    }
+                    if (style.PaddingTop is > 0)
+                    {
+                        rules.Add($"padding-top: {style.PaddingTop}px");
+                    }
+                    if (style.PaddingRight is > 0)
+                    {
+                        rules.Add($"padding-right: {style.PaddingRight}px");
+                    }
+                    if (style.PaddingBottom is > 0)
+                    {
+                        rules.Add($"padding-bottom: {style.PaddingBottom}px");
+                    }
+                    if (style.PaddingLeft is > 0)
+                    {
+                        rules.Add($"padding-left: {style.PaddingLeft}px");
+                    }
+                }
+
+                return rules.Count == 0 ? string.Empty : string.Join("; ", rules);
+            }
+
+            private static void AppendInlineStyle(IElement element, string style)
+            {
+                if (element is null || string.IsNullOrWhiteSpace(style))
+                {
+                    return;
+                }
+
+                var existing = element.GetAttribute("style");
+                if (string.IsNullOrWhiteSpace(existing))
+                {
+                    element.SetAttribute("style", style);
+                    return;
+                }
+
+                element.SetAttribute("style", existing.Trim().TrimEnd(';') + "; " + style);
             }
 
             private static SectionStyleModel? ResolveSectionStyle(ContentModel content, string key)
@@ -690,40 +1518,114 @@ img[class*='decoration'] { z-index: 50 !important; }
             {
                 var rules = new List<string>();
 
-                var borderColor = SanitizeCssColor(style.BorderColor);
-                if (!string.IsNullOrWhiteSpace(borderColor))
-                {
-                    var borderWidth = style.BorderWidth is > 0 ? style.BorderWidth.Value : 1;
-                    var borderStyle = string.IsNullOrWhiteSpace(style.BorderStyle) ? "solid" : style.BorderStyle;
-                    rules.Add($"border: {borderWidth}px {borderStyle} {borderColor} !important;");
-                }
+                var design = style.Design;
+                var hasDesign = design is not null;
+                var overlayNeeded = design is not null && RequiresOverlay(design);
 
-                if (style.Radius is > 0)
+                if (hasDesign)
                 {
-                    rules.Add($"border-radius: {style.Radius}px !important;");
-                }
+                    var background = BuildDesignBackground(design!);
+                    if (!string.IsNullOrWhiteSpace(background))
+                    {
+                        rules.Add($"background: {background} !important;");
+                    }
+                    if (string.Equals(design!.Type, "image", StringComparison.OrdinalIgnoreCase))
+                    {
+                        rules.Add("background-size: cover !important;");
+                        rules.Add("background-repeat: no-repeat !important;");
+                        rules.Add("background-position: center !important;");
+                    }
 
-                var shadow = ResolveSectionShadow(style.Shadow);
-                if (!string.IsNullOrWhiteSpace(shadow))
-                {
-                    rules.Add($"box-shadow: {shadow} !important;");
-                }
+                    if (design.BorderRadius is > 0)
+                    {
+                        rules.Add($"border-radius: {design.BorderRadius}px !important;");
+                    }
 
-                if (style.PaddingTop is > 0)
-                {
-                    rules.Add($"padding-top: {style.PaddingTop}px !important;");
+                    var (paddingX, paddingY) = ResolveDesignPadding(design);
+                    if (paddingY is > 0)
+                    {
+                        rules.Add($"padding-top: {paddingY}px !important;");
+                        rules.Add($"padding-bottom: {paddingY}px !important;");
+                    }
+                    if (paddingX is > 0)
+                    {
+                        rules.Add($"padding-left: {paddingX}px !important;");
+                        rules.Add($"padding-right: {paddingX}px !important;");
+                    }
+
+                    if (design.MarginBottom is >= 0)
+                    {
+                        rules.Add($"margin-bottom: {design.MarginBottom}px !important;");
+                    }
+
+                    if (design.BorderWidth is > 0)
+                    {
+                        var borderColor = SanitizeCssColor(design.BorderColor) ?? "#e5e7eb";
+                        var borderWidth = design.BorderWidth.Value;
+                        rules.Add($"border: {borderWidth}px solid {borderColor} !important;");
+                    }
+
+                    var shadow = ResolveSectionShadow(design.ShadowLevel ?? "off");
+                    if (design.AccentLineEnabled)
+                    {
+                        var accentColor = SanitizeCssColor(design.AccentColor) ?? "#4f46e5";
+                        var accentHeight = design.AccentHeight is > 0 ? design.AccentHeight.Value : 4;
+                        var accentShadow = $"inset 0 {accentHeight}px 0 0 {accentColor}";
+                        shadow = string.IsNullOrWhiteSpace(shadow) ? accentShadow : $"{shadow}, {accentShadow}";
+                    }
+                    if (!string.IsNullOrWhiteSpace(shadow))
+                    {
+                        rules.Add($"box-shadow: {shadow} !important;");
+                    }
+
+                    if (string.Equals(design.Animation, "fadein", StringComparison.OrdinalIgnoreCase))
+                    {
+                        rules.Add("animation: lp-section-fadein 0.6s ease;");
+                    }
+
+                    if (overlayNeeded)
+                    {
+                        rules.Add("position: relative !important;");
+                        rules.Add("overflow: hidden !important;");
+                    }
                 }
-                if (style.PaddingRight is > 0)
+                else
                 {
-                    rules.Add($"padding-right: {style.PaddingRight}px !important;");
-                }
-                if (style.PaddingBottom is > 0)
-                {
-                    rules.Add($"padding-bottom: {style.PaddingBottom}px !important;");
-                }
-                if (style.PaddingLeft is > 0)
-                {
-                    rules.Add($"padding-left: {style.PaddingLeft}px !important;");
+                    var borderColor = SanitizeCssColor(style.BorderColor);
+                    if (!string.IsNullOrWhiteSpace(borderColor))
+                    {
+                        var borderWidth = style.BorderWidth is > 0 ? style.BorderWidth.Value : 1;
+                        var borderStyle = string.IsNullOrWhiteSpace(style.BorderStyle) ? "solid" : style.BorderStyle;
+                        rules.Add($"border: {borderWidth}px {borderStyle} {borderColor} !important;");
+                    }
+
+                    if (style.Radius is > 0)
+                    {
+                        rules.Add($"border-radius: {style.Radius}px !important;");
+                    }
+
+                    var shadow = ResolveSectionShadow(style.Shadow);
+                    if (!string.IsNullOrWhiteSpace(shadow))
+                    {
+                        rules.Add($"box-shadow: {shadow} !important;");
+                    }
+
+                    if (style.PaddingTop is > 0)
+                    {
+                        rules.Add($"padding-top: {style.PaddingTop}px !important;");
+                    }
+                    if (style.PaddingRight is > 0)
+                    {
+                        rules.Add($"padding-right: {style.PaddingRight}px !important;");
+                    }
+                    if (style.PaddingBottom is > 0)
+                    {
+                        rules.Add($"padding-bottom: {style.PaddingBottom}px !important;");
+                    }
+                    if (style.PaddingLeft is > 0)
+                    {
+                        rules.Add($"padding-left: {style.PaddingLeft}px !important;");
+                    }
                 }
 
                 if (rules.Count == 0)
@@ -734,6 +1636,104 @@ img[class*='decoration'] { z-index: 50 !important; }
                 return $"{selector} {{ {string.Join(" ", rules)} }}";
             }
 
+            private static (int? PaddingX, int? PaddingY) ResolveDesignPadding(SectionDesignModel design)
+            {
+                if (string.Equals(design.PaddingPreset, "custom", StringComparison.OrdinalIgnoreCase))
+                {
+                    return (design.PaddingX, design.PaddingY);
+                }
+
+                return design.PaddingPreset switch
+                {
+                    "sm" => (16, 16),
+                    "lg" => (32, 28),
+                    _ => (24, 24)
+                };
+            }
+
+            private static string BuildDesignBackground(SectionDesignModel design)
+            {
+                var type = design.Type?.ToLowerInvariant() ?? "simple";
+                if (type == "gradient")
+                {
+                    var a = SanitizeCssColor(design.GradientColorA) ?? "#e0f2fe";
+                    var b = SanitizeCssColor(design.GradientColorB) ?? "#ffffff";
+                    var deg = design.GradientDirection is >= 0 ? design.GradientDirection.Value : 135;
+                    return $"linear-gradient({deg}deg, {a}, {b})";
+                }
+
+                if (type == "image")
+                {
+                    var url = SanitizeCssUrl(design.ImageUrl);
+                    return string.IsNullOrWhiteSpace(url) ? string.Empty : $"url('{url}')";
+                }
+
+                var color = SanitizeCssColor(design.BackgroundColor) ?? "#ffffff";
+                var opacity = design.BackgroundOpacity is >= 0 and <= 1 ? design.BackgroundOpacity.Value : 1;
+                return ToRgba(color, opacity);
+            }
+
+            private static bool RequiresOverlay(SectionDesignModel design)
+            {
+                if (string.Equals(design.Type, "image", StringComparison.OrdinalIgnoreCase))
+                {
+                    return true;
+                }
+
+                return !string.Equals(design.PatternType, "off", StringComparison.OrdinalIgnoreCase);
+            }
+
+            private static string BuildSectionDesignOverlayRule(SectionStyleModel style, string selector)
+            {
+                var design = style.Design;
+                if (design is null)
+                {
+                    return string.Empty;
+                }
+
+                var pattern = design.PatternType?.ToLowerInvariant() ?? "off";
+                if (!string.Equals(design.Type, "image", StringComparison.OrdinalIgnoreCase)
+                    && string.Equals(pattern, "off", StringComparison.OrdinalIgnoreCase))
+                {
+                    return string.Empty;
+                }
+
+                var overlayColor = SanitizeCssColor(design.OverlayColor);
+                var overlayOpacity = design.OverlayOpacity is >= 0 and <= 1 ? design.OverlayOpacity.Value : 0.0;
+                var baseOverlay = string.Equals(design.Type, "image", StringComparison.OrdinalIgnoreCase)
+                    ? (!string.IsNullOrWhiteSpace(overlayColor) ? ToRgba(overlayColor!, overlayOpacity) : "transparent")
+                    : "transparent";
+
+                var patternLayer = pattern switch
+                {
+                    "dots" => "radial-gradient(circle at 2px 2px, rgba(255,255,255,0.45) 1.2px, transparent 1.2px)",
+                    "stripes" => "linear-gradient(135deg, rgba(255,255,255,0.45) 0, rgba(255,255,255,0.45) 10px, transparent 10px, transparent 20px)",
+                    _ => string.Empty
+                };
+
+                if (string.IsNullOrWhiteSpace(baseOverlay) && string.IsNullOrWhiteSpace(patternLayer))
+                {
+                    return string.Empty;
+                }
+
+                var layers = string.IsNullOrWhiteSpace(patternLayer)
+                    ? baseOverlay
+                    : $"{baseOverlay}, {patternLayer}";
+                var size = pattern switch
+                {
+                    "dots" => "8px 8px",
+                    "stripes" => "24px 24px",
+                    _ => "auto"
+                };
+
+                return $"{selector}::after {{ content: ''; position: absolute; inset: 0; background: {layers}; background-size: {size}; pointer-events: none; border-radius: inherit; z-index: 0; }}";
+            }
+
+            private static string BuildSectionDesignContentRule(string selector)
+            {
+                return $"{selector} > * {{ position: relative; z-index: 1; }}";
+            }
+
             private static string? ResolveSectionShadow(string value)
             {
                 var normalized = value?.Trim().ToLowerInvariant();
@@ -742,9 +1742,769 @@ img[class*='decoration'] { z-index: 50 !important; }
                     "sm" => "0 4px 10px rgba(15, 23, 42, 0.12)",
                     "md" => "0 10px 24px rgba(15, 23, 42, 0.18)",
                     "lg" => "0 18px 38px rgba(15, 23, 42, 0.22)",
-                    "none" or "" or null => null,
+                    "none" or "off" or "" or null => null,
                     _ => value
                 };
+            }
+
+            private static void ApplyFrameStyle(IElement section, ContentModel content, string normalizedKey)
+            {
+                var frame = section.QuerySelector(".lp-frame") as IElement;
+                var header = section.QuerySelector(".lp-frame-header") as IElement;
+                var body = section.QuerySelector(".lp-frame-body") as IElement;
+                if (frame is null || header is null || body is null)
+                {
+                    return;
+                }
+
+                ApplyFrameStyleToElements(frame, header, body, ResolveFrameStyle(content, normalizedKey));
+            }
+
+            private static FrameStyle ResolveFrameStyle(ContentModel content, string normalizedKey)
+            {
+                return content.FrameDefaultStyle ?? content.CardThemeStyle ?? new FrameStyle();
+            }
+
+            private static void ApplyFrameAnimations(IDocument document, ContentModel content)
+            {
+                var groups = document.QuerySelectorAll(".section-group[data-section]").ToList();
+                if (groups.Count == 0)
+                {
+                    return;
+                }
+
+                foreach (var group in groups)
+                {
+                    var rawKey = group.GetAttribute("data-section") ?? string.Empty;
+                    if (string.IsNullOrWhiteSpace(rawKey))
+                    {
+                        continue;
+                    }
+
+                    var normalizedKey = NormalizeSectionKey(rawKey);
+                    if (string.IsNullOrWhiteSpace(normalizedKey))
+                    {
+                        normalizedKey = rawKey;
+                    }
+
+                    var section = group.QuerySelector(".lp-section") as IElement;
+                    if (section is null)
+                    {
+                        continue;
+                    }
+
+                    if (!content.AnimationPreviewEnabled)
+                    {
+                        ClearFrameAnimationTargets(section);
+                        continue;
+                    }
+
+                    var overrideStyle = FindFrameStyleOverrideByNormalizedKey(content, normalizedKey);
+                    var baseStyle = ResolveFrameStyle(content, normalizedKey);
+                    var targets = (overrideStyle?.AnimationTargets?.Count ?? 0) > 0
+                        ? overrideStyle!.AnimationTargets
+                        : baseStyle.AnimationTargets;
+                    ClearFrameAnimationTargets(section);
+
+                    if (targets is null || targets.Count == 0)
+                    {
+                        continue;
+                    }
+
+                    foreach (var pair in targets)
+                    {
+                        ApplyFrameAnimationToTargets(section, pair.Key, pair.Value);
+                    }
+                }
+            }
+
+            private static void ClearFrameAnimationTargets(IElement section)
+            {
+                foreach (var target in GetFrameAnimationElements(section, "outer"))
+                {
+                    ClearFrameAnimation(target);
+                }
+                foreach (var target in GetFrameAnimationElements(section, "band"))
+                {
+                    ClearFrameAnimation(target);
+                }
+                foreach (var target in GetFrameAnimationElements(section, "inner"))
+                {
+                    ClearFrameAnimation(target);
+                }
+                foreach (var target in GetFrameAnimationElements(section, "content"))
+                {
+                    ClearFrameAnimation(target);
+                }
+                foreach (var target in GetFrameAnimationElements(section, "corner-tl"))
+                {
+                    ClearFrameAnimation(target);
+                }
+                foreach (var target in GetFrameAnimationElements(section, "corner-tr"))
+                {
+                    ClearFrameAnimation(target);
+                }
+                foreach (var target in GetFrameAnimationElements(section, "corner-bl"))
+                {
+                    ClearFrameAnimation(target);
+                }
+                foreach (var target in GetFrameAnimationElements(section, "corner-br"))
+                {
+                    ClearFrameAnimation(target);
+                }
+                foreach (var target in GetFrameAnimationElements(section, "tab"))
+                {
+                    ClearFrameAnimation(target);
+                }
+            }
+
+            private static void ApplyFrameAnimationToTargets(IElement section, string targetKey, FrameAnimationTargetSetting setting)
+            {
+                var elements = GetFrameAnimationElements(section, targetKey);
+                foreach (var element in elements)
+                {
+                    ApplyFrameAnimationToElement(element, setting);
+                }
+            }
+
+            private static IEnumerable<IElement> GetFrameAnimationElements(IElement section, string targetKey)
+            {
+                if (section is null)
+                {
+                    return Enumerable.Empty<IElement>();
+                }
+
+                var key = (targetKey ?? string.Empty).Trim().ToLowerInvariant();
+                return key switch
+                {
+                    "outer" => section.QuerySelectorAll(".lp-frame").OfType<IElement>().ToList(),
+                    "band" => section.QuerySelectorAll(".lp-frame-header").OfType<IElement>().ToList(),
+                    "inner" => section.QuerySelectorAll(".lp-frame-body").OfType<IElement>().ToList(),
+                    "content" => section.QuerySelectorAll(".lp-frame-body > *").OfType<IElement>().ToList(),
+                    "corner-tl" => section.QuerySelectorAll(".lp-frame-corner[data-corner='tl']").OfType<IElement>().ToList(),
+                    "corner-tr" => section.QuerySelectorAll(".lp-frame-corner[data-corner='tr']").OfType<IElement>().ToList(),
+                    "corner-bl" => section.QuerySelectorAll(".lp-frame-corner[data-corner='bl']").OfType<IElement>().ToList(),
+                    "corner-br" => section.QuerySelectorAll(".lp-frame-corner[data-corner='br']").OfType<IElement>().ToList(),
+                    "tab" => section.QuerySelectorAll(".sticky-tabs__tab").OfType<IElement>().ToList(),
+                    _ => Enumerable.Empty<IElement>()
+                };
+            }
+
+            private static void ApplyFrameAnimationToElement(IElement element, FrameAnimationTargetSetting setting)
+            {
+                if (element is null)
+                {
+                    return;
+                }
+
+                ClearFrameAnimation(element);
+
+                if (setting is null || !setting.Enabled)
+                {
+                    return;
+                }
+
+                if (string.IsNullOrWhiteSpace(setting.PresetId)
+                    || string.Equals(setting.PresetId, "none", StringComparison.OrdinalIgnoreCase))
+                {
+                    return;
+                }
+
+                element.SetAttribute("data-frame-anim", setting.PresetId);
+                element.SetAttribute("data-frame-anim-trigger", string.IsNullOrWhiteSpace(setting.Trigger) ? "scroll" : setting.Trigger);
+                if (setting.DurationMs is > 0)
+                {
+                    element.SetAttribute("data-frame-anim-duration", setting.DurationMs.Value.ToString());
+                }
+                if (setting.DelayMs is >= 0)
+                {
+                    element.SetAttribute("data-frame-anim-delay", setting.DelayMs.Value.ToString());
+                }
+                if (!string.IsNullOrWhiteSpace(setting.Easing))
+                {
+                    element.SetAttribute("data-frame-anim-easing", setting.Easing);
+                }
+                element.SetAttribute("data-frame-anim-loop", setting.Loop ? "true" : "false");
+                element.ClassList.Add("lp-frame-anim");
+                element.ClassList.Add($"anim-{setting.PresetId}");
+            }
+
+            private static void ClearFrameAnimation(IElement element)
+            {
+                element.RemoveAttribute("data-frame-anim");
+                element.RemoveAttribute("data-frame-anim-trigger");
+                element.RemoveAttribute("data-frame-anim-duration");
+                element.RemoveAttribute("data-frame-anim-delay");
+                element.RemoveAttribute("data-frame-anim-easing");
+                element.RemoveAttribute("data-frame-anim-loop");
+                element.ClassList.Remove("lp-frame-anim");
+                element.ClassList.Remove("is-inview");
+
+                foreach (var cls in element.ClassList.ToList())
+                {
+                    if (cls.StartsWith("anim-", StringComparison.OrdinalIgnoreCase))
+                    {
+                        element.ClassList.Remove(cls);
+                    }
+                }
+            }
+
+            private static void EnsureFrameAnimationStyle(IDocument document)
+            {
+                var head = document.Head;
+                if (head is null)
+                {
+                    return;
+                }
+
+                if (document.QuerySelector("style[data-frame-anim-style='true']") is not null)
+                {
+                    return;
+                }
+
+                var style = document.CreateElement("style");
+                style.SetAttribute("data-frame-anim-style", "true");
+                style.TextContent = @"
+.lp-frame-anim {
+  opacity: 0;
+  animation-duration: var(--lp-frame-anim-duration, 600ms);
+  animation-delay: var(--lp-frame-anim-delay, 0ms);
+  animation-timing-function: var(--lp-frame-anim-easing, ease);
+  animation-fill-mode: both;
+  animation-iteration-count: var(--lp-frame-anim-iterations, 1);
+  animation-play-state: paused;
+  will-change: transform, opacity, filter;
+}
+.lp-frame-anim.is-inview { opacity: 1; animation-play-state: running; }
+.lp-frame-anim[data-frame-anim-trigger='load'] { opacity: 1; animation-play-state: running; }
+.lp-frame-anim[data-frame-anim-trigger='hover'] { opacity: 1; animation-play-state: paused; }
+.lp-frame-anim[data-frame-anim-trigger='hover']:hover { animation-play-state: running; }
+
+.anim-fade-in { animation-name: anim-fade-in; }
+.anim-fade-up { animation-name: anim-fade-up; }
+.anim-fade-down { animation-name: anim-fade-down; }
+.anim-fade-left { animation-name: anim-fade-left; }
+.anim-fade-right { animation-name: anim-fade-right; }
+.anim-slide-up { animation-name: anim-slide-up; }
+.anim-slide-left { animation-name: anim-slide-left; }
+.anim-slide-right { animation-name: anim-slide-right; }
+.anim-zoom-in { animation-name: anim-zoom-in; }
+.anim-blur-in { animation-name: anim-blur-in; }
+.anim-bounce-in { animation-name: anim-bounce-in; }
+.anim-pop { animation-name: anim-pop; }
+.anim-rubber { animation-name: anim-rubber; }
+.anim-swing { animation-name: anim-swing; }
+.anim-tada { animation-name: anim-tada; }
+.anim-flip { animation-name: anim-flip; }
+.anim-rotate-in { animation-name: anim-rotate-in; }
+.anim-skew { animation-name: anim-skew; }
+.anim-glow { animation-name: anim-glow; }
+.anim-shimmer { animation-name: anim-shimmer; }
+.anim-float { animation-name: anim-float; }
+.anim-breathe { animation-name: anim-breathe; }
+.anim-gentle-wiggle { animation-name: anim-gentle-wiggle; }
+
+@keyframes anim-fade-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes anim-fade-up { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes anim-fade-down { from { opacity: 0; transform: translateY(-20px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes anim-fade-left { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: translateX(0); } }
+@keyframes anim-fade-right { from { opacity: 0; transform: translateX(-20px); } to { opacity: 1; transform: translateX(0); } }
+@keyframes anim-slide-up { from { transform: translateY(26px); } to { transform: translateY(0); } }
+@keyframes anim-slide-left { from { transform: translateX(26px); } to { transform: translateX(0); } }
+@keyframes anim-slide-right { from { transform: translateX(-26px); } to { transform: translateX(0); } }
+@keyframes anim-zoom-in { from { transform: scale(0.92); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+@keyframes anim-blur-in { from { opacity: 0; filter: blur(8px); } to { opacity: 1; filter: blur(0); } }
+@keyframes anim-bounce-in { 0% { transform: scale(0.9); opacity: 0; } 60% { transform: scale(1.05); opacity: 1; } 100% { transform: scale(1); } }
+@keyframes anim-pop { 0% { transform: scale(0.85); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+@keyframes anim-rubber { 0% { transform: scale3d(1,1,1); } 30% { transform: scale3d(1.15,0.85,1); } 40% { transform: scale3d(0.9,1.1,1); } 50% { transform: scale3d(1.05,0.95,1); } 65% { transform: scale3d(0.98,1.02,1); } 100% { transform: scale3d(1,1,1); } }
+@keyframes anim-swing { 20% { transform: rotate(6deg); } 40% { transform: rotate(-4deg); } 60% { transform: rotate(2deg); } 80% { transform: rotate(-2deg); } 100% { transform: rotate(0); } }
+@keyframes anim-tada { 0% { transform: scale3d(1,1,1); } 10%, 20% { transform: scale3d(0.9,0.9,0.9) rotate(-3deg); } 30%, 50%, 70%, 90% { transform: scale3d(1.1,1.1,1.1) rotate(3deg); } 40%, 60%, 80% { transform: scale3d(1.1,1.1,1.1) rotate(-3deg); } 100% { transform: scale3d(1,1,1); } }
+@keyframes anim-flip { from { transform: perspective(600px) rotateX(90deg); opacity: 0; } to { transform: perspective(600px) rotateX(0); opacity: 1; } }
+@keyframes anim-rotate-in { from { transform: rotate(-8deg) scale(0.98); opacity: 0; } to { transform: rotate(0) scale(1); opacity: 1; } }
+@keyframes anim-skew { from { transform: skewX(-8deg) translateY(10px); opacity: 0; } to { transform: skewX(0) translateY(0); opacity: 1; } }
+@keyframes anim-glow { from { box-shadow: 0 0 0 rgba(56, 189, 248, 0); } to { box-shadow: 0 14px 28px rgba(56, 189, 248, 0.35); } }
+@keyframes anim-shimmer { 0% { background-position: -120% 0; } 100% { background-position: 120% 0; } }
+@keyframes anim-float { 0% { transform: translateY(0); } 50% { transform: translateY(-6px); } 100% { transform: translateY(0); } }
+@keyframes anim-breathe { 0% { transform: scale(0.98); } 50% { transform: scale(1.02); } 100% { transform: scale(0.98); } }
+@keyframes anim-gentle-wiggle { 0% { transform: rotate(0); } 25% { transform: rotate(1.5deg); } 50% { transform: rotate(0); } 75% { transform: rotate(-1.5deg); } 100% { transform: rotate(0); } }
+";
+                head.AppendChild(style);
+            }
+
+            private static void EnsureFrameAnimationScript(IDocument document)
+            {
+                var head = document.Head;
+                if (head is null)
+                {
+                    return;
+                }
+
+                if (document.QuerySelector("script[data-frame-anim='true']") is not null)
+                {
+                    return;
+                }
+
+                var script = document.CreateElement("script");
+                script.SetAttribute("data-frame-anim", "true");
+                                script.TextContent = @"
+(function(){
+    function init(){
+        var items = Array.prototype.slice.call(document.querySelectorAll('[data-frame-anim]'));
+        if (items.length === 0) return;
+
+        function applyVars(el){
+            var duration = el.getAttribute('data-frame-anim-duration') || '600';
+            var delay = el.getAttribute('data-frame-anim-delay') || '0';
+            var easing = el.getAttribute('data-frame-anim-easing') || 'ease';
+            var loop = el.getAttribute('data-frame-anim-loop') === 'true';
+            el.style.setProperty('--lp-frame-anim-duration', duration + 'ms');
+            el.style.setProperty('--lp-frame-anim-delay', delay + 'ms');
+            el.style.setProperty('--lp-frame-anim-easing', easing);
+            el.style.setProperty('--lp-frame-anim-iterations', loop ? 'infinite' : '1');
+        }
+
+        if (!('IntersectionObserver' in window)) {
+            items.forEach(function(el){ applyVars(el); el.classList.add('is-inview'); });
+            return;
+        }
+
+        var observer = new IntersectionObserver(function(entries){
+            entries.forEach(function(entry){
+                if (!entry.isIntersecting) return;
+                var el = entry.target;
+                el.classList.add('is-inview');
+            });
+        }, { threshold: 0.2 });
+
+        items.forEach(function(el){
+            applyVars(el);
+            if (el.getAttribute('data-frame-anim-trigger') === 'load') {
+                el.classList.add('is-inview');
+                return;
+            }
+            observer.observe(el);
+        });
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', init);
+    } else {
+        init();
+    }
+})();
+";
+                head.AppendChild(script);
+            }
+
+            private static FrameStyle? FindFrameStyleOverrideByNormalizedKey(ContentModel content, string normalizedKey)
+            {
+                if (content.SectionStyles is null)
+                {
+                    return null;
+                }
+
+                foreach (var pair in content.SectionStyles)
+                {
+                    if (NormalizeSectionKey(pair.Key) != normalizedKey)
+                    {
+                        continue;
+                    }
+
+                    var overrideStyle = pair.Value?.FrameStyleOverride;
+                    if (overrideStyle is not null)
+                    {
+                        return overrideStyle;
+                    }
+                }
+
+                return null;
+            }
+
+            private static FrameStyle MergeFrameStyle(FrameStyle baseStyle, FrameStyle? overrideStyle)
+            {
+                if (overrideStyle is null)
+                {
+                    return baseStyle;
+                }
+
+                return new FrameStyle
+                {
+                    Type = string.IsNullOrWhiteSpace(overrideStyle.Type) ? baseStyle.Type : overrideStyle.Type,
+                    BackgroundColor = !string.IsNullOrWhiteSpace(overrideStyle.BackgroundColor) ? overrideStyle.BackgroundColor : baseStyle.BackgroundColor,
+                    BackgroundOpacity = overrideStyle.BackgroundOpacity ?? baseStyle.BackgroundOpacity,
+                    BorderColor = !string.IsNullOrWhiteSpace(overrideStyle.BorderColor) ? overrideStyle.BorderColor : baseStyle.BorderColor,
+                    BorderWidth = overrideStyle.BorderWidth ?? baseStyle.BorderWidth,
+                    BorderRadius = overrideStyle.BorderRadius ?? baseStyle.BorderRadius,
+                    ShadowLevel = !string.IsNullOrWhiteSpace(overrideStyle.ShadowLevel) ? overrideStyle.ShadowLevel : baseStyle.ShadowLevel,
+                    PaddingPreset = !string.IsNullOrWhiteSpace(overrideStyle.PaddingPreset) ? overrideStyle.PaddingPreset : baseStyle.PaddingPreset,
+                    PaddingX = overrideStyle.PaddingX ?? baseStyle.PaddingX,
+                    PaddingY = overrideStyle.PaddingY ?? baseStyle.PaddingY,
+                    MaxWidthPx = overrideStyle.MaxWidthPx ?? baseStyle.MaxWidthPx,
+                    Centered = overrideStyle.Centered,
+                    HeaderBackgroundColor = !string.IsNullOrWhiteSpace(overrideStyle.HeaderBackgroundColor) ? overrideStyle.HeaderBackgroundColor : baseStyle.HeaderBackgroundColor,
+                    HeaderTextColor = !string.IsNullOrWhiteSpace(overrideStyle.HeaderTextColor) ? overrideStyle.HeaderTextColor : baseStyle.HeaderTextColor,
+                    HeaderFontSizePx = overrideStyle.HeaderFontSizePx ?? baseStyle.HeaderFontSizePx,
+                    HeaderFontFamily = !string.IsNullOrWhiteSpace(overrideStyle.HeaderFontFamily) ? overrideStyle.HeaderFontFamily : baseStyle.HeaderFontFamily,
+                    HeaderHeightPx = overrideStyle.HeaderHeightPx ?? baseStyle.HeaderHeightPx,
+                    HeaderRadiusTop = overrideStyle.HeaderRadiusTop,
+                    BodyFontSizePx = overrideStyle.BodyFontSizePx ?? baseStyle.BodyFontSizePx,
+                    BodyFontFamily = !string.IsNullOrWhiteSpace(overrideStyle.BodyFontFamily) ? overrideStyle.BodyFontFamily : baseStyle.BodyFontFamily,
+                    CornerDecoration = MergeCornerDecoration(baseStyle.CornerDecoration, overrideStyle.CornerDecoration)
+                };
+            }
+
+            private static CornerDecorationSet? MergeCornerDecoration(CornerDecorationSet? baseSet, CornerDecorationSet? overrideSet)
+            {
+                if (overrideSet is null)
+                {
+                    return baseSet;
+                }
+
+                return new CornerDecorationSet
+                {
+                    TopLeft = MergeCornerDecoration(baseSet?.TopLeft, overrideSet.TopLeft),
+                    TopRight = MergeCornerDecoration(baseSet?.TopRight, overrideSet.TopRight),
+                    BottomLeft = MergeCornerDecoration(baseSet?.BottomLeft, overrideSet.BottomLeft),
+                    BottomRight = MergeCornerDecoration(baseSet?.BottomRight, overrideSet.BottomRight)
+                };
+            }
+
+            private static CornerDecoration? MergeCornerDecoration(CornerDecoration? baseDeco, CornerDecoration? overrideDeco)
+            {
+                if (overrideDeco is null)
+                {
+                    return baseDeco;
+                }
+
+                return new CornerDecoration
+                {
+                    ImagePath = !string.IsNullOrWhiteSpace(overrideDeco.ImagePath) ? overrideDeco.ImagePath : baseDeco?.ImagePath,
+                    SizePx = overrideDeco.SizePx ?? baseDeco?.SizePx,
+                    OffsetX = overrideDeco.OffsetX ?? baseDeco?.OffsetX,
+                    OffsetY = overrideDeco.OffsetY ?? baseDeco?.OffsetY,
+                    RotateDeg = overrideDeco.RotateDeg ?? baseDeco?.RotateDeg,
+                    Opacity = overrideDeco.Opacity ?? baseDeco?.Opacity,
+                    FlipX = overrideDeco.FlipX ?? baseDeco?.FlipX,
+                    FlipY = overrideDeco.FlipY ?? baseDeco?.FlipY,
+                    ZIndex = overrideDeco.ZIndex ?? baseDeco?.ZIndex,
+                    Inside = overrideDeco.Inside ?? baseDeco?.Inside
+                };
+            }
+
+            private static void ApplyFrameStyleToElements(IElement frame, IElement header, IElement body, FrameStyle style)
+            {
+                var (paddingX, paddingY) = ResolveFramePadding(style);
+                var borderRadius = style.BorderRadius is > 0 ? style.BorderRadius.Value : 0;
+
+                var frameStyle = BuildFrameStyleInline(style, borderRadius);
+                var headerStyle = BuildFrameHeaderInline(style, borderRadius, paddingX);
+                var bodyStyle = BuildFrameBodyInline(paddingX, paddingY, style);
+
+                AppendInlineStyle(frame, frameStyle);
+                AppendInlineStyle(header, headerStyle);
+                AppendInlineStyle(body, bodyStyle);
+            }
+
+            private static void ApplyCornerDecorations(IElement section, ContentModel content, string normalizedKey)
+            {
+                var frame = section.QuerySelector(".lp-frame") as IElement;
+                if (frame is null)
+                {
+                    return;
+                }
+
+                var style = ResolveFrameStyle(content, normalizedKey);
+                ApplyCornerDecorations(frame, style);
+            }
+
+            private static void ApplyCornerDecorations(IElement frame, FrameStyle style)
+            {
+                foreach (var existing in frame.QuerySelectorAll(".lp-frame-corner").ToList())
+                {
+                    existing.Remove();
+                }
+
+                var set = style.CornerDecoration;
+                if (set is null)
+                {
+                    return;
+                }
+
+                var hasOutside = false;
+                hasOutside |= AppendCornerDecoration(frame, set.TopLeft, "tl");
+                hasOutside |= AppendCornerDecoration(frame, set.TopRight, "tr");
+                hasOutside |= AppendCornerDecoration(frame, set.BottomLeft, "bl");
+                hasOutside |= AppendCornerDecoration(frame, set.BottomRight, "br");
+
+                if (hasOutside)
+                {
+                    AppendInlineStyle(frame, "overflow: visible");
+                }
+            }
+
+            private static bool AppendCornerDecoration(IElement frame, CornerDecoration? deco, string corner)
+            {
+                if (deco is null)
+                {
+                    return false;
+                }
+
+                if (string.IsNullOrWhiteSpace(deco.ImagePath))
+                {
+                    return false;
+                }
+
+                var doc = frame.Owner;
+                if (doc is null)
+                {
+                    return false;
+                }
+
+                var img = doc.CreateElement("img");
+                img.ClassList.Add("lp-frame-corner");
+                img.SetAttribute("data-corner", corner);
+                img.SetAttribute("src", deco.ImagePath);
+
+                var size = Math.Clamp(deco.SizePx ?? 80, 12, 320);
+                var opacity = Math.Clamp(deco.Opacity ?? 100, 0, 100) / 100d;
+                var rotate = deco.RotateDeg ?? 0d;
+                var flipX = deco.FlipX == true ? -1 : 1;
+                var flipY = deco.FlipY == true ? -1 : 1;
+                var zIndex = deco.ZIndex ?? 2;
+                var inside = deco.Inside ?? true;
+
+                var offsetX = deco.OffsetX ?? 0;
+                var offsetY = deco.OffsetY ?? 0;
+                var cornerLeft = corner is "tl" or "bl";
+                var cornerTop = corner is "tl" or "tr";
+                var xSign = cornerLeft ? 1 : -1;
+                var ySign = cornerTop ? 1 : -1;
+                var appliedX = inside ? offsetX : -offsetX;
+                var appliedY = inside ? offsetY : -offsetY;
+                var translateX = xSign * appliedX;
+                var translateY = ySign * appliedY;
+
+                var posRules = new List<string>
+                {
+                    "position:absolute",
+                    $"width:{size}px",
+                    $"height:{size}px",
+                    $"opacity:{opacity:0.###}",
+                    $"z-index:{zIndex}",
+                    "pointer-events:none",
+                    $"transform: translate({translateX}px, {translateY}px) rotate({rotate}deg) scale({flipX}, {flipY})"
+                };
+
+                if (cornerLeft)
+                {
+                    posRules.Add("left:0");
+                }
+                else
+                {
+                    posRules.Add("right:0");
+                }
+
+                if (cornerTop)
+                {
+                    posRules.Add("top:0");
+                }
+                else
+                {
+                    posRules.Add("bottom:0");
+                }
+
+                img.SetAttribute("style", string.Join("; ", posRules));
+                frame.AppendChild(img);
+
+                return !inside;
+            }
+
+            private static string BuildFrameStyleInline(FrameStyle style, int borderRadius)
+            {
+                var rules = new List<string> { "box-sizing: border-box" };
+
+                var backgroundColor = SanitizeCssColor(style.BackgroundColor);
+                if (!string.IsNullOrWhiteSpace(backgroundColor))
+                {
+                    var opacity = Math.Clamp((style.BackgroundOpacity ?? 100) / 100d, 0, 1);
+                    rules.Add($"background: {ToRgba(backgroundColor, opacity)}");
+                }
+
+                if (style.BorderWidth is > 0)
+                {
+                    var borderColor = SanitizeCssColor(style.BorderColor) ?? "#dc2626";
+                    rules.Add($"border: {style.BorderWidth}px solid {borderColor}");
+                }
+
+                if (borderRadius > 0)
+                {
+                    rules.Add($"border-radius: {borderRadius}px");
+                    rules.Add("overflow: hidden");
+                }
+
+                var shadow = ResolveSectionShadow(style.ShadowLevel ?? "off");
+                if (!string.IsNullOrWhiteSpace(shadow))
+                {
+                    rules.Add($"box-shadow: {shadow}");
+                }
+
+                if (style.MaxWidthPx is > 0)
+                {
+                    rules.Add("width: 100%");
+                    rules.Add($"max-width: {style.MaxWidthPx}px");
+                    rules.Add(style.Centered ? "margin: 0 auto" : "margin: 0");
+                }
+
+                return string.Join("; ", rules);
+            }
+
+            private static string BuildFrameHeaderInline(FrameStyle style, int borderRadius, int paddingX)
+            {
+                var rules = new List<string> { "box-sizing: border-box", "width: 100%" };
+
+                var headerBg = SanitizeCssColor(style.HeaderBackgroundColor);
+                if (!string.IsNullOrWhiteSpace(headerBg))
+                {
+                    rules.Add($"background: {headerBg}");
+                }
+
+                var headerText = SanitizeCssColor(style.HeaderTextColor);
+                if (!string.IsNullOrWhiteSpace(headerText))
+                {
+                    rules.Add($"color: {headerText}");
+                }
+
+                if (style.HeaderHeightPx is > 0)
+                {
+                    rules.Add($"height: {style.HeaderHeightPx}px");
+                    rules.Add($"min-height: {style.HeaderHeightPx}px");
+                }
+
+                rules.Add($"padding: 0 {paddingX}px");
+
+                if (style.HeaderFontSizePx is > 0)
+                {
+                    rules.Add($"font-size: {style.HeaderFontSizePx}px");
+                }
+
+                var headerFont = SanitizeFontFamily(style.HeaderFontFamily);
+                if (!string.IsNullOrWhiteSpace(headerFont))
+                {
+                    rules.Add($"font-family: {headerFont}");
+                }
+
+                if (style.HeaderRadiusTop && borderRadius > 0)
+                {
+                    rules.Add($"border-top-left-radius: {borderRadius}px");
+                    rules.Add($"border-top-right-radius: {borderRadius}px");
+                }
+
+                return string.Join("; ", rules);
+            }
+
+            private static string BuildFrameBodyInline(int paddingX, int paddingY, FrameStyle style)
+            {
+                var rules = new List<string>
+                {
+                    $"padding: {paddingY}px {paddingX}px",
+                    "box-sizing: border-box",
+                    "width: 100%"
+                };
+
+                if (style.BodyFontSizePx is > 0)
+                {
+                    rules.Add($"font-size: {style.BodyFontSizePx}px");
+                }
+
+                var bodyFont = SanitizeFontFamily(style.BodyFontFamily);
+                if (!string.IsNullOrWhiteSpace(bodyFont))
+                {
+                    rules.Add($"font-family: {bodyFont}");
+                }
+
+                return string.Join("; ", rules);
+            }
+
+            private static (int PaddingX, int PaddingY) ResolveFramePadding(FrameStyle style)
+            {
+                if (string.Equals(style.PaddingPreset, "custom", StringComparison.OrdinalIgnoreCase))
+                {
+                    return (Math.Clamp(style.PaddingX ?? 0, 0, 48), Math.Clamp(style.PaddingY ?? 0, 0, 48));
+                }
+
+                return style.PaddingPreset switch
+                {
+                    "compact" => (16, 12),
+                    "spacious" => (32, 24),
+                    _ => (24, 20)
+                };
+            }
+
+            private static string? ResolveSectionTitle(ContentModel content, string normalizedKey, string rawKey, IElement group)
+            {
+                var normalized = NormalizeSectionKey(normalizedKey);
+                if (string.Equals(normalized, "ranking", StringComparison.OrdinalIgnoreCase))
+                {
+                    return string.Empty;
+                }
+                var displayName = content.SectionGroups
+                    .FirstOrDefault(g => NormalizeSectionKey(g.Key) == normalized)
+                    ?.DisplayName;
+                if (!string.IsNullOrWhiteSpace(displayName))
+                {
+                    return displayName;
+                }
+
+                if (content.CustomSections is not null)
+                {
+                    var customTitle = content.CustomSections
+                        .FirstOrDefault(s => NormalizeSectionKey(s.Key) == normalized)
+                        ?.Title;
+                    if (!string.IsNullOrWhiteSpace(customTitle))
+                    {
+                        return customTitle;
+                    }
+                }
+
+                switch (normalized)
+                {
+                    case "campaigncontent":
+                        return content.Sections.CampaignContent.Title;
+                    case "couponnotes":
+                        return content.Sections.CouponNotes.Title;
+                    case "couponperiod":
+                        return content.Sections.CouponPeriod.Title;
+                    case "couponflow":
+                        return content.Sections.CouponFlow.Title;
+                    case "stickytabs":
+                        return "付箋タブ";
+                    case "ranking":
+                        return string.Empty;
+                    case "paymenthistory":
+                        return string.IsNullOrWhiteSpace(content.Sections.PaymentHistory.TitleText)
+                            ? content.Sections.PaymentHistory.TitleAlt
+                            : content.Sections.PaymentHistory.TitleText;
+                }
+
+                if (normalized.StartsWith("storesearch", StringComparison.OrdinalIgnoreCase))
+                {
+                    return string.IsNullOrWhiteSpace(content.Sections.StoreSearch.Title)
+                        ? "キャンペーン対象店舗検索"
+                        : content.Sections.StoreSearch.Title;
+                }
+
+                if (rawKey.StartsWith("custom-section", StringComparison.OrdinalIgnoreCase))
+                {
+                    return "通常セクション";
+                }
+
+                var heading = group.QuerySelector(".campaign__heading, .section-title, h2, h3")?.TextContent?.Trim();
+                if (!string.IsNullOrWhiteSpace(heading))
+                {
+                    return heading;
+                }
+
+                return rawKey;
             }
 
             private static void ApplySectionAnimations(IDocument document, ContentModel content)
@@ -752,13 +2512,18 @@ img[class*='decoration'] { z-index: 50 !important; }
                 foreach (var group in document.QuerySelectorAll(".section-group[data-section]").ToList())
                 {
                     var key = group.GetAttribute("data-section");
-                    if (string.IsNullOrWhiteSpace(key) || !IsEditorManagedSectionKey(key, content))
+                    if (string.IsNullOrWhiteSpace(key))
                     {
                         continue;
                     }
 
                     var animation = ResolveSectionAnimation(content, key);
-                    if (animation is null || string.Equals(animation.Type, "none", StringComparison.OrdinalIgnoreCase))
+                    if (animation is null)
+                    {
+                        continue;
+                    }
+
+                    if (string.Equals(animation.Type, "none", StringComparison.OrdinalIgnoreCase))
                     {
                         group.RemoveAttribute("data-anim");
                         group.RemoveAttribute("data-anim-duration");
@@ -799,20 +2564,69 @@ img[class*='decoration'] { z-index: 50 !important; }
 
             private static SectionAnimationModel? ResolveSectionAnimation(ContentModel content, string key)
             {
-                if (content.SectionStyles is not null
-                    && content.SectionStyles.TryGetValue(key, out var style)
-                    && style?.SectionAnimation is not null)
+                if (TryGetSectionStyle(content, key, out var style) && style?.SectionAnimation is not null)
                 {
                     return style.SectionAnimation;
                 }
 
-                if (content.SectionAnimations is not null
-                    && content.SectionAnimations.TryGetValue(key, out var animation))
+                if (TryGetSectionAnimation(content, key, out var animation))
                 {
                     return animation;
                 }
 
                 return null;
+            }
+
+            private static bool TryGetSectionStyle(ContentModel content, string key, out SectionStyleModel? style)
+            {
+                style = null;
+                if (content.SectionStyles is null || content.SectionStyles.Count == 0)
+                {
+                    return false;
+                }
+
+                if (content.SectionStyles.TryGetValue(key, out style) && style is not null)
+                {
+                    return true;
+                }
+
+                var normalizedKey = NormalizeSectionKey(key);
+                foreach (var entry in content.SectionStyles)
+                {
+                    if (NormalizeSectionKey(entry.Key) == normalizedKey)
+                    {
+                        style = entry.Value;
+                        return style is not null;
+                    }
+                }
+
+                return false;
+            }
+
+            private static bool TryGetSectionAnimation(ContentModel content, string key, out SectionAnimationModel? animation)
+            {
+                animation = null;
+                if (content.SectionAnimations is null || content.SectionAnimations.Count == 0)
+                {
+                    return false;
+                }
+
+                if (content.SectionAnimations.TryGetValue(key, out animation) && animation is not null)
+                {
+                    return true;
+                }
+
+                var normalizedKey = NormalizeSectionKey(key);
+                foreach (var entry in content.SectionAnimations)
+                {
+                    if (NormalizeSectionKey(entry.Key) == normalizedKey)
+                    {
+                        animation = entry.Value;
+                        return animation is not null;
+                    }
+                }
+
+                return false;
             }
 
             private static void EnsureSectionAnimationStyle(IDocument document)
@@ -954,6 +2768,7 @@ img[class*='decoration'] { z-index: 50 !important; }
                 style.TextContent = @"
 .section-group { position: relative; }
 .lp-decorations { position:absolute; inset:0; pointer-events:none; }
+.lp-frame-body .lp-decorations { inset: 0; }
 .lp-decor { position:absolute; opacity: var(--decor-opacity, 1); background: var(--decor-color, #1e1b4b); color:#fff; display:grid; place-items:center; font-size:0.75rem; font-weight:700; border-radius:999px; }
 .lp-decor.layer-back { z-index:1; }
 .lp-decor.layer-front { z-index:3; }
@@ -965,6 +2780,12 @@ img[class*='decoration'] { z-index: 50 !important; }
 .lp-decor.decor-divider { height: calc(var(--decor-size, 40px) / 6); border-radius:8px; }
 .lp-decor.decor-pattern { width:100%; height:100%; opacity:0.15; background: transparent; background-image: radial-gradient(var(--decor-color, #1e1b4b) 1px, transparent 1px); background-size: 20px 20px; }
 .lp-decor.decor-shape { border-radius:50%; }
+
+/* auto-fit decoration images to frame width (opt-in) */
+.lp-frame-body :where(.deco-img)[data-autofit='true'] { max-width: clamp(72px, 18vw, 240px); height: auto; position: absolute; }
+.lp-frame-body :where(.deco-img)[data-autofit='true'] img { width: 100%; height: auto; object-fit: contain; display: block; }
+.lp-frame-body :where(.deco-img.-left)[data-autofit='true'] { left: clamp(-10px, -2vw, -18px); top: clamp(8px, 2vw, 26px); }
+.lp-frame-body :where(.deco-img.-right)[data-autofit='true'] { right: clamp(-10px, -2vw, -18px); top: clamp(6px, 1.6vw, 22px); }
 ";
                 head.AppendChild(style);
             }
@@ -1038,9 +2859,10 @@ img[class*='decoration'] { z-index: 50 !important; }
                         container.AppendChild(decor);
                     }
 
-                    if (container.ParentElement != group)
+                    var host = group.QuerySelector(".lp-frame-body") as IElement ?? group;
+                    if (container.ParentElement != host)
                     {
-                        group.AppendChild(container);
+                        host.AppendChild(container);
                     }
                 }
             }
@@ -1246,12 +3068,13 @@ img[class*='decoration'] { z-index: 50 !important; }
         }
     }
 
-    private static void EnsureViewportMeta(IDocument document)
+    private static void EnsureViewportMeta(IDocument document, int? fixedViewportWidth)
     {
-        var head = document.Head;
+        IElement? head = document.Head ?? document.QuerySelector("head") as IElement;
         if (head is null)
         {
-            return;
+            head = document.CreateElement("head");
+            document.DocumentElement?.Prepend(head);
         }
 
         var viewport = document.QuerySelector("meta[name='viewport']");
@@ -1262,7 +3085,40 @@ img[class*='decoration'] { z-index: 50 !important; }
             head.AppendChild(viewport);
         }
 
-        viewport.SetAttribute("content", "width=device-width, initial-scale=1");
+        if (fixedViewportWidth is > 0)
+        {
+            viewport.SetAttribute("content", $"width={fixedViewportWidth}, initial-scale=1, maximum-scale=1");
+        }
+        else
+        {
+            viewport.SetAttribute("content", "width=device-width, initial-scale=1");
+        }
+    }
+
+    private static void EnsureSpResetStyle(IDocument document)
+    {
+        IElement? head = document.Head ?? document.QuerySelector("head") as IElement;
+        if (head is null)
+        {
+            head = document.CreateElement("head");
+            document.DocumentElement?.Prepend(head);
+        }
+
+        if (document.QuerySelector("style[data-sp-reset='true']") is not null)
+        {
+            return;
+        }
+
+        var style = document.CreateElement("style");
+        style.SetAttribute("data-sp-reset", "true");
+        style.TextContent = @"
+html, body { overflow-x: hidden !important; min-width: 0 !important; }
+*, *::before, *::after { box-sizing: border-box; }
+img, svg, video, canvas { max-width: 100% !important; height: auto !important; }
+    [class*='container'], [class*='inner'], .container, .inner, .wrap, .wrapper { max-width: 100% !important; width: 100% !important; }
+    body { width: 100% !important; }
+";
+        head.AppendChild(style);
     }
 
     private static void EnsureBaseHref(IDocument document, string href)
@@ -1349,6 +3205,51 @@ img[class*='decoration'] { z-index: 50 !important; }
         }
 
         return string.IsNullOrWhiteSpace(background.Position) ? "center top" : background.Position;
+    }
+
+    private static string? SanitizeCssUrl(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return null;
+        }
+
+        var trimmed = value.Trim();
+        if (Uri.TryCreate(trimmed, UriKind.Absolute, out var uri))
+        {
+            if (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps)
+            {
+                return uri.ToString();
+            }
+        }
+
+        if (trimmed.StartsWith("/", StringComparison.Ordinal) || !trimmed.Contains(":", StringComparison.Ordinal))
+        {
+            return trimmed.Replace("'", "");
+        }
+
+        return null;
+    }
+
+    private static string ToRgba(string hex, double opacity)
+    {
+        var color = SanitizeCssColor(hex) ?? "#ffffff";
+        var normalized = color.TrimStart('#');
+        if (normalized.Length == 3)
+        {
+            normalized = string.Concat(normalized.Select(c => new string(c, 2)));
+        }
+
+        if (normalized.Length != 6
+            || !int.TryParse(normalized[..2], System.Globalization.NumberStyles.HexNumber, null, out var r)
+            || !int.TryParse(normalized.Substring(2, 2), System.Globalization.NumberStyles.HexNumber, null, out var g)
+            || !int.TryParse(normalized.Substring(4, 2), System.Globalization.NumberStyles.HexNumber, null, out var b))
+        {
+            return color;
+        }
+
+        var alpha = Math.Max(0, Math.Min(1, opacity));
+        return $"rgba({r}, {g}, {b}, {alpha:0.##})";
     }
 
     private static string ResolveBackgroundSize(LpBackgroundModel background)
@@ -1539,6 +3440,10 @@ img[class*='decoration'] { z-index: 50 !important; }
         ApplySectionFont(document, "campaignContent", content.Sections.CampaignContent.FontFamily);
         ApplySectionFont(document, "coupon-period", content.Sections.CouponPeriod.FontFamily);
         ApplySectionFont(document, "couponPeriod", content.Sections.CouponPeriod.FontFamily);
+        ApplySectionFont(document, "coupon-flow", content.Sections.CouponFlow.FontFamily);
+        ApplySectionFont(document, "couponFlow", content.Sections.CouponFlow.FontFamily);
+        ApplySectionFont(document, "sticky-tabs", content.Sections.StickyTabs.FontFamily);
+        ApplySectionFont(document, "stickyTabs", content.Sections.StickyTabs.FontFamily);
         ApplySectionFont(document, "store-search", content.Sections.StoreSearch.FontFamily);
         ApplySectionFont(document, "storeSearch", content.Sections.StoreSearch.FontFamily);
         ApplySectionFont(document, "coupon-notes", content.Sections.CouponNotes.FontFamily);
@@ -1557,7 +3462,7 @@ img[class*='decoration'] { z-index: 50 !important; }
 
         if (!string.IsNullOrWhiteSpace(content.Campaign.FooterFontFamily))
         {
-            foreach (var element in document.QuerySelectorAll(".section-group[data-section='countdown']").ToList())
+            foreach (var element in document.QuerySelectorAll("footer, .footer, .mv-footer").ToList())
             {
                 ApplyFontStyle(element, content.Campaign.FooterFontFamily);
             }
@@ -1594,6 +3499,10 @@ img[class*='decoration'] { z-index: 50 !important; }
         ApplySectionTextAlign(document, "campaignContent", content.Sections.CampaignContent.TextAlign);
         ApplySectionTextAlign(document, "coupon-period", content.Sections.CouponPeriod.TextAlign);
         ApplySectionTextAlign(document, "couponPeriod", content.Sections.CouponPeriod.TextAlign);
+        ApplySectionTextAlign(document, "coupon-flow", content.Sections.CouponFlow.TextAlign);
+        ApplySectionTextAlign(document, "couponFlow", content.Sections.CouponFlow.TextAlign);
+        ApplySectionTextAlign(document, "sticky-tabs", content.Sections.StickyTabs.TextAlign);
+        ApplySectionTextAlign(document, "stickyTabs", content.Sections.StickyTabs.TextAlign);
         ApplySectionTextAlign(document, "store-search", content.Sections.StoreSearch.TextAlign);
         ApplySectionTextAlign(document, "storeSearch", content.Sections.StoreSearch.TextAlign);
         ApplySectionTextAlignSelector(document, ".section-group[data-section^='store-search']", content.Sections.StoreSearch.TextAlign);
@@ -1693,6 +3602,11 @@ img[class*='decoration'] { z-index: 50 !important; }
         var textColor = SanitizeCssColor(content.CampaignStyle.TextColor);
 
         var mvFooterColor = SanitizeCssColor(content.CampaignStyle.MvFooterBackgroundColor);
+        if (mvFooterColor is null)
+        {
+            var frameStyle = content.FrameDefaultStyle ?? content.CardThemeStyle;
+            mvFooterColor = SanitizeCssColor(frameStyle?.HeaderBackgroundColor);
+        }
         var backgroundRules = BuildBackgroundPresetRules(content);
 
         if (boxColor is null && headingColor is null && headingBackgroundColor is null && frameBorderColor is null && textColor is null && mvFooterColor is null && string.IsNullOrWhiteSpace(backgroundRules))
@@ -1728,7 +3642,7 @@ img[class*='decoration'] { z-index: 50 !important; }
 
         if (mvFooterColor is not null)
         {
-            rules.Add($".mv-footer {{ background-color: {mvFooterColor} !important; }}");
+            rules.Add($".section-group[data-section='countdown'] .section-title {{ background-color: {mvFooterColor} !important; }}");
         }
 
         if (!string.IsNullOrWhiteSpace(backgroundRules))
@@ -1795,7 +3709,10 @@ img[class*='decoration'] { z-index: 50 !important; }
     {
         var heroPicture = document.QuerySelector(".mv picture");
         var heroPc = heroPicture?.QuerySelector("img") ?? document.QuerySelector(".mv img");
-        var heroSp = heroPicture?.QuerySelector("source[media]");
+        var heroSp = heroPicture?.QuerySelectorAll("source[media]")
+            ?.FirstOrDefault(source =>
+                (source.GetAttribute("media") ?? string.Empty)
+                    .Contains("max-width", StringComparison.OrdinalIgnoreCase));
 
         if (heroPc is not null)
         {
@@ -1847,6 +3764,48 @@ img[class*='decoration'] { z-index: 50 !important; }
                 source.SetAttribute("srcset", ResolveImageUrl(content.Hero.ImageSp, template, overrides, embedImages));
                 heroPicture.InsertBefore(source, heroPc);
             }
+
+                if (!IsImageDeleted(content, content.Hero.ImageSp))
+                {
+                        var head = document.Head ?? document.QuerySelector("head") as IElement;
+                        var spUrl = ResolveImageUrl(content.Hero.ImageSp, template, overrides, embedImages);
+
+                        if (heroPc is not null)
+                        {
+                                var existingSpImg = document.QuerySelector(".mv img.mv-sp-preview") as IElement;
+                                if (existingSpImg is null)
+                                {
+                                        var spImg = document.CreateElement("img");
+                                        spImg.ClassList.Add("mv-sp-preview");
+                                        spImg.SetAttribute("src", spUrl);
+                                        spImg.SetAttribute("alt", content.Hero.Alt ?? string.Empty);
+                                        heroPc.ParentElement?.InsertBefore(spImg, heroPc);
+                                }
+                        }
+
+                        if (head is not null && document.QuerySelector("style[data-hero-sp='true']") is null)
+                        {
+                                var style = document.CreateElement("style");
+                                style.SetAttribute("data-hero-sp", "true");
+                                style.TextContent = @$"@media (max-width: 768px) {{
+    .mv, .mv-wrap, .mv__wrap, .mv__wrapper, .hero, .hero-wrap, .hero__wrap {{
+        height: auto !important;
+        min-height: 0 !important;
+        overflow: visible !important;
+        background-image: none !important;
+    }}
+    .mv img.mv-sp-preview {{ display: block !important; width: 100% !important; height: auto !important; }}
+    .mv picture, .mv img:not(.mv-sp-preview) {{ display: none !important; }}
+    .mv, .mv-wrap, .mv__wrap, .mv__wrapper, .hero, .hero-wrap, .hero__wrap {{
+        background-size: contain !important;
+        background-repeat: no-repeat !important;
+        background-position: center top !important;
+        background-image: url('{spUrl}') !important;
+    }}
+}}";
+                                head.AppendChild(style);
+                        }
+                }
         }
     }
 
@@ -1859,7 +3818,10 @@ img[class*='decoration'] { z-index: 50 !important; }
     {
         EnsureCustomSections(document, content, template, overrides, embedImages);
         EnsureRankingSection(document, content, template, overrides, embedImages);
+        EnsurePaymentHistorySection(document, content, template, overrides, embedImages);
         EnsureStoreSearchSection(document, content, template, overrides, embedImages);
+        EnsureCouponFlowSection(document, content, template, overrides, embedImages);
+        EnsureStickyTabsSection(document, content, template, overrides, embedImages);
         ApplySectionGroups(document, template, content);
 
         var campaignContentSection = document.QuerySelector(".section-group[data-section='campaign-content']")
@@ -1868,9 +3830,13 @@ img[class*='decoration'] { z-index: 50 !important; }
             ?? document.QuerySelector(".section-group[data-section='couponNotes']");
         var couponPeriodSection = document.QuerySelector(".section-group[data-section='coupon-period']")
             ?? document.QuerySelector(".section-group[data-section='couponPeriod']");
+        var couponFlowSection = document.QuerySelector(".section-group[data-section='coupon-flow']")
+            ?? document.QuerySelector(".section-group[data-section='couponFlow']");
         var storeSearchSection = document.QuerySelector(".section-group[data-section='store-search']")
             ?? document.QuerySelector(".section-group[data-section='storeSearch']");
         var rankingSection = document.QuerySelector(".section-group[data-section='ranking']");
+        var paymentHistorySection = document.QuerySelector(".section-group[data-section='payment-history']")
+            ?? document.QuerySelector(".section-group[data-section='paymentHistory']");
         var countdownSection = document.QuerySelector(".section-group[data-section='countdown']");
 
         if (campaignContentSection is not null
@@ -1894,6 +3860,13 @@ img[class*='decoration'] { z-index: 50 !important; }
             couponPeriodSection = null;
         }
 
+        if (couponFlowSection is not null
+            && !content.Sections.CouponFlow.Enabled)
+        {
+            couponFlowSection.Remove();
+            couponFlowSection = null;
+        }
+
         if (storeSearchSection is not null
             && !content.Sections.StoreSearch.Enabled)
         {
@@ -1906,6 +3879,13 @@ img[class*='decoration'] { z-index: 50 !important; }
         {
             rankingSection.Remove();
             rankingSection = null;
+        }
+
+        if (paymentHistorySection is not null
+            && !content.Sections.PaymentHistory.Enabled)
+        {
+            paymentHistorySection.Remove();
+            paymentHistorySection = null;
         }
 
         var conditionsSection = document.QuerySelector("section.conditions");
@@ -1937,7 +3917,20 @@ img[class*='decoration'] { z-index: 50 !important; }
         }
 
         var dateRangeText = FormatDateRange(content.Campaign.StartDate, content.Campaign.EndDate);
-        ApplyCountdownDisplay(document, content, dateRangeText);
+        var hasCountdownGroup = content.SectionGroups.Any(group => NormalizeSectionKey(group.Key) == "countdown");
+        if (!hasCountdownGroup)
+        {
+            if (countdownSection is not null)
+            {
+                countdownSection.Remove();
+                countdownSection = null;
+            }
+            HideCountdownElements(document, dateRangeText);
+        }
+        else
+        {
+            ApplyCountdownDisplay(document, content, dateRangeText);
+        }
 
         if (campaignContentSection is not null && content.Sections.CampaignContent.Enabled)
         {
@@ -1975,6 +3968,11 @@ img[class*='decoration'] { z-index: 50 !important; }
             SetHtmlText(couponPeriodSection, periodText, ".campaign__text");
         }
 
+        if (couponFlowSection is not null && content.Sections.CouponFlow.Enabled)
+        {
+            UpdateCouponFlowSection(couponFlowSection, content, template, overrides, embedImages);
+        }
+
         if (storeSearchSection is not null && content.Sections.StoreSearch.Enabled)
         {
             SetText(storeSearchSection, content.Sections.StoreSearch.Title, ".campaign__heading");
@@ -1997,6 +3995,14 @@ img[class*='decoration'] { z-index: 50 !important; }
             if (rankingSection is not null)
             {
                 UpdateRankingSection(rankingSection, content, template, overrides, embedImages);
+            }
+        }
+
+        if (content.Sections.PaymentHistory.Enabled)
+        {
+            if (paymentHistorySection is not null)
+            {
+                UpdatePaymentHistorySection(paymentHistorySection, content, template, overrides, embedImages);
             }
         }
 
@@ -2201,6 +4207,37 @@ img[class*='decoration'] { z-index: 50 !important; }
             }
         }
 
+        private static void EnsurePaymentHistorySection(
+            IDocument document,
+            ContentModel content,
+            TemplateProject template,
+            IDictionary<string, byte[]>? overrides,
+            bool embedImages)
+        {
+            if (!content.Sections.PaymentHistory.Enabled)
+            {
+                return;
+            }
+
+            var paymentSection = document.QuerySelector(".section-group[data-section='payment-history']")
+                ?? document.QuerySelector(".section-group[data-section='paymentHistory']");
+            if (paymentSection is null)
+            {
+                var parent = GetSectionGroupParent(document);
+                if (parent is null)
+                {
+                    return;
+                }
+
+                paymentSection = CreatePaymentHistorySection(document, content, template, overrides, embedImages);
+                parent.AppendChild(paymentSection);
+            }
+            else
+            {
+                UpdatePaymentHistorySection(paymentSection, content, template, overrides, embedImages);
+            }
+        }
+
         private static void EnsureStoreSearchSection(
             IDocument document,
             ContentModel content,
@@ -2246,6 +4283,241 @@ img[class*='decoration'] { z-index: 50 !important; }
                     section.InnerHtml = BuildStoreSearchSectionHtml(content, template, overrides, embedImages);
                 }
             }
+        }
+
+        private static void EnsureCouponFlowSection(
+            IDocument document,
+            ContentModel content,
+            TemplateProject template,
+            IDictionary<string, byte[]>? overrides,
+            bool embedImages)
+        {
+            if (!content.Sections.CouponFlow.Enabled)
+            {
+                return;
+            }
+
+            var couponFlowSection = document.QuerySelector(".section-group[data-section='coupon-flow']")
+                ?? document.QuerySelector(".section-group[data-section='couponFlow']");
+            if (couponFlowSection is null)
+            {
+                var parent = GetSectionGroupParent(document);
+                if (parent is null)
+                {
+                    return;
+                }
+
+                couponFlowSection = CreateCouponFlowSection(document, content, template, overrides, embedImages);
+                parent.AppendChild(couponFlowSection);
+            }
+            else
+            {
+                UpdateCouponFlowSection(couponFlowSection, content, template, overrides, embedImages);
+            }
+        }
+
+        private static void EnsureStickyTabsSection(
+            IDocument document,
+            ContentModel content,
+            TemplateProject template,
+            IDictionary<string, byte[]>? overrides,
+            bool embedImages)
+        {
+            if (!content.Sections.StickyTabs.Enabled)
+            {
+                return;
+            }
+
+            var stickySection = document.QuerySelector(".section-group[data-section='sticky-tabs']")
+                ?? document.QuerySelector(".section-group[data-section='stickyTabs']");
+            if (stickySection is null)
+            {
+                var parent = GetSectionGroupParent(document);
+                if (parent is null)
+                {
+                    return;
+                }
+
+                stickySection = CreateStickyTabsSection(document, content, template, overrides, embedImages);
+                parent.AppendChild(stickySection);
+            }
+            else
+            {
+                UpdateStickyTabsSection(stickySection, content, template, overrides, embedImages);
+            }
+        }
+
+        private static IElement CreateStickyTabsSection(
+            IDocument document,
+            ContentModel content,
+            TemplateProject template,
+            IDictionary<string, byte[]>? overrides,
+            bool embedImages)
+        {
+            var section = document.CreateElement("section");
+            section.ClassList.Add("section-group", "sticky-tabs-section");
+            section.SetAttribute("data-section", "sticky-tabs");
+            section.InnerHtml = BuildStickyTabsSectionHtml(content, template, overrides, embedImages);
+            return section;
+        }
+
+        private static void UpdateStickyTabsSection(
+            IElement section,
+            ContentModel content,
+            TemplateProject template,
+            IDictionary<string, byte[]>? overrides,
+            bool embedImages)
+        {
+            section.ClassList.Add("sticky-tabs-section");
+            section.InnerHtml = BuildStickyTabsSectionHtml(content, template, overrides, embedImages);
+        }
+
+        private static string BuildStickyTabsSectionHtml(
+            ContentModel content,
+            TemplateProject template,
+            IDictionary<string, byte[]>? overrides,
+            bool embedImages)
+        {
+            var tabs = content.Sections.StickyTabs.Tabs ?? new List<StickyTabModel>();
+            if (tabs.Count == 0)
+            {
+                return "<div class=\"sticky-tabs\" data-sticky-tabs=\"true\"><div class=\"sticky-tabs__empty\">タブを追加してください。</div></div>";
+            }
+
+            var tabButtons = new StringBuilder();
+            var panes = new StringBuilder();
+            for (var i = 0; i < tabs.Count; i++)
+            {
+                var tab = tabs[i];
+                var title = WebUtility.HtmlEncode(tab.Title ?? string.Empty);
+                var bg = string.IsNullOrWhiteSpace(tab.Color) ? "#e5e7eb" : tab.Color;
+                var textColor = ResolveStickyTabTextColor(bg, tab.TextColor);
+                var activeClass = i == 0 ? " is-active" : string.Empty;
+                tabButtons.Append($"<button type=\"button\" class=\"sticky-tabs__tab{activeClass}\" data-tab-index=\"{i}\" style=\"background:{bg};color:{textColor};\" aria-selected=\"{(i == 0 ? "true" : "false")}\">{title}</button>");
+
+                var paneClass = i == 0 ? "sticky-tabs__pane is-active" : "sticky-tabs__pane";
+                panes.Append($"<div class=\"{paneClass}\" data-tab-index=\"{i}\">{BuildStickyTabContentHtml(tab, template, overrides, embedImages)}</div>");
+            }
+
+                        return $@"
+<div class=""sticky-tabs"" data-sticky-tabs=""true"">
+    <div class=""sticky-tabs__bar"">
+        <div class=""sticky-tabs__tabs"">{tabButtons}</div>
+    </div>
+    <div class=""sticky-tabs__panes"">{panes}</div>
+</div>";
+        }
+
+        private static string BuildStickyTabContentHtml(
+            StickyTabModel tab,
+            TemplateProject template,
+            IDictionary<string, byte[]>? overrides,
+            bool embedImages)
+        {
+            if (tab.ContentBlocks is null || tab.ContentBlocks.Count == 0)
+            {
+                return "<div class=\"sticky-tabs__empty\">内容を追加してください。</div>";
+            }
+
+            var blocks = new StringBuilder();
+            foreach (var block in tab.ContentBlocks)
+            {
+                blocks.Append(BuildStickyBlockHtml(block, template, overrides, embedImages));
+            }
+
+            return blocks.ToString();
+        }
+
+        private static string BuildStickyBlockHtml(
+            StickyBlockModel block,
+            TemplateProject template,
+            IDictionary<string, byte[]>? overrides,
+            bool embedImages)
+        {
+            switch (block.Type)
+            {
+                case StickyBlockType.Image:
+                    return BuildStickyImageBlock(block, template, overrides, embedImages, includeCaption: false);
+                case StickyBlockType.ImageWithCaption:
+                    return BuildStickyImageBlock(block, template, overrides, embedImages, includeCaption: true);
+                case StickyBlockType.Divider:
+                    return "<hr class=\"sticky-tabs__divider\" />";
+                default:
+                    var html = NormalizeStickyText(block.RichTextHtml);
+                    return $"<div class=\"sticky-tabs__text\">{html}</div>";
+            }
+        }
+
+        private static string BuildStickyImageBlock(
+            StickyBlockModel block,
+            TemplateProject template,
+            IDictionary<string, byte[]>? overrides,
+            bool embedImages,
+            bool includeCaption)
+        {
+            if (string.IsNullOrWhiteSpace(block.ImageSrc))
+            {
+                return "<div class=\"sticky-tabs__image empty\">画像を指定してください。</div>";
+            }
+
+            var src = ResolveImageUrl(block.ImageSrc, template, overrides, embedImages);
+            var caption = includeCaption && !string.IsNullOrWhiteSpace(block.Caption)
+                ? $"<figcaption class=\"sticky-tabs__caption\">{WebUtility.HtmlEncode(block.Caption)}</figcaption>"
+                : string.Empty;
+
+            return $"<figure class=\"sticky-tabs__image\"><img src=\"{src}\" alt=\"\" />{caption}</figure>";
+        }
+
+        private static string NormalizeStickyText(string? text)
+        {
+            return WebUtility.HtmlEncode(text ?? string.Empty)
+                .Replace("\r\n", "\n", StringComparison.Ordinal)
+                .Replace("\n", "<br />", StringComparison.Ordinal);
+        }
+
+        private static string ResolveStickyTabTextColor(string? backgroundColor, string? manualTextColor)
+        {
+            if (!string.IsNullOrWhiteSpace(manualTextColor))
+            {
+                return manualTextColor;
+            }
+
+            if (!TryParseHexColor(backgroundColor, out var r, out var g, out var b))
+            {
+                return "#111827";
+            }
+
+            var luminance = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255d;
+            return luminance > 0.6 ? "#111827" : "#ffffff";
+        }
+
+        private static bool TryParseHexColor(string? value, out int r, out int g, out int b)
+        {
+            r = g = b = 0;
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return false;
+            }
+
+            var hex = value.Trim();
+            if (hex.StartsWith('#'))
+            {
+                hex = hex[1..];
+            }
+
+            if (hex.Length == 3)
+            {
+                hex = string.Concat(hex.Select(ch => string.Concat(ch, ch)));
+            }
+
+            if (hex.Length != 6)
+            {
+                return false;
+            }
+
+            return int.TryParse(hex.AsSpan(0, 2), System.Globalization.NumberStyles.HexNumber, System.Globalization.CultureInfo.InvariantCulture, out r)
+                && int.TryParse(hex.AsSpan(2, 2), System.Globalization.NumberStyles.HexNumber, System.Globalization.CultureInfo.InvariantCulture, out g)
+                && int.TryParse(hex.AsSpan(4, 2), System.Globalization.NumberStyles.HexNumber, System.Globalization.CultureInfo.InvariantCulture, out b);
         }
 
         private static IElement? GetSectionGroupParent(IDocument document)
@@ -2305,6 +4577,93 @@ img[class*='decoration'] { z-index: 50 !important; }
             head.AppendChild(style);
         }
 
+                private static void EnsureCouponFlowStyle(IDocument document, ContentModel content)
+                {
+                        if (!content.Sections.CouponFlow.Enabled)
+                        {
+                                return;
+                        }
+
+                        var head = document.Head;
+                        if (head is null || document.QuerySelector("style[data-coupon-flow-style='true']") is not null)
+                        {
+                                return;
+                        }
+
+                        var style = document.CreateElement("style");
+                        style.SetAttribute("data-coupon-flow-style", "true");
+                        style.TextContent = @"
+.coupon-flow-section .coupon-howto-inner { padding: 4px 0 8px; overflow-x: hidden; }
+.coupon-flow-section .coupon-howto-lead { margin: 8px 0 12px; }
+.coupon-flow-section .coupon-howto-lead strong { color: #e50012; }
+.coupon-flow-section .coupon-howto-swiper { position: relative; width: 100%; overflow-x: hidden; }
+.coupon-flow-section .coupon-howto-swiper .swiper-wrapper { position: relative; }
+.coupon-flow-section .coupon-howto-swiper .swiper-slide { position: absolute; inset: 0; text-align: center; opacity: 0; pointer-events: none; transition: opacity .4s ease; }
+.coupon-flow-section .coupon-howto-swiper .swiper-slide.is-active { position: relative; opacity: 1; pointer-events: auto; }
+.coupon-flow-section .coupon-howto-swiper img { margin: auto; max-width: min(100%, 520px); width: 100%; height: auto; }
+.coupon-flow-section .coupon-flow-empty { padding: 40px 0; text-align: center; color: #6b7280; }
+.coupon-flow-section .swiper-pagination { display: flex; justify-content: center; width: 100%; padding: 14px 8px; }
+.coupon-flow-section .swiper-pagination-bullet { display: block; background: #ccc; width: 12px; height: 12px; border-radius: 100%; margin: 0 6px; cursor: pointer; transition: .2s; }
+.coupon-flow-section .swiper-pagination-bullet-active { background: var(--coupon-flow-accent, #ea5504) !important; transition: .2s; }
+.coupon-flow-section .swiper-button-prev, .coupon-flow-section .swiper-button-next { position: absolute; top: 50%; z-index: 10; display: block; cursor: pointer; background: none; width: 44px; height: 44px; transition: .2s; }
+.coupon-flow-section .swiper-button-prev { left: 8px; }
+.coupon-flow-section .swiper-button-next { right: 8px; }
+.coupon-flow-section .swiper-button-disabled { pointer-events: none; filter: grayscale(100%); opacity: 0.2; }
+.coupon-flow-section .swiper-button-prev:before,
+.coupon-flow-section .swiper-button-next:before { content: ''; display: block; background: #FFF; box-sizing: border-box; width: 36px; height: 36px; border: 2px solid var(--coupon-flow-accent, #ea5504); border-radius: 50%; position: absolute; opacity: 0.8; }
+.coupon-flow-section .swiper-button-prev:before { left: 0; }
+.coupon-flow-section .swiper-button-next:before { right: 1px; }
+.coupon-flow-section .swiper-button-prev:after,
+.coupon-flow-section .swiper-button-next:after { content: ''; display: block; width: 10px; height: 10px; position: absolute; top: 13px; opacity: 0.8; }
+.coupon-flow-section .swiper-button-prev:after { border-top: 4px solid var(--coupon-flow-accent, #ea5504); border-left: 4px solid var(--coupon-flow-accent, #ea5504); transform: rotate(-45deg); left: 14px; }
+.coupon-flow-section .swiper-button-next:after { border-top: 4px solid var(--coupon-flow-accent, #ea5504); border-right: 4px solid var(--coupon-flow-accent, #ea5504); transform: rotate(45deg); right: 14px; }
+.coupon-flow-section .note { font-size: 18px; text-align: center; margin-bottom: 0.8em; }
+.coupon-flow-section .c-btn { font-weight: 700; text-align: center; line-height: 1.5; margin-left: auto; margin-right: auto; }
+.coupon-flow-section .c-btn a { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; color: var(--coupon-flow-accent, #ea5504); border-radius: 2em; border: solid 1px var(--coupon-flow-accent, #ea5504); padding: .2em .5em; background-color: white; text-decoration: none; }
+.coupon-flow-section .c-btn.-border a { background-color: var(--coupon-flow-accent, #ea5504); border: 3px solid white; box-shadow: 0 0 0 3px var(--coupon-flow-accent, #ea5504); color: white; }
+.coupon-flow-section .c-btn.-l { font-size: 2rem; width: 100%; max-width: 520px; height: 48px; }
+.coupon-flow-section .indent { padding-left: 1em; text-indent: -1em; }
+@media (max-width: 767px) {
+    .coupon-flow-section .note { font-size: 1.5rem; }
+}
+";
+                        head.AppendChild(style);
+                }
+
+                    private static void EnsureStickyTabsStyle(IDocument document, ContentModel content)
+                    {
+                        if (!content.Sections.StickyTabs.Enabled)
+                        {
+                            return;
+                        }
+
+                        var head = document.Head;
+                        if (head is null || document.QuerySelector("style[data-sticky-tabs-style='true']") is not null)
+                        {
+                            return;
+                        }
+
+                        var style = document.CreateElement("style");
+                        style.SetAttribute("data-sticky-tabs-style", "true");
+                        style.TextContent = @"
+                .sticky-tabs-section .sticky-tabs { display: flex; flex-direction: column; gap: 14px; }
+                .sticky-tabs-section .sticky-tabs__bar { position: sticky; top: 0; z-index: 2; background: #fff; padding: 8px 0; }
+                .sticky-tabs-section .sticky-tabs__tabs { display: flex; gap: 10px; flex-wrap: wrap; }
+                .sticky-tabs-section .sticky-tabs__tab { border: none; padding: 10px 16px; border-radius: 14px 14px 8px 8px; font-weight: 700; cursor: pointer; box-shadow: 0 4px 10px rgba(15,23,42,0.08); }
+                .sticky-tabs-section .sticky-tabs__tab.is-active { box-shadow: 0 8px 18px rgba(15,23,42,0.12); transform: translateY(-1px); }
+                .sticky-tabs-section .sticky-tabs__panes { display: flex; flex-direction: column; gap: 12px; }
+                .sticky-tabs-section .sticky-tabs__pane { display: none; }
+                .sticky-tabs-section .sticky-tabs__pane.is-active { display: block; }
+                .sticky-tabs-section .sticky-tabs__text { line-height: 1.7; }
+                .sticky-tabs-section .sticky-tabs__image { margin: 0; display: flex; flex-direction: column; gap: 6px; }
+                .sticky-tabs-section .sticky-tabs__image img { width: 100%; height: auto; border-radius: 10px; }
+                .sticky-tabs-section .sticky-tabs__caption { font-size: 0.9rem; color: #475569; }
+                .sticky-tabs-section .sticky-tabs__divider { border: none; border-top: 1px solid #e2e8f0; margin: 12px 0; }
+                .sticky-tabs-section .sticky-tabs__empty { color: #64748b; font-size: 0.92rem; }
+            ";
+                        head.AppendChild(style);
+                    }
+
     private static void EnsureRankingStyle(IDocument document, ContentModel content)
     {
         if (!content.Sections.Ranking.Enabled)
@@ -2318,124 +4677,58 @@ img[class*='decoration'] { z-index: 50 !important; }
             return;
         }
 
-        var ranking = content.Sections.Ranking;
-        var colors = ResolveRankingTableColors(ranking);
-        var borderWidth = (ranking.TableBorderWidth is > 0) ? ranking.TableBorderWidth.Value : 4;
-        var tableFont = SanitizeFontFamily(ranking.TableFontFamily);
-        var tableTextColor = SanitizeCssColor(ranking.TableTextColor);
-        var tableTextStrokeColor = SanitizeCssColor(ranking.TableTextStrokeColor);
-
-        var rules = new List<string>
-        {
-            $".ranking-section .ranking-table {{ width: 100%; border-collapse: collapse; margin-top: 8px; }}",
-            $".ranking-section .ranking-table th, .ranking-section .ranking-table td {{ border: {borderWidth}px solid {colors.Border}; padding: 8px 10px; text-align: center; }}",
-            $".ranking-section .ranking-table th {{ background: {colors.HeaderBg}; color: {colors.HeaderText}; font-weight: 700; }}",
-            $".ranking-section .ranking-table tbody tr:nth-child(odd) {{ background: {colors.Stripe}; }}",
-            ".ranking-section .ranking-meta { display: flex; gap: 10px; flex-wrap: wrap; font-size: 0.9rem; color: #4b5563; }",
-            ".ranking-section .ranking-period-label { font-weight: 700; margin-right: 4px; }",
-            ".ranking-section .ranking-free-texts { margin-top: 8px; display: grid; gap: 6px; }",
-            ".ranking-section .ranking-table-notes { margin-top: 10px; display: grid; gap: 6px; font-size: 0.85rem; color: #6b7280; }",
-            ".ranking-section .ranking-text-line { width: 100%; }",
-            ".ranking-section .ranking-crown { position: relative; display: inline-flex; align-items: center; justify-content: center; width: 48px; height: 40px; margin-right: 6px; font-weight: 700; line-height: 1; }",
-            ".ranking-section .ranking-crown .crown-icon { width: 38px; height: 38px; line-height: 1; display: block; }",
-            ".ranking-section .ranking-crown .crown-rank { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); font-size: 16px; color: #111827; }",
-            ".ranking-section .ranking-crown .crown-unit { position: absolute; top: 26px; left: 50%; transform: translateX(-50%); font-size: 10px; color: #111827; }",
-            ".ranking-section .ranking-crown.rank-1 .crown-icon { color: #fbbf24; }",
-            ".ranking-section .ranking-crown.rank-2 .crown-icon { color: #9ca3af; }",
-            ".ranking-section .ranking-crown.rank-3 .crown-icon { color: #d97706; }",
-            "@media (max-width: 767px) { .section-group.ranking-section .campaign__box, .section-group.ranking-section .ranking-table { width: 100% !important; } }"
-        };
-
-        if (!string.IsNullOrWhiteSpace(tableFont))
-        {
-            rules.Add($".ranking-section .ranking-table {{ font-family: {tableFont}; }}");
-        }
-
-        if (!string.IsNullOrWhiteSpace(tableTextColor))
-        {
-            rules.Add($".ranking-section .ranking-table td {{ color: {tableTextColor}; }}");
-        }
-
-        if (ranking.TableTextBold)
-        {
-            rules.Add(".ranking-section .ranking-table td { font-weight: 700; }");
-        }
-
-        if (!string.IsNullOrWhiteSpace(tableTextStrokeColor))
-        {
-            rules.Add($".ranking-section .ranking-table td {{ text-shadow: -0.6px 0 {tableTextStrokeColor}, 0 0.6px {tableTextStrokeColor}, 0.6px 0 {tableTextStrokeColor}, 0 -0.6px {tableTextStrokeColor}; }}");
-        }
-
-                rules.Add(@"
-table.campaign_rank-box {
-    width: var(--ranking-table-width, 100%);
-    margin: 0 auto;
-    border-collapse: collapse;
-    table-layout: fixed;
-}
-table.campaign_rank-box th,
-table.campaign_rank-box td {
-    text-align: center;
-    vertical-align: middle;
-    padding: 18px 10px;
-    font-weight: 800;
-    line-height: 1.15;
-    white-space: nowrap;
-    border: 6px solid #b30000;
-}
-table.campaign_rank-box th {
-    background: #fff3b0;
-    font-size: 20px;
-}
-table.campaign_rank-box td {
-    font-size: 26px;
-}
-table.campaign_rank-box td.king {
-    position: relative !important;
-    height: 120px !important;
-    min-height: 120px !important;
-    padding: 0 !important;
-    vertical-align: middle !important;
-    z-index: 1;
-}
-table.campaign_rank-box td.king::after {
-    content: "" !important;
-    position: absolute !important;
-    left: 50% !important;
-    top: 50% !important;
-    transform: translate(-50%, -50%) !important;
-    width: 120px !important;
-    height: 90px !important;
-    background-repeat: no-repeat !important;
-    background-position: center !important;
-    background-size: 120px 90px !important;
-    pointer-events: none !important;
-    z-index: 0;
-}
-table.campaign_rank-box td.king.king-01--number::after { background-image: url('images/icon-king-01.svg'); }
-table.campaign_rank-box td.king.king-02--number::after { background-image: url('images/icon-king-02.svg'); }
-table.campaign_rank-box td.king.king-03--number::after { background-image: url('images/icon-king-03.svg'); }
-table.campaign_rank-box td.king .king-rank-text {
-    position: relative;
-    z-index: 1;
-}
-@media (max-width: 767px) {
-    table.campaign_rank-box th,
-    table.campaign_rank-box td {
-        padding: 12px 6px;
-        border-width: 4px;
-    }
-    table.campaign_rank-box th { font-size: 16px; }
-    table.campaign_rank-box td { font-size: 20px; }
-    table.campaign_rank-box td.king { min-height: 96px !important; height: 96px !important; }
-    table.campaign_rank-box td.king::after { width: 96px !important; height: 72px !important; background-size: 96px 72px !important; }
-}
-");
-
         var style = document.CreateElement("style");
         style.SetAttribute("data-ranking-style", "true");
-        style.TextContent = string.Join(Environment.NewLine, rules);
-        head.AppendChild(style);
+        var frameStyle = ResolveFrameStyle(content, "ranking");
+        var rankBackground = SanitizeCssColor(frameStyle.HeaderBackgroundColor) ?? "#BF1D20";
+                var css = @"
+        .lp-section[data-section-type='ranking'] .ranking-inner { background-color: __RANK_BG__; padding: 30px 55px 50px; max-width: 100%; width: 100%; display: block; margin: 0 auto; position: relative; box-sizing: border-box; overflow-x: hidden; }
+.lp-section[data-section-type='ranking'] .campaign__rank-text { margin-top: 20px; font-family: ""M PLUS 1"", ""Noto Sans JP"", sans-serif; color: #fff; font-weight: 800; text-align: center; line-height: 1.2; }
+.lp-section[data-section-type='ranking'] .campaign__rank-text > .-heading { font-size: 32px; display: flex; align-items: flex-end; justify-content: center; gap: 2px; }
+.lp-section[data-section-type='ranking'] .campaign__rank-text > .-heading::before, .lp-section[data-section-type='ranking'] .campaign__rank-text > .-heading::after { display: inline-block; content: ""; height: 29px; width: 15px; background: url(images/deco-rank01.png) no-repeat center bottom/100% 100%; }
+.lp-section[data-section-type='ranking'] .campaign__rank-text > .-heading::before { margin-right: 10px; }
+.lp-section[data-section-type='ranking'] .campaign__rank-text > .-heading::after { transform: scale(-1, 1); }
+.lp-section[data-section-type='ranking'] .campaign__rank-text > .-kikan { display: flex; align-items: center; justify-content: center; gap: 10px; font-size: 22px; margin-top: 12px; }
+.lp-section[data-section-type='ranking'] .campaign__rank-text > .-kikan > span { background: white; border-radius: 4px; color: #BF1D20; display: inline-block; padding: 0 7px 2px; }
+.lp-section[data-section-type='ranking'] .campaign__rank-text > .-date { display: flex; align-items: center; justify-content: center; gap: 12px; font-size: 30px; margin-top: 24px; }
+.lp-section[data-section-type='ranking'] .campaign__rank-text > .-date::before, .lp-section[data-section-type='ranking'] .campaign__rank-text > .-date::after { display: inline-block; content: ""; height: 10px; flex: 1; background: url(images/deco-rank02.png) no-repeat center center/100% 100%; }
+.lp-section[data-section-type='ranking'] .campaign__rank-notes { margin-top: 25px; }
+.lp-section[data-section-type='ranking'] .campaign__rank-notes li { color: #fff; }
+.lp-section[data-section-type='ranking'] .campaign__rank-box { width: calc(100% + 16px); margin-left: -8px; margin-top: 12px; border-collapse: separate; border-spacing: 8px; font-family: ""M PLUS 1"", ""Noto Sans JP"", sans-serif; font-weight: 800; line-height: 1.4; }
+.lp-section[data-section-type='ranking'] .campaign__rank-box th, .lp-section[data-section-type='ranking'] .campaign__rank-box td { padding: 10px 25px; }
+.lp-section[data-section-type='ranking'] .campaign__rank-box th { background-color: #FFF3B1; font-size: 28px; text-align: center; }
+.lp-section[data-section-type='ranking'] .campaign__rank-box td { position: relative; background-color: #fff; font-size: 32px; }
+.lp-section[data-section-type='ranking'] .campaign__rank-box td.-number { font-size: 30px; text-align: center; }
+.lp-section[data-section-type='ranking'] .campaign__rank-box td:not(.-number) { text-align: end; }
+.lp-section[data-section-type='ranking'] .campaign__rank-box .king { z-index: 5; line-height: 1; vertical-align: bottom; text-shadow: 2px 2px 0 white, -2px 2px 0 white, 2px -2px 0 white, -2px -2px 0 white; }
+.lp-section[data-section-type='ranking'] .campaign__rank-box .king::after { position: absolute; content: ""; width: 72px; height: 56px; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: -1; }
+.lp-section[data-section-type='ranking'] .campaign__rank-box .king-01::after { background: url(images/icon-king-01.svg) no-repeat center center/100% auto; }
+.lp-section[data-section-type='ranking'] .campaign__rank-box .king-02::after { background: url(images/icon-king-02.svg) no-repeat center center/100% auto; }
+.lp-section[data-section-type='ranking'] .campaign__rank-box .king-03::after { background: url(images/icon-king-03.svg) no-repeat center center/100% auto; }
+.lp-section[data-section-type='ranking'] .deco-img { position: absolute; content: ""; z-index: 2; }
+.lp-section[data-section-type='ranking'] .deco-img img { height: 100%; width: auto; object-fit: contain; }
+.lp-section[data-section-type='ranking'] .deco-img.-left { top: 36px; left: 32px; }
+.lp-section[data-section-type='ranking'] .deco-img.-right { top: 12px; right: -16px; }
+.lp-section[data-section-type='ranking'] .deco-img.-deco04 { max-width: 183px; height: auto; }
+.lp-section[data-section-type='ranking'] .deco-img.-deco05 { max-width: 236px; height: auto; }
+@media (max-width: 767px) {
+    .lp-section[data-section-type='ranking'] .ranking-inner { padding: 30px 15px 30px; }
+    .lp-section[data-section-type='ranking'] .campaign__rank-text > .-heading { font-size: 18px; }
+    .lp-section[data-section-type='ranking'] .campaign__rank-text > .-heading::before, .lp-section[data-section-type='ranking'] .campaign__rank-text > .-heading::after { width: 10px; height: 20px; }
+    .lp-section[data-section-type='ranking'] .campaign__rank-text > .-kikan { font-size: 16px; gap: 6px; }
+    .lp-section[data-section-type='ranking'] .campaign__rank-text > .-date { font-size: 18px; margin-top: 20px; gap: 8px; }
+    .lp-section[data-section-type='ranking'] .campaign__rank-box { border-spacing: 3px; width: calc(100% + 8px); margin-left: -4px; }
+    .lp-section[data-section-type='ranking'] .campaign__rank-box th { font-size: 16px; }
+    .lp-section[data-section-type='ranking'] .campaign__rank-box td { font-size: 18px; }
+    .lp-section[data-section-type='ranking'] .campaign__rank-box td.-number { font-size: 16px; }
+    .lp-section[data-section-type='ranking'] .campaign__rank-box .king { text-shadow: 1px 1px 0 white, -1px 1px 0 white, 1px -1px 0 white, -1px -1px 0 white; }
+    .lp-section[data-section-type='ranking'] .campaign__rank-box .king::after { width: 56px; height: 40px; }
+    .lp-section[data-section-type='ranking'] .deco-img.-deco04 { width: 80px; left: 0; top: -20px; height: 60px; }
+    .lp-section[data-section-type='ranking'] .deco-img.-deco05 { width: 90px; right: 0; top: -28px; height: 65px; }
+}
+";
+    style.TextContent = css.Replace("__RANK_BG__", rankBackground, StringComparison.Ordinal);
+    head.AppendChild(style);
 	}
 
     private static (string HeaderBg, string HeaderText, string Border, string Stripe) ResolveRankingTableColors(RankingSectionModel ranking)
@@ -2491,7 +4784,6 @@ table.campaign_rank-box td.king .king-rank-text {
 
         var cards = Array.prototype.slice.call(list.querySelectorAll('.store-search-card'));
         var input = section.querySelector('.store-search-keyword');
-        var geo = section.querySelector('.store-search-geo');
         var result = section.querySelector('.store-search-result');
         var prev = section.querySelector('.store-search-prev');
         var next = section.querySelector('.store-search-next');
@@ -2572,15 +4864,6 @@ table.campaign_rank-box td.king .king-rank-text {
         if (prev) prev.addEventListener('click', function(){ if (currentPage > 1) { currentPage--; apply(); } });
         if (next) next.addEventListener('click', function(){ currentPage++; apply(); });
 
-        if (geo) {
-            geo.addEventListener('click', function(){
-                if (!navigator.geolocation) { alert('位置情報が利用できません'); return; }
-                navigator.geolocation.getCurrentPosition(function(pos){
-                    applyDistance(pos.coords.latitude, pos.coords.longitude);
-                }, function(){ alert('位置情報の取得に失敗しました'); });
-            });
-        }
-
         window.addEventListener('resize', function(){ apply(); });
         apply();
     }
@@ -2598,6 +4881,144 @@ table.campaign_rank-box td.king .king-rank-text {
 ";
                 head.AppendChild(script);
         }
+
+    private static void EnsureCouponFlowScript(IDocument document, ContentModel content)
+    {
+        if (!content.Sections.CouponFlow.Enabled)
+        {
+            return;
+        }
+
+        var head = document.Head;
+        if (head is null || document.QuerySelector("script[data-coupon-flow-script='true']") is not null)
+        {
+            return;
+        }
+
+        var script = document.CreateElement("script");
+        script.SetAttribute("data-coupon-flow-script", "true");
+        script.TextContent = @"
+(function(){
+    function init(section){
+        var swiper = section.querySelector('.coupon-flow-swiper');
+        if (!swiper) return;
+        var slides = Array.prototype.slice.call(swiper.querySelectorAll('.swiper-slide'));
+        var bullets = Array.prototype.slice.call(section.querySelectorAll('.swiper-pagination-bullet'));
+        var prev = section.querySelector('.swiper-button-prev');
+        var next = section.querySelector('.swiper-button-next');
+        var index = 0;
+        var timer = null;
+        var intervalMs = 4000;
+
+        function clampIndex(nextIndex){
+            if (slides.length === 0) return 0;
+            if (nextIndex < 0) return slides.length - 1;
+            if (nextIndex >= slides.length) return 0;
+            return nextIndex;
+        }
+
+        function update(nextIndex){
+            if (slides.length === 0) return;
+            index = clampIndex(nextIndex);
+            slides.forEach(function(slide, i){ slide.classList.toggle('is-active', i === index); });
+            bullets.forEach(function(bullet, i){
+                bullet.classList.toggle('swiper-pagination-bullet-active', i === index);
+                bullet.setAttribute('aria-current', i === index ? 'true' : 'false');
+            });
+            if (prev) prev.classList.toggle('swiper-button-disabled', slides.length <= 1);
+            if (next) next.classList.toggle('swiper-button-disabled', slides.length <= 1);
+        }
+
+        function nextSlide(){
+            update(index + 1);
+        }
+
+        function startAuto(){
+            if (timer || slides.length <= 1) return;
+            timer = setInterval(nextSlide, intervalMs);
+        }
+
+        function stopAuto(){
+            if (timer) { clearInterval(timer); timer = null; }
+        }
+
+        if (prev) prev.addEventListener('click', function(){ update(index - 1); });
+        if (next) next.addEventListener('click', function(){ update(index + 1); });
+        bullets.forEach(function(bullet, i){ bullet.addEventListener('click', function(){ update(i); }); });
+        swiper.addEventListener('mouseenter', stopAuto);
+        swiper.addEventListener('mouseleave', startAuto);
+        update(0);
+        startAuto();
+    }
+
+    function boot(){
+        document.querySelectorAll('.section-group.coupon-flow-section').forEach(init);
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', boot);
+    } else {
+        boot();
+    }
+})();
+";
+        head.AppendChild(script);
+    }
+
+    private static void EnsureStickyTabsScript(IDocument document, ContentModel content)
+    {
+        if (!content.Sections.StickyTabs.Enabled)
+        {
+            return;
+        }
+
+        var head = document.Head;
+        if (head is null || document.QuerySelector("script[data-sticky-tabs-script='true']") is not null)
+        {
+            return;
+        }
+
+        var script = document.CreateElement("script");
+        script.SetAttribute("data-sticky-tabs-script", "true");
+        script.TextContent = @"
+(function(){
+    function init(section){
+        var tabs = Array.prototype.slice.call(section.querySelectorAll('.sticky-tabs__tab'));
+        var panes = Array.prototype.slice.call(section.querySelectorAll('.sticky-tabs__pane'));
+        if (tabs.length === 0 || panes.length === 0) return;
+
+        function activate(index){
+            tabs.forEach(function(tab, i){
+                var active = i === index;
+                tab.classList.toggle('is-active', active);
+                tab.setAttribute('aria-selected', active ? 'true' : 'false');
+            });
+            panes.forEach(function(pane, i){
+                var active = i === index;
+                pane.classList.toggle('is-active', active);
+            });
+        }
+
+        tabs.forEach(function(tab, i){
+            tab.addEventListener('click', function(){ activate(i); });
+        });
+
+        activate(0);
+    }
+
+    function boot(){
+        document.querySelectorAll('.section-group.sticky-tabs-section').forEach(init);
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', boot);
+    } else {
+        boot();
+    }
+})();
+";
+        head.AppendChild(script);
+    }
 
         private static void EnsureCustomSectionGalleryStyle(IDocument document, ContentModel content)
         {
@@ -2792,7 +5213,7 @@ table.campaign_rank-box td.king .king-rank-text {
         bool embedImages)
     {
         var wrapper = document.CreateElement("div");
-        wrapper.ClassName = "section-group ranking-section";
+        wrapper.ClassName = "section-group ranking-section rank-ref";
         wrapper.SetAttribute("data-section", "ranking");
         wrapper.InnerHtml = BuildRankingSectionHtml(content, template, overrides, embedImages);
         return wrapper;
@@ -2810,6 +5231,34 @@ table.campaign_rank-box td.king .king-rank-text {
         wrapper.ClassName = "section-group store-search-section";
         wrapper.SetAttribute("data-section", key);
         wrapper.InnerHtml = BuildStoreSearchSectionHtml(content, template, overrides, embedImages);
+        return wrapper;
+    }
+
+    private static IElement CreateCouponFlowSection(
+        IDocument document,
+        ContentModel content,
+        TemplateProject template,
+        IDictionary<string, byte[]>? overrides,
+        bool embedImages)
+    {
+        var wrapper = document.CreateElement("div");
+        wrapper.ClassName = "section-group coupon-flow-section";
+        wrapper.SetAttribute("data-section", "coupon-flow");
+        wrapper.InnerHtml = BuildCouponFlowSectionHtml(content, template, overrides, embedImages);
+        return wrapper;
+    }
+
+    private static IElement CreatePaymentHistorySection(
+        IDocument document,
+        ContentModel content,
+        TemplateProject template,
+        IDictionary<string, byte[]>? overrides,
+        bool embedImages)
+    {
+        var wrapper = document.CreateElement("div");
+        wrapper.ClassName = "section-group payment-history-section";
+        wrapper.SetAttribute("data-section", "payment-history");
+        wrapper.InnerHtml = BuildPaymentHistorySectionHtml(content, template, overrides, embedImages);
         return wrapper;
     }
 
@@ -2836,6 +5285,7 @@ table.campaign_rank-box td.king .king-rank-text {
         bool embedImages)
     {
         section.ClassList.Add("ranking-section");
+        section.ClassList.Add("rank-ref");
         section.InnerHtml = BuildRankingSectionHtml(content, template, overrides, embedImages);
     }
 
@@ -2845,145 +5295,382 @@ table.campaign_rank-box td.king .king-rank-text {
         TemplateProject template,
         IDictionary<string, byte[]>? overrides,
         bool embedImages)
-    {
-        section.ClassList.Add("store-search-section");
-        section.InnerHtml = BuildStoreSearchSectionHtml(content, template, overrides, embedImages);
-    }
+        {
+                section.ClassList.Add("store-search-section");
+                section.InnerHtml = BuildStoreSearchSectionHtml(content, template, overrides, embedImages);
+        }
 
-    private static void UpdateCustomSection(
+    private static void UpdateCouponFlowSection(
         IElement section,
-        CustomSectionModel custom,
         ContentModel content,
         TemplateProject template,
         IDictionary<string, byte[]>? overrides,
         bool embedImages)
     {
-        section.ClassList.Add("custom-section");
-        section.InnerHtml = BuildCustomSectionHtml(custom, content, template, overrides, embedImages);
+        section.ClassList.Add("coupon-flow-section");
+        section.InnerHtml = BuildCouponFlowSectionHtml(content, template, overrides, embedImages);
     }
 
-    private static string BuildRankingSectionHtml(
+    private static void UpdatePaymentHistorySection(
+        IElement section,
         ContentModel content,
         TemplateProject template,
         IDictionary<string, byte[]>? overrides,
         bool embedImages)
     {
-        Debug.WriteLine($"[Preview] NotesItems={content.Sections.Ranking.NotesItems?.Count} text={string.Join("|", content.Sections.Ranking.NotesItems?.Select(x => x.Text) ?? Enumerable.Empty<string>())}");
-        var ranking = content.Sections.Ranking;
-        var title = ranking.Title ?? string.Empty;
-        var subtitle = ranking.Subtitle ?? string.Empty;
-        var headerLabels = ranking.HeaderLabels
-            .Where(label => !string.IsNullOrWhiteSpace(label))
-            .Select(label => label.Trim())
-            .ToList();
-        if (headerLabels.Count == 0)
-        {
-            headerLabels = new List<string> { "順位", "決済金額" };
-        }
-        if (headerLabels.Count > 3)
-        {
-            headerLabels = headerLabels.Take(3).ToList();
-        }
+        section.ClassList.Add("payment-history-section");
+        section.InnerHtml = BuildPaymentHistorySectionHtml(content, template, overrides, embedImages);
+    }
 
-        var leftImg = string.IsNullOrWhiteSpace(ranking.ImageLeft) || IsImageDeleted(content, ranking.ImageLeft)
+    private static string BuildPaymentHistorySectionHtml(
+        ContentModel content,
+        TemplateProject template,
+        IDictionary<string, byte[]>? overrides,
+        bool embedImages)
+    {
+        var model = content.Sections.PaymentHistory;
+        var textStyle = BuildPaymentHistoryTextStyle(model, "text");
+        var textStyleAttr = string.IsNullOrWhiteSpace(textStyle) ? string.Empty : $" style=\"{textStyle}\"";
+        var textHtml = string.IsNullOrWhiteSpace(model.Text)
             ? string.Empty
-            : $"<img src=\"{ResolveImageUrl(ranking.ImageLeft, template, overrides, embedImages)}\" alt=\"\" />";
-        var rightImg = string.IsNullOrWhiteSpace(ranking.ImageRight) || IsImageDeleted(content, ranking.ImageRight)
+            : $"<p class=\"campaign__text\"{textStyleAttr}>{model.Text}</p>";
+
+        var importantStyle = BuildPaymentHistoryTextStyle(model, "important");
+        var importantStyleAttr = string.IsNullOrWhiteSpace(importantStyle) ? string.Empty : $" style=\"{importantStyle}\"";
+        var importantHtml = string.IsNullOrWhiteSpace(model.ImportantText)
             ? string.Empty
-            : $"<img src=\"{ResolveImageUrl(ranking.ImageRight, template, overrides, embedImages)}\" alt=\"\" />";
+            : $"<p class=\"campaign__text -important\"{importantStyleAttr}>{model.ImportantText}</p>";
 
-        var rows = ranking.Rows.Count == 0
-            ? new List<RankingRowModel>
-            {
-                new() { Rank = "1", Amount = "368,330円", Items = "940品以上" },
-                new() { Rank = "2", Amount = "308,000円", Items = "790品以上" },
-                new() { Rank = "3", Amount = "246,940円", Items = "630品以上" }
-            }
-            : ranking.Rows;
+        var imageHtml = string.IsNullOrWhiteSpace(model.Image)
+            ? string.Empty
+            : (IsImageDeleted(content, model.Image)
+                ? string.Empty
+                : $"<img class=\"campaign__iphoneImg\" src=\"{ResolveImageUrl(model.Image, template, overrides, embedImages)}\" alt=\"{WebUtility.HtmlEncode(model.ImageAlt ?? string.Empty)}\" />");
 
-        var headerCells = string.Join("", headerLabels.Select(label => $"<th>{WebUtility.HtmlEncode(label)}</th>"));
-        var colGroupHtml = headerLabels.Count switch
+        var decoHtml = string.IsNullOrWhiteSpace(model.DecoImage)
+            ? string.Empty
+            : (IsImageDeleted(content, model.DecoImage)
+                ? string.Empty
+                : $"<div class=\"deco-img -right -deco06\" data-autofit=\"true\"><img src=\"{ResolveImageUrl(model.DecoImage, template, overrides, embedImages)}\" alt=\"{WebUtility.HtmlEncode(model.DecoAlt ?? string.Empty)}\" /></div>");
+
+                return $@"
+<div class=""campaign__inner"">
+    {textHtml}
+    {importantHtml}
+    {imageHtml}
+</div>
+{decoHtml}";
+    }
+
+    private static string BuildCouponFlowSectionHtml(
+        ContentModel content,
+        TemplateProject template,
+        IDictionary<string, byte[]>? overrides,
+        bool embedImages)
+    {
+        var model = content.Sections.CouponFlow;
+        var title = WebUtility.HtmlEncode(model.Title ?? string.Empty);
+        var lead = model.Lead ?? string.Empty;
+        var note = WebUtility.HtmlEncode(model.Note ?? string.Empty);
+        var buttonLabel = WebUtility.HtmlEncode(model.ButtonLabel ?? string.Empty);
+        var buttonUrl = WebUtility.HtmlEncode(model.ButtonUrl ?? string.Empty);
+        var accent = SanitizeCssColor(ResolveFrameStyle(content, "couponflow").HeaderBackgroundColor) ?? "#ea5504";
+
+        var slides = model.Slides.Count > 0
+            ? model.Slides
+            : GetDefaultCouponFlowSlides();
+
+        var slideHtml = string.Join(string.Empty, slides.Select((slide, index) =>
         {
-            3 => "<colgroup><col style=\"width:22%\" /><col style=\"width:39%\" /><col style=\"width:39%\" /></colgroup>",
-            2 => "<colgroup><col style=\"width:35%\" /><col style=\"width:65%\" /></colgroup>",
-            _ => "<colgroup><col style=\"width:100%\" /></colgroup>"
-        };
-
-        var bodyRows = string.Join("", rows.Select((row, rowIndex) =>
-        {
-            var cells = new List<string>();
-            for (var i = 0; i < headerLabels.Count; i++)
+            if (string.IsNullOrWhiteSpace(slide.Image) || IsImageDeleted(content, slide.Image))
             {
-                var cellValue = WebUtility.HtmlEncode(GetRankingCellValue(row, i));
-                var isTop = ranking.ShowCrowns && i == 0 && rowIndex < 3;
-                var tdClass = ranking.ShowCrowns && i == 0 && rowIndex < 3
-                    ? $"king king-0{rowIndex + 1}--number"
-                    : string.Empty;
-                if (isTop)
-                {
-                    cellValue = $"<span class=\"king-rank-text\">{rowIndex + 1}</span>";
-                }
-                cells.Add(string.IsNullOrWhiteSpace(tdClass) ? $"<td>{cellValue}</td>" : $"<td class=\"{tdClass}\">{cellValue}</td>");
+                return string.Empty;
             }
-            return $"<tr>{string.Join(string.Empty, cells)}</tr>";
+
+            var src = ResolveImageUrl(slide.Image, template, overrides, embedImages);
+            var alt = WebUtility.HtmlEncode(slide.Alt ?? string.Empty);
+            var active = index == 0 ? " is-active" : string.Empty;
+            return $"<div class=\"swiper-slide{active}\"><img src=\"{src}\" alt=\"{alt}\" /></div>";
         }));
 
-        var textsHtml = RenderTextLines(ranking.FreeTexts, "ranking-free-texts");
-        var subtitleUnderHtml = RenderTextLines(ranking.SubtitleUnderItems, "ranking-subtitle-under");
-        var noteLines = RenderTextLineItems(ranking.NotesItems);
-
-        var titleLines = RenderTextLineItems(ranking.TitleLines);
-        if (titleLines.Count == 0 && !string.IsNullOrWhiteSpace(title))
+        if (string.IsNullOrWhiteSpace(slideHtml))
         {
-            titleLines.Add(BuildStyledTextLine(new StyledTextItem { Text = title, Bold = true, Align = "center" }));
+            slideHtml = "<div class=\"swiper-slide is-active\"><div class=\"coupon-flow-empty\">スライド画像が未設定です</div></div>";
         }
 
-        var subtitleLines = RenderTextLineItems(ranking.SubtitleLines);
-        if (subtitleLines.Count == 0 && !string.IsNullOrWhiteSpace(subtitle))
+        var bulletCount = slides.Count > 0 ? slides.Count : 1;
+        var bullets = string.Join(string.Empty, Enumerable.Range(0, bulletCount).Select(index =>
         {
-            subtitleLines.Add(BuildStyledTextLine(new StyledTextItem { Text = subtitle, Align = "center" }));
-        }
+            var active = index == 0 ? " swiper-pagination-bullet-active" : string.Empty;
+            return $"<span class=\"swiper-pagination-bullet{active}\" data-index=\"{index}\" aria-label=\"Go to slide {index + 1}\" role=\"button\"></span>";
+        }));
 
-        var titleHtml = titleLines.Count == 0
+        var items = model.Items.Count > 0
+            ? model.Items
+            : GetDefaultCouponFlowNotes();
+        var notesHtml = string.Join(string.Empty, items.Select(item => $"<li class=\"indent\">{ToStyledHtml(item)}</li>"));
+
+        var buttonHtml = string.IsNullOrWhiteSpace(buttonLabel)
             ? string.Empty
-            : $"<div class=\"campaign__heading -white ranking-title-lines\">{string.Join(string.Empty, titleLines)}</div>";
-        var subtitleHtml = subtitleLines.Count == 0
-            ? string.Empty
-            : $"<div class=\"ranking-subtitle-lines\">{string.Join(string.Empty, subtitleLines)}</div>";
+            : $"<div class=\"c-btn -border -l\"><a href=\"{buttonUrl}\" target=\"_blank\" rel=\"noopener noreferrer\"><span>{buttonLabel}</span></a></div>";
 
-        var tableNotesHtml = noteLines.Count == 0
-            ? string.Empty
-            : $"<div class=\"ranking-table-notes\">{string.Join(string.Empty, noteLines)}</div>";
-
-        var tableWidthPercent = Math.Clamp(ranking.TableWidthPercent ?? 100, 60, 100);
-
-		return $@"
-<section class=""campaign"">
-    <div class=""l-page-contents"">
-        <div class=""campaign__block"">
-            <div class=""campaign__box"" style=""width: {tableWidthPercent}%; margin: 0 auto;"">
-                {titleHtml}
-                <div class=""campaign__inner"">
-          {subtitleHtml}
-                    {subtitleUnderHtml}
-                    {textsHtml}
-                    
-          {(string.IsNullOrWhiteSpace(leftImg) && string.IsNullOrWhiteSpace(rightImg) ? string.Empty : $"<div class=\"ranking-images\">{leftImg}{rightImg}</div>")}
-                    <table class=""ranking-table campaign_rank-box"" style=""width: {tableWidthPercent}%; margin: 0 auto;"">
-                        {colGroupHtml}
-            <thead>
-                              <tr>{headerCells}</tr>
-            </thead>
-            <tbody>
-              {bodyRows}
-            </tbody>
-          </table>
-                    {tableNotesHtml}
+                return $@"
+            <div class=""coupon-howto-inner"" style=""--coupon-flow-accent:{accent};"">
+    {(string.IsNullOrWhiteSpace(lead) ? string.Empty : $"<div class=\"coupon-howto-lead\"><p><strong>{lead}</strong></p></div>")}
+    <div class=""coupon-howto-swiper swiper coupon-flow-swiper"">
+        <div class=""swiper-wrapper"">
+            {slideHtml}
         </div>
-      </div>
+        <button type=""button"" class=""swiper-button-prev"" aria-label=""前のスライド""></button>
+        <button type=""button"" class=""swiper-button-next"" aria-label=""次のスライド""></button>
     </div>
-  </div>
-</section>";
+    <div class=""swiper-pagination"">{bullets}</div>
+    {(string.IsNullOrWhiteSpace(note) ? string.Empty : $"<p class=\"note\">{note}</p>")}
+    {buttonHtml}
+    {(string.IsNullOrWhiteSpace(notesHtml) ? string.Empty : $"<ul>{notesHtml}</ul>")}
+</div>";
+    }
+
+    private static List<CouponFlowSlideModel> GetDefaultCouponFlowSlides()
+    {
+        return new List<CouponFlowSlideModel>
+        {
+            new() { Image = "images/slide-img1.png", Alt = "1. au PAY アプリのホームの下のクーポンから獲得できます。「一覧」でクーポン画面に遷移します。" },
+            new() { Image = "images/slide-img2.png", Alt = "2. クーポン画面で、クーポンを獲得できる他、クーポンをタップするとクーポンの詳細画面を確認することができます。" },
+            new() { Image = "images/slide-img3.png", Alt = "3. クーポンの詳細画面でも獲得できます。" },
+            new() { Image = "images/slide-img4.png", Alt = "4. マイクーポンが自動で適応されます。" },
+            new() { Image = "images/slide-img5.png", Alt = "5. クーポン対象のお店で決済します。" },
+            new() { Image = "images/slide-img6.png", Alt = "6. マイクーポンが自動で適応されます。" }
+        };
+    }
+
+    private static List<TextItemModel> GetDefaultCouponFlowNotes()
+    {
+        return new List<TextItemModel>
+        {
+            new() { Text = "※スマートフォンもしくはタブレットからご確認ください" },
+            new() { Text = "※上記「クーポンを獲得する」ボタンからアプリへ遷移できます。" },
+            new() { Text = "※クーポンは、1月1日(木・祝)から獲得できます。" }
+        };
+    }
+
+    private static string BuildPaymentHistoryTextStyle(PaymentHistorySectionModel model, string kind)
+    {
+        var style = new StringBuilder();
+
+        var font = SanitizeFontFamily(model.FontFamily);
+        if (!string.IsNullOrWhiteSpace(font))
+        {
+            style.Append($"font-family:{font};");
+        }
+
+        if (!string.IsNullOrWhiteSpace(model.TextAlign))
+        {
+            style.Append($"text-align:{model.TextAlign};");
+        }
+
+        switch (kind)
+        {
+            case "title":
+                if (model.TitleFontSize is > 0)
+                {
+                    style.Append($"font-size:{model.TitleFontSize}px;");
+                }
+                var titleColor = SanitizeCssColor(model.TitleColor);
+                if (!string.IsNullOrWhiteSpace(titleColor))
+                {
+                    style.Append($"color:{titleColor};");
+                }
+                if (model.TitleBold)
+                {
+                    style.Append("font-weight:700;");
+                }
+                break;
+            case "important":
+                if (model.ImportantFontSize is > 0)
+                {
+                    style.Append($"font-size:{model.ImportantFontSize}px;");
+                }
+                var importantColor = SanitizeCssColor(model.ImportantColor);
+                if (!string.IsNullOrWhiteSpace(importantColor))
+                {
+                    style.Append($"color:{importantColor};");
+                }
+                if (model.ImportantBold)
+                {
+                    style.Append("font-weight:700;");
+                }
+                break;
+            default:
+                if (model.TextFontSize is > 0)
+                {
+                    style.Append($"font-size:{model.TextFontSize}px;");
+                }
+                var textColor = SanitizeCssColor(model.TextColor);
+                if (!string.IsNullOrWhiteSpace(textColor))
+                {
+                    style.Append($"color:{textColor};");
+                }
+                if (model.TextBold)
+                {
+                    style.Append("font-weight:700;");
+                }
+                break;
+        }
+
+        return style.ToString();
+    }
+
+        private static void UpdateCustomSection(
+                IElement section,
+                CustomSectionModel custom,
+                ContentModel content,
+                TemplateProject template,
+                IDictionary<string, byte[]>? overrides,
+                bool embedImages)
+        {
+                section.ClassList.Add("custom-section");
+                section.InnerHtml = BuildCustomSectionHtml(custom, content, template, overrides, embedImages);
+        }
+
+        private static string BuildRankingSectionHtml(
+                ContentModel content,
+                TemplateProject template,
+                IDictionary<string, byte[]>? overrides,
+                bool embedImages)
+        {
+                var ranking = content.Sections.Ranking;
+                var title = string.IsNullOrWhiteSpace(ranking.Title)
+                        ? ranking.TitleLines.FirstOrDefault()?.Text ?? "最新順位はこちら"
+                        : ranking.Title;
+                var campaignName = string.IsNullOrWhiteSpace(ranking.CampaignName)
+                        ? (string.IsNullOrWhiteSpace(ranking.Subtitle) ? ranking.SubtitleLines.FirstOrDefault()?.Text ?? string.Empty : ranking.Subtitle)
+                        : ranking.CampaignName;
+                var periodText = ranking.PeriodText ?? string.Empty;
+                var asOfText = ranking.AsOfText ?? string.Empty;
+
+                var headerLabels = ranking.HeaderLabels
+                        .Select(label => (label ?? string.Empty).Trim())
+                        .ToList();
+                if (headerLabels.Count == 0)
+                {
+                    headerLabels = new List<string> { "順位", "決済金額", "品数" };
+                }
+                if (headerLabels.Count < 2)
+                {
+                    headerLabels = new List<string> { "順位", "決済金額" };
+                }
+                if (headerLabels.Count > 3)
+                {
+                    headerLabels = headerLabels.Take(3).ToList();
+                }
+
+                var headerCells = string.Join(string.Empty, headerLabels.Select(label => $"<th>{WebUtility.HtmlEncode(label)}</th>"));
+
+                var rows = ranking.Rows.Count == 0
+                        ? new List<RankingRowModel>
+                        {
+                                new() { Rank = "1", Amount = "000,000円", Items = "000品以上" },
+                                new() { Rank = "2", Amount = "000,000円", Items = "000品以上" },
+                                new() { Rank = "3", Amount = "000,000円", Items = "000品以上" },
+                                new() { Rank = "4", Amount = "000,000円", Items = "000品以上" },
+                                new() { Rank = "10", Amount = "000,000円", Items = "000品以上" },
+                                new() { Rank = "100", Amount = "000,000円", Items = "000品以上" },
+                                new() { Rank = "300", Amount = "000,000円", Items = "000品以上" },
+                                new() { Rank = "1,000", Amount = "000,000円", Items = "000品以上" }
+                        }
+                        : ranking.Rows;
+
+                var bodyRows = string.Join(string.Empty, rows.Select((row, rowIndex) =>
+                {
+                    var isTop = ranking.ShowCrowns && rowIndex < 3;
+                    var kingClass = isTop ? $"king king-0{rowIndex + 1} -number" : "-number";
+                    var cells = new List<string>
+                    {
+                        $"<td class=\"{kingClass}\">{WebUtility.HtmlEncode(row.Rank)}</td>",
+                        $"<td>{WebUtility.HtmlEncode(row.Amount)}</td>"
+                    };
+                    if (headerLabels.Count >= 3)
+                    {
+                        cells.Add($"<td>{WebUtility.HtmlEncode(row.Items)}</td>");
+                    }
+                    return $"<tr>{string.Join(string.Empty, cells)}</tr>";
+                }));
+
+                var notes = ranking.NotesItems.Count > 0
+                        ? ranking.NotesItems.Where(item => item.Visible && !string.IsNullOrWhiteSpace(item.Text)).Select(item => item.Text)
+                        : SplitLines(ranking.TableNotes);
+                var notesHtml = notes.Any()
+                        ? $"<ul class=\"c-notes-list campaign__rank-notes\">{string.Join(string.Empty, notes.Select(n => $"<li>{WebUtility.HtmlEncode(n)}</li>"))}</ul>"
+                        : string.Empty;
+
+                var leftImageHtml = BuildRankingDecorImageHtml(ResolveRankingDecorImage(ranking.LeftTopImage, ranking.ImageLeft), template, overrides, embedImages, "-left -deco04");
+                var rightImageHtml = BuildRankingDecorImageHtml(ResolveRankingDecorImage(ranking.RightTopImage, ranking.ImageRight), template, overrides, embedImages, "-right -deco05");
+
+                return $@"
+<div class=""ranking-inner campaign__rank-block"">
+    <p class=""campaign__rank-text"">
+        {(string.IsNullOrWhiteSpace(campaignName) ? string.Empty : $"<span class=\"-heading\">{WebUtility.HtmlEncode(campaignName)}</span>")}
+        {(string.IsNullOrWhiteSpace(periodText) ? string.Empty : $"<span class=\"-kikan\"><span>{WebUtility.HtmlEncode(ranking.PeriodLabel)}</span>{WebUtility.HtmlEncode(periodText)}</span>")}
+        {(string.IsNullOrWhiteSpace(asOfText) ? string.Empty : $"<span class=\"-date\">{WebUtility.HtmlEncode(asOfText)}</span>")}
+    </p>
+    <table class=""campaign__rank-box"">
+        <thead>
+            <tr>{headerCells}</tr>
+        </thead>
+        <tbody>
+            {bodyRows}
+        </tbody>
+    </table>
+    {notesHtml}
+    {leftImageHtml}
+    {rightImageHtml}
+</div>";
+        }
+
+    private static IEnumerable<string> SplitLines(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return Enumerable.Empty<string>();
+        }
+
+        return value
+            .Split(new[] { "\r\n", "\n" }, StringSplitOptions.RemoveEmptyEntries)
+            .Select(line => line.Trim())
+            .Where(line => !string.IsNullOrWhiteSpace(line));
+    }
+
+    private static RankingDecorImageModel ResolveRankingDecorImage(RankingDecorImageModel image, string fallbackPath)
+    {
+        if (!string.IsNullOrWhiteSpace(image.Src))
+        {
+            return image;
+        }
+
+        return new RankingDecorImageModel
+        {
+            Src = fallbackPath,
+            Alt = string.Empty,
+            Visible = true
+        };
+    }
+
+    private static string BuildRankingDecorImageHtml(
+        RankingDecorImageModel image,
+        TemplateProject template,
+        IDictionary<string, byte[]>? overrides,
+        bool embedImages,
+        string className)
+    {
+        if (image is null || !image.Visible || string.IsNullOrWhiteSpace(image.Src))
+        {
+            return string.Empty;
+        }
+
+        var src = ResolveImageUrl(image.Src, template, overrides, embedImages);
+        var alt = WebUtility.HtmlEncode(image.Alt ?? string.Empty);
+        return $"<div class=\"deco-img {className}\"><img src=\"{src}\" alt=\"{alt}\" /></div>";
     }
 
     private static string BuildStyledTextLine(StyledTextItem item, string tagName = "div", string? className = "ranking-text-line")
@@ -3049,13 +5736,9 @@ table.campaign_rank-box td.king .king-rank-text {
 		IDictionary<string, byte[]>? overrides,
 		bool embedImages)
 	{
-        var titleValue = string.IsNullOrWhiteSpace(content.Sections.StoreSearch.Title)
-            ? "キャンペーン対象店舗検索"
-            : content.Sections.StoreSearch.Title;
         var noticeTitleValue = string.IsNullOrWhiteSpace(content.Sections.StoreSearch.NoticeTitle)
             ? "⚠️ ご注意ください！"
             : content.Sections.StoreSearch.NoticeTitle;
-        var title = WebUtility.HtmlEncode(titleValue);
         var noticeTitle = WebUtility.HtmlEncode(noticeTitleValue);
 		var noticeItems = content.Sections.StoreSearch.NoticeItems.Count == 0
 			? new List<TextItemModel>
@@ -3095,39 +5778,29 @@ table.campaign_rank-box td.king .king-rank-text {
         }));
 
 		return $@"
-<section class=""campaign"">
-    <div class=""l-page-contents"">
-        <div class=""campaign__block"">
-            <div class=""campaign__box"">
-                <h2 class=""campaign__heading -white"">{title}</h2>
-                <div class=""store-search-body"">
-                    <div class=""store-search-notice"">
-                        {(string.IsNullOrWhiteSpace(noticeTitle) ? string.Empty : $"<div class=\"store-search-notice-heading\">{noticeTitle}</div>")}
-                        <ul class=""store-search-notice-list"">{noticeList}</ul>
-                    </div>
-                    <div class=""store-search-search"">
-                        <div class=""store-search-filters"">
-                            {BuildStoreFilterHtml(labels)}
-                        </div>
-                        <div class=""store-search-input"">
-                            <input type=""text"" class=""store-search-keyword"" placeholder=""キーワードを入力してください"" />
-                            <button type=""button"" class=""store-search-geo"">現在地から検索</button>
-                        </div>
-                    </div>
-                    <div class=""store-search-result"">該当件数：{stores.Count}件</div>
-                    <div class=""store-search-pager"">
-                        <button type=""button"" class=""store-search-prev"">前へ</button>
-                        <span class=""store-search-page-info"">1 / 1</span>
-                        <button type=""button"" class=""store-search-next"">次へ</button>
-                    </div>
-                    <div class=""store-search-list"">
-                        {storeCards}
-                    </div>
-                </div>
-            </div>
+<div class=""store-search-body"">
+    <div class=""store-search-notice"">
+        {(string.IsNullOrWhiteSpace(noticeTitle) ? string.Empty : $"<div class=\"store-search-notice-heading\">{noticeTitle}</div>")}
+        <ul class=""store-search-notice-list"">{noticeList}</ul>
+    </div>
+    <div class=""store-search-search"">
+        <div class=""store-search-filters"">
+            {BuildStoreFilterHtml(labels)}
+        </div>
+        <div class=""store-search-input"">
+            <input type=""text"" class=""store-search-keyword"" placeholder=""キーワードを入力してください"" />
         </div>
     </div>
-</section>";
+    <div class=""store-search-result"">該当件数：{stores.Count}件</div>
+    <div class=""store-search-pager"">
+        <button type=""button"" class=""store-search-prev"">前へ</button>
+        <span class=""store-search-page-info"">1 / 1</span>
+        <button type=""button"" class=""store-search-next"">次へ</button>
+    </div>
+    <div class=""store-search-list"">
+        {storeCards}
+    </div>
+</div>";
 	}
 
 	private static string BuildCustomSectionHtml(
@@ -3137,7 +5810,6 @@ table.campaign_rank-box td.king .king-rank-text {
 		IDictionary<string, byte[]>? overrides,
 		bool embedImages)
 	{
-		var title = WebUtility.HtmlEncode(section.Title ?? string.Empty);
 		var bodyHtml = RenderTextLines(section.BodyTextItems, "custom-section-body-lines");
 		var notesHtml = RenderTextLines(section.ImageNotesItems, "custom-section-notes");
         var imageHtml = BuildCustomSectionGalleryHtml(section, content, template, overrides, embedImages);
@@ -3149,21 +5821,12 @@ table.campaign_rank-box td.king .king-rank-text {
 		}
 
 		return $@"
-<section class=""campaign"">
-  <div class=""l-page-contents"">
-    <div class=""campaign__block"">
-      <div class=""campaign__box"">
-        <h2 class=""campaign__heading -white"">{title}</h2>
-        <div class=""custom-section-body"">
-          {bodyHtml}
-          {imageHtml}
-          {notesHtml}
-          {linkHtml}
-        </div>
-      </div>
-    </div>
-  </div>
-</section>";
+<div class=""custom-section-body"">
+    {bodyHtml}
+    {imageHtml}
+    {notesHtml}
+    {linkHtml}
+</div>";
 	}
 
     private static string BuildCustomSectionGalleryHtml(
@@ -3367,12 +6030,8 @@ table.campaign_rank-box td.king .king-rank-text {
         }
     private static void ApplySectionGroups(IDocument document, TemplateProject template, ContentModel content)
     {
-        var stateList = content.SectionGroups?.Where(group => !string.IsNullOrWhiteSpace(group.Key)).ToList();
-        if (stateList is null || stateList.Count == 0)
-        {
-            return;
-        }
-
+        var stateList = content.SectionGroups?.Where(group => !string.IsNullOrWhiteSpace(group.Key)).ToList()
+            ?? new List<SectionGroupModel>();
         var orderKeys = stateList.Select(group => group.Key).Where(key => !string.IsNullOrWhiteSpace(key)).ToList();
         var fixedBottomKeys = orderKeys
             .Where(key => key.Contains("conditions-contact-banners", StringComparison.OrdinalIgnoreCase))
@@ -3388,6 +6047,29 @@ table.campaign_rank-box td.king .king-rank-text {
         }
 
         var enabledMap = stateList.ToDictionary(group => group.Key, group => group.Enabled, StringComparer.OrdinalIgnoreCase);
+
+        foreach (var element in document.QuerySelectorAll(".section-group[data-section]").ToList())
+        {
+            var key = element.GetAttribute("data-section") ?? string.Empty;
+            if (string.IsNullOrWhiteSpace(key))
+            {
+                continue;
+            }
+            if (!IsEditorManagedSectionKey(key, content))
+            {
+                continue;
+            }
+            if (!enabledMap.ContainsKey(key)
+                || (enabledMap.TryGetValue(key, out var enabled) && !enabled))
+            {
+                element.Remove();
+            }
+        }
+
+        if (stateList.Count == 0)
+        {
+            return;
+        }
 
         var entries = orderKeys.Concat(fixedBottomKeys)
             .SelectMany(key => GetElementsForSectionKey(document, key)
@@ -3502,8 +6184,11 @@ table.campaign_rank-box td.king .king-rank-text {
         {
             "campaigncontent" => true,
             "couponperiod" => true,
+            "couponflow" => true,
+            "stickytabs" => true,
             "couponnotes" => true,
             "ranking" => true,
+            "paymenthistory" => true,
             "countdown" => true,
             "storesearch" => true,
             _ => false
@@ -3822,24 +6507,7 @@ table.campaign_rank-box td.king .king-rank-text {
     {
         if (!content.Campaign.ShowCountdown)
         {
-            foreach (var element in document.All.Where(el => el.ClassList.Any(cls => cls.Contains("countdown", StringComparison.OrdinalIgnoreCase))).ToList())
-            {
-                if (element.ClassList.Contains("countdown-period") || element.QuerySelector(".countdown-period") is not null)
-                {
-                    continue;
-                }
-
-                if (!string.IsNullOrWhiteSpace(element.TextContent)
-                    && element.TextContent.Contains("キャンペーン期間", StringComparison.Ordinal))
-                {
-                    continue;
-                }
-
-                element.SetAttribute("data-countdown-hidden", "true");
-            }
-
-            EnsureCountdownHiddenStyle(document);
-            UpdateCountdownPeriodText(document, dateRangeText);
+            HideCountdownElements(document, dateRangeText);
             return;
         }
 
@@ -3848,6 +6516,28 @@ table.campaign_rank-box td.king .king-rank-text {
             element.RemoveAttribute("data-countdown-hidden");
         }
 
+        UpdateCountdownPeriodText(document, dateRangeText);
+    }
+
+    private static void HideCountdownElements(IDocument document, string dateRangeText)
+    {
+        foreach (var element in document.All.Where(el => el.ClassList.Any(cls => cls.Contains("countdown", StringComparison.OrdinalIgnoreCase))).ToList())
+        {
+            if (element.ClassList.Contains("countdown-period") || element.QuerySelector(".countdown-period") is not null)
+            {
+                continue;
+            }
+
+            if (!string.IsNullOrWhiteSpace(element.TextContent)
+                && element.TextContent.Contains("キャンペーン期間", StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            element.SetAttribute("data-countdown-hidden", "true");
+        }
+
+        EnsureCountdownHiddenStyle(document);
         UpdateCountdownPeriodText(document, dateRangeText);
     }
 
@@ -3877,6 +6567,31 @@ table.campaign_rank-box td.king .king-rank-text {
         style.TextContent = @"
 [data-countdown-hidden='true'] { display: none !important; }
 ";
+        head.AppendChild(style);
+    }
+
+    private static void EnsurePaymentHistoryStyle(IDocument document, ContentModel content)
+    {
+        if (!content.Sections.PaymentHistory.Enabled)
+        {
+            return;
+        }
+
+        var head = document.Head;
+        if (head is null || document.QuerySelector("style[data-payment-history-style='true']") is not null)
+        {
+            return;
+        }
+
+        var style = document.CreateElement("style");
+        style.SetAttribute("data-payment-history-style", "true");
+        style.TextContent = @"
+    .payment-history-section .campaign__text.-important { margin-top: 30px; }
+    .payment-history-section .campaign__iphoneImg { margin: 25px auto 0; width: 420px; max-width: 100%; display: block; }
+    @media (max-width: 767px) {
+      .payment-history-section .campaign__text.-important { margin-top: 15px; }
+    }
+    ";
         head.AppendChild(style);
     }
 

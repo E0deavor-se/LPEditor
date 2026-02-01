@@ -1,0 +1,91 @@
+@using LPEditorApp.Models
+
+<UiPanel Title="クイックプリセット">
+    <div class="ui-preset-grid">
+        @foreach (var preset in Presets)
+        {
+            <button type="button" class="ui-preset" @onclick="() => ApplyPreset(preset)">
+                <div class="ui-preset__title">@preset.Name</div>
+                <div class="ui-preset__desc">@preset.Description</div>
+            </button>
+        }
+    </div>
+</UiPanel>
+
+@code {
+    [Parameter] public SectionStyleModel Style { get; set; } = new();
+    [Parameter] public EventCallback OnChanged { get; set; }
+
+    private IReadOnlyList<StylePreset> Presets => new List<StylePreset>
+    {
+        new("Rounded Soft", "白背景 + 柔らかい影", new PresetValues
+        {
+            BackgroundMode = "color",
+            BackgroundColor = "#ffffff",
+            BorderColor = "#e2e8f0",
+            BorderWidth = 1,
+            Radius = 18,
+            Shadow = "sm",
+            Padding = 24
+        }),
+        new("Cool Flat", "フラット＆クリーン", new PresetValues
+        {
+            BackgroundMode = "color",
+            BackgroundColor = "#f8fafc",
+            BorderColor = "#e2e8f0",
+            BorderWidth = 1,
+            Radius = 8,
+            Shadow = "none",
+            Padding = 20
+        }),
+        new("Dark Glass", "濃色 + 影", new PresetValues
+        {
+            BackgroundMode = "color",
+            BackgroundColor = "#0f172a",
+            BorderColor = "#1e293b",
+            BorderWidth = 1,
+            Radius = 16,
+            Shadow = "md",
+            Padding = 24
+        }),
+        new("Accent Card", "強めの枠 + 影", new PresetValues
+        {
+            BackgroundMode = "color",
+            BackgroundColor = "#ffffff",
+            BorderColor = "#3b82f6",
+            BorderWidth = 2,
+            Radius = 14,
+            Shadow = "md",
+            Padding = 24
+        })
+    };
+
+    private async Task ApplyPreset(StylePreset preset)
+    {
+        Style.Background.Mode = preset.Values.BackgroundMode;
+        Style.Background.Color = preset.Values.BackgroundColor;
+        Style.BorderColor = preset.Values.BorderColor;
+        Style.BorderWidth = preset.Values.BorderWidth;
+        Style.Radius = preset.Values.Radius;
+        Style.Shadow = preset.Values.Shadow;
+        Style.Layout.PaddingTop = preset.Values.Padding;
+        Style.Layout.PaddingRight = preset.Values.Padding;
+        Style.Layout.PaddingBottom = preset.Values.Padding;
+        Style.Layout.PaddingLeft = preset.Values.Padding;
+
+        await OnChanged.InvokeAsync();
+    }
+
+    private record StylePreset(string Name, string Description, PresetValues Values);
+
+    private record PresetValues
+    {
+        public string BackgroundMode { get; init; } = "color";
+        public string BackgroundColor { get; init; } = "#ffffff";
+        public string BorderColor { get; init; } = "#e2e8f0";
+        public int BorderWidth { get; init; } = 1;
+        public int Radius { get; init; } = 12;
+        public string Shadow { get; init; } = "sm";
+        public int Padding { get; init; } = 24;
+    }
+}

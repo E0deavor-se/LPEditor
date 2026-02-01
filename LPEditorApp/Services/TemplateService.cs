@@ -164,7 +164,7 @@ public class TemplateService
 
     private static void EnsureSectionOrder(ContentModel content)
     {
-        var available = new List<string> { "campaignContent", "couponPeriod", "storeSearch", "couponNotes", "ranking", "countdown" };
+        var available = new List<string> { "campaignContent", "couponPeriod", "storeSearch", "couponNotes", "ranking", "paymentHistory", "countdown" };
         if (content.SectionsOrder is null || content.SectionsOrder.Count == 0)
         {
             content.SectionsOrder = new List<string>(available);
@@ -379,6 +379,10 @@ public class TemplateService
             "campaignContent",
             "coupon-period",
             "couponPeriod",
+            "coupon-flow",
+            "couponFlow",
+            "sticky-tabs",
+            "stickyTabs",
             "store-search",
             "storeSearch",
             "coupon-notes",

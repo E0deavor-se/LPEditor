@@ -18,12 +18,6 @@
             <div class="label-editor-meta">
                 <div class="label-editor-title">@label.Name</div>
                 <div class="label-editor-key">キー: @label.Key</div>
-                <div class="label-editor-actions">
-                    <button type="button" class="btn small" @onclick="() => CopyStyle(label)">コピー</button>
-                    <button type="button" class="btn small" @onclick="PasteStyle" disabled="@(Clipboard is null)">ペースト</button>
-                    <button type="button" class="btn small" @onclick="() => ResetStyle(label)">リセット</button>
-                    <button type="button" class="btn small" @onclick="Undo" disabled="@(!CanUndo)">元に戻す</button>
-                </div>
             </div>
         </div>
 
@@ -32,53 +26,6 @@
                 <label>表示名</label>
                 <input class="text" @bind-value="label.Name" @bind-value:event="oninput" @bind-value:after="() => UpdateLabel(label)" />
             </div>
-
-            <LabelPresetPicker Presets="Presets" OnPresetSelected="preset => ApplyPresetToSelection(preset, LabelApplyTarget.All)" />
-
-            <div class="label-style-tabs">
-                <button type="button" class="tab-btn @(ActiveTab == "background" ? "active" : "")" @onclick="@(() => SetActiveTab("background"))">背景</button>
-                <button type="button" class="tab-btn @(ActiveTab == "border" ? "active" : "")" @onclick="@(() => SetActiveTab("border"))">枠線</button>
-                <button type="button" class="tab-btn @(ActiveTab == "text" ? "active" : "")" @onclick="@(() => SetActiveTab("text"))">文字</button>
-            </div>
-
-            @if (ActiveTab == "background")
-            {
-                @RenderColorSection(label, "背景色", label.BackgroundColor, label.BackgroundOpacity,
-                    color => SetColor(label, "background", color),
-                    opacity => SetOpacity(label, "background", opacity))
-            }
-            else if (ActiveTab == "border")
-            {
-                @RenderColorSection(label, "枠線色", label.BorderColor, label.BorderOpacity,
-                    color => SetColor(label, "border", color),
-                    opacity => SetOpacity(label, "border", opacity))
-
-                <div class="label-editor-field inline">
-                    <label>枠線太さ</label>
-                    <input type="number" min="0" max="8" step="1" class="text" value="@(label.BorderWidth ?? 1)" @oninput="e => SetBorderWidth(label, e.Value?.ToString())" />
-                    <span class="unit">px</span>
-                </div>
-            }
-            else if (ActiveTab == "text")
-            {
-                @RenderColorSection(label, "文字色", label.TextColor, label.TextOpacity,
-                    color => SetColor(label, "text", color),
-                    opacity => SetOpacity(label, "text", opacity))
-
-                <div class="label-editor-grid">
-                    <div class="label-editor-field inline">
-                        <label>文字サイズ</label>
-                        <input type="number" min="10" max="20" step="1" class="text" value="@(label.FontSize ?? 12)" @oninput="e => SetFontSize(label, e.Value?.ToString())" />
-                        <span class="unit">px</span>
-                    </div>
-                    <div class="label-editor-field inline">
-                        <label>太字</label>
-                        <label class="check"><input type="checkbox" checked="@(label.FontBold != false)" @onchange="e => SetFontBold(label, e)" /> 強調</label>
-                    </div>
-                </div>
-            }
-
-            @RenderWarnings(label)
         </div>
     }
     else
@@ -94,73 +41,6 @@
             </div>
             <div class="label-editor-meta">
                 <div class="label-editor-title">複数選択 (@SelectedLabels.Count 件)</div>
-                <div class="label-editor-actions">
-                    <button type="button" class="btn small" @onclick="() => ApplyPresetToSelection(SelectedPreset, LabelApplyTarget.All)" disabled="@(SelectedPreset is null)">プリセット適用</button>
-                    <button type="button" class="btn small" @onclick="ApplyBulk" disabled="!CanApplyBulk">一括適用</button>
-                    <button type="button" class="btn small" @onclick="Undo" disabled="@(!CanUndo)">元に戻す</button>
-                </div>
-            </div>
-        </div>
-
-        <div class="label-editor-body">
-            <LabelPresetPicker Presets="Presets" OnPresetSelected="preset => SelectedPreset = preset" />
-
-            <div class="bulk-apply-panel">
-                <div class="bulk-apply-header">
-                    <span>適用対象</span>
-                    <div class="bulk-apply-toggle">
-                        <label class="check"><input type="checkbox" @bind="ApplyBackground" /> 背景</label>
-                        <label class="check"><input type="checkbox" @bind="ApplyBorder" /> 枠線</label>
-                        <label class="check"><input type="checkbox" @bind="ApplyText" /> 文字</label>
-                    </div>
-                </div>
-
-                <div class="label-style-tabs">
-                    <button type="button" class="tab-btn @(ActiveTab == "background" ? "active" : "")" @onclick="@(() => SetActiveTab("background"))">背景</button>
-                    <button type="button" class="tab-btn @(ActiveTab == "border" ? "active" : "")" @onclick="@(() => SetActiveTab("border"))">枠線</button>
-                    <button type="button" class="tab-btn @(ActiveTab == "text" ? "active" : "")" @onclick="@(() => SetActiveTab("text"))">文字</button>
-                </div>
-
-                @if (ActiveTab == "background")
-                {
-                    @RenderBulkColorSection("背景色", BulkStyle.BackgroundColor, BulkStyle.BackgroundOpacity,
-                        color => BulkStyle.BackgroundColor = color,
-                        opacity => BulkStyle.BackgroundOpacity = opacity)
-                }
-                else if (ActiveTab == "border")
-                {
-                    @RenderBulkColorSection("枠線色", BulkStyle.BorderColor, BulkStyle.BorderOpacity,
-                        color => BulkStyle.BorderColor = color,
-                        opacity => BulkStyle.BorderOpacity = opacity)
-
-                    <div class="label-editor-field inline">
-                        <label>枠線太さ</label>
-                        <input type="number" min="0" max="8" step="1" class="text" value="@BulkBorderWidth" @oninput="e => BulkBorderWidth = e.Value?.ToString()" placeholder="—" />
-                        <span class="unit">px</span>
-                    </div>
-                }
-                else if (ActiveTab == "text")
-                {
-                    @RenderBulkColorSection("文字色", BulkStyle.TextColor, BulkStyle.TextOpacity,
-                        color => BulkStyle.TextColor = color,
-                        opacity => BulkStyle.TextOpacity = opacity)
-
-                    <div class="label-editor-grid">
-                        <div class="label-editor-field inline">
-                            <label>文字サイズ</label>
-                            <input type="number" min="10" max="20" step="1" class="text" value="@BulkFontSize" @oninput="e => BulkFontSize = e.Value?.ToString()" placeholder="—" />
-                            <span class="unit">px</span>
-                        </div>
-                        <div class="label-editor-field inline">
-                            <label>太字</label>
-                            <InputSelect class="text-option-select" @bind-Value="BulkFontBold">
-                                <option value="mixed">混在</option>
-                                <option value="true">太字</option>
-                                <option value="false">標準</option>
-                            </InputSelect>
-                        </div>
-                    </div>
-                }
             </div>
         </div>
     }
@@ -183,7 +63,6 @@
     private string? BulkBorderWidth;
     private string? BulkFontSize;
     private string BulkFontBold = "mixed";
-    private LabelStylePreset? SelectedPreset;
 
     private readonly Stack<Dictionary<string, LabelStyleSnapshot>> _undoStack = new();
 

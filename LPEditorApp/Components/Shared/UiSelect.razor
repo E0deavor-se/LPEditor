@@ -1,0 +1,17 @@
+@typeparam TValue
+
+<InputSelect class="ui-select" @bind-Value="Value" @bind-Value:after="OnAfter">
+    @ChildContent
+</InputSelect>
+
+@code {
+    [Parameter] public TValue? Value { get; set; }
+    [Parameter] public EventCallback<TValue?> ValueChanged { get; set; }
+    [Parameter] public EventCallback OnChanged { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+
+    private async Task OnAfter()
+    {
+        await OnChanged.InvokeAsync();
+    }
+}

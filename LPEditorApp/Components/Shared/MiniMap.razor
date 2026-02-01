@@ -1,0 +1,34 @@
+@using LPEditorApp.Components.Shared
+
+<div class="sectionNav-miniMap" role="list">
+    @if (Sections is null || Sections.Count == 0)
+    {
+        <div class="mini-map__empty"></div>
+    }
+    else
+    {
+        @foreach (var item in Sections)
+        {
+            var isActive = string.Equals(item.NormalizedKey, ActiveId, StringComparison.OrdinalIgnoreCase);
+                <button type="button"
+                    class="sectionNav-miniMapBlock @(isActive ? "is-active" : "") @(item.IsEnabled ? "" : "is-disabled")"
+                title="@item.Title"
+                @onclick="() => OnSelect.InvokeAsync(item.Key)">
+            </button>
+        }
+    }
+</div>
+
+@code {
+    [Parameter] public IReadOnlyList<MiniMapSection> Sections { get; set; } = Array.Empty<MiniMapSection>();
+    [Parameter] public string ActiveId { get; set; } = string.Empty;
+    [Parameter] public EventCallback<string> OnSelect { get; set; }
+
+    public sealed class MiniMapSection
+    {
+        public string Key { get; set; } = string.Empty;
+        public string NormalizedKey { get; set; } = string.Empty;
+        public string Title { get; set; } = string.Empty;
+        public bool IsEnabled { get; set; } = true;
+    }
+}

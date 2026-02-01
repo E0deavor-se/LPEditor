@@ -3,94 +3,24 @@
 
 <div class="ranking-editor">
     <div class="ranking-block">
-        <div class="ranking-block__title">基本</div>
+        <div class="ranking-block__title">表示テキスト</div>
         <div class="ranking-basic-stack">
-            <div class="field list-field">
-                <div class="list-row">
-                    <label>タイトル（固定）</label>
-                    <span class="badge fixed">固定</span>
-                </div>
-                <div class="list-row">
-                    <input class="text" placeholder="タイトル" value="@Ranking.TitleLines[0].Text" @oninput="e => UpdateTitleLine(0, e)" />
-                </div>
-                <div class="list-row">
-                    <div class="text-options">
-                        <InputSelect class="text-option-select" @bind-Value="TitleStyleFontFamily" @bind-Value:after="NotifyAfter">
-                            <option value="">フォント</option>
-                            @foreach (var font in FontFamilyOptions)
-                            {
-                                <option value="@font.Value">@font.Label</option>
-                            }
-                        </InputSelect>
-                        <InputSelect class="text-option-select" @bind-Value="TitleStyleFontSize" @bind-Value:after="NotifyAfter">
-                            <option value="">サイズ</option>
-                            @foreach (var size in FontSizeOptions)
-                            {
-                                <option value="@size">@($"{size}px")</option>
-                            }
-                        </InputSelect>
-                        <label class="check"><input type="checkbox" @bind="TitleStyleBold" @bind:after="NotifyAfter" /> 太字</label>
-                        <label class="check"><input type="checkbox" @bind="TitleStyleVisible" @bind:after="NotifyAfter" /> 表示</label>
-                        <input type="color" class="text-option-color" value="@GetColorValue(TitleStyleColor)" @onchange="e => UpdateTitleStyleColor(e)" />
-                        <InputSelect class="text-option-select" @bind-Value="TitleStyleAlign" @bind-Value:after="NotifyAfter">
-                            <option value="">中央</option>
-                            <option value="left">左</option>
-                            <option value="center">中央</option>
-                            <option value="right">右</option>
-                        </InputSelect>
-                    </div>
-                </div>
+            <div class="field">
+                <label>タイトル</label>
+                <input class="text" @bind-value="Ranking.Title" @bind-value:event="oninput" @bind-value:after="OnTitleChanged" placeholder="最新順位はこちら" />
             </div>
-            <div class="field list-field">
-                <div class="list-row">
-                    <label>サブタイトル（固定）</label>
-                    <span class="badge fixed">固定</span>
-                </div>
-                <div class="list-row">
-                    <input class="text" placeholder="サブタイトル" value="@Ranking.SubtitleLines[0].Text" @oninput="e => UpdateSubtitleLine(0, e)" />
-                </div>
-                <div class="list-row">
-                    <div class="text-options">
-                        <InputSelect class="text-option-select" @bind-Value="SubtitleStyleFontFamily" @bind-Value:after="NotifyAfter">
-                            <option value="">フォント</option>
-                            @foreach (var font in FontFamilyOptions)
-                            {
-                                <option value="@font.Value">@font.Label</option>
-                            }
-                        </InputSelect>
-                        <InputSelect class="text-option-select" @bind-Value="SubtitleStyleFontSize" @bind-Value:after="NotifyAfter">
-                            <option value="">サイズ</option>
-                            @foreach (var size in FontSizeOptions)
-                            {
-                                <option value="@size">@($"{size}px")</option>
-                            }
-                        </InputSelect>
-                        <label class="check"><input type="checkbox" @bind="SubtitleStyleBold" @bind:after="NotifyAfter" /> 太字</label>
-                        <label class="check"><input type="checkbox" @bind="SubtitleStyleVisible" @bind:after="NotifyAfter" /> 表示</label>
-                        <input type="color" class="text-option-color" value="@GetColorValue(SubtitleStyleColor)" @onchange="e => UpdateSubtitleStyleColor(e)" />
-                        <InputSelect class="text-option-select" @bind-Value="SubtitleStyleAlign" @bind-Value:after="NotifyAfter">
-                            <option value="">中央</option>
-                            <option value="left">左</option>
-                            <option value="center">中央</option>
-                            <option value="right">右</option>
-                        </InputSelect>
-                    </div>
-                </div>
+            <div class="field">
+                <label>キャンペーン名</label>
+                <input class="text" @bind-value="Ranking.CampaignName" @bind-value:event="oninput" @bind-value:after="OnCampaignNameChanged" placeholder="キャンペーン名" />
             </div>
-            <TextLinesEditor Title="追加テキスト（サブタイトル直下）"
-                             Items="Ranking.SubtitleUnderItems"
-                             AllowDelete="true"
-                             OnChanged="OnSubtitleUnderChanged"
-                             FontSizeOptions="FontSizeOptions"
-                             FontFamilyOptions="FontFamilyOptions"
-                             GetColorValue="GetColorValue" />
-            <TextLinesEditor Title="追加テキスト（表の下）"
-                             Items="Ranking.NotesItems"
-                             AllowDelete="true"
-                             OnChanged="OnNotesChanged"
-                             FontSizeOptions="FontSizeOptions"
-                             FontFamilyOptions="FontFamilyOptions"
-                             GetColorValue="GetColorValue" />
+            <div class="field">
+                <label>集計期間</label>
+                <input class="text" @bind-value="Ranking.PeriodText" @bind-value:event="oninput" @bind-value:after="NotifyAfter" placeholder="YYYY/MM/DD〜YYYY/MM/DD" />
+            </div>
+            <div class="field">
+                <label>時点テキスト</label>
+                <input class="text" @bind-value="Ranking.AsOfText" @bind-value:event="oninput" @bind-value:after="NotifyAfter" placeholder="YYYY/MM/DD時点" />
+            </div>
         </div>
     </div>
 
@@ -140,73 +70,26 @@
     <details class="ranking-details">
         <summary>詳細設定</summary>
         <div class="ranking-details__body">
-            <details class="ranking-details-group" open>
-                <summary>表の見た目</summary>
-                <div class="compact-grid">
-                    <div class="compact-row">
-                        <span class="compact-label">表幅</span>
-                        <input type="range" min="60" max="100" step="1" @bind-value="Ranking.TableWidthPercent" @bind-value:event="oninput" @bind-value:after="NotifyAfter" />
-                        <span class="count">@(GetTableWidthPercent())%</span>
-                    </div>
-                    <div class="compact-row">
-                        <span class="compact-label">枠線</span>
-                        <InputSelect class="text-option-select" @bind-Value="Ranking.TableBorderWidth" @bind-Value:after="NotifyAfter">
-                            <option value="">標準</option>
-                            <option value="1">1px</option>
-                            <option value="2">2px</option>
-                            <option value="3">3px</option>
-                            <option value="4">4px</option>
-                        </InputSelect>
-                        <input type="color" @bind-value="Ranking.TableBorderColor" @bind-value:event="oninput" @bind-value:after="NotifyAfter" />
-                    </div>
-                    <div class="compact-row">
-                        <span class="compact-label">ストライプ</span>
-                        <input type="color" @bind-value="Ranking.TableStripeColor" @bind-value:event="oninput" @bind-value:after="NotifyAfter" />
-                    </div>
-                    <div class="compact-row">
-                        <span class="compact-label">王冠</span>
-                        <label class="check"><input type="checkbox" @bind="Ranking.ShowCrowns" @bind:after="NotifyAfter" /> 表示</label>
-                    </div>
-                </div>
-            </details>
-            <details class="ranking-details-group" open>
-                <summary>見出し</summary>
-                <div class="compact-grid">
-                    <div class="compact-row">
-                        <span class="compact-label">背景</span>
-                        <input type="color" @bind-value="Ranking.TableHeaderColor" @bind-value:event="oninput" @bind-value:after="NotifyAfter" />
-                    </div>
-                    <div class="compact-row">
-                        <span class="compact-label">文字</span>
-                        <input type="color" @bind-value="Ranking.TableHeaderTextColor" @bind-value:event="oninput" @bind-value:after="NotifyAfter" />
-                    </div>
-                </div>
-            </details>
-            <details class="ranking-details-group" open>
-                <summary>本文</summary>
-                <div class="compact-grid">
-                    <div class="compact-row">
-                        <span class="compact-label">文字色</span>
-                        <input type="color" @bind-value="Ranking.TableTextColor" @bind-value:event="oninput" @bind-value:after="NotifyAfter" />
-                    </div>
-                    <div class="compact-row">
-                        <span class="compact-label">太字</span>
-                        <label class="check"><input type="checkbox" @bind="Ranking.TableTextBold" @bind:after="NotifyAfter" /> 有効</label>
-                    </div>
-                </div>
-            </details>
             <div class="field">
-                <label>左画像</label>
+                <label>左上装飾画像</label>
                 <div class="image-row">
-                    <input class="text" @bind-value="Ranking.ImageLeft" @bind-value:event="oninput" @bind-value:after="NotifyAfter" />
+                    <input class="text" @bind-value="Ranking.LeftTopImage.Src" @bind-value:event="oninput" @bind-value:after="NotifyAfter" placeholder="images/xxx.png" />
                     <InputFile OnChange="OnImageLeftSelected" accept="image/*" />
+                </div>
+                <div class="text-options">
+                    <label class="check"><input type="checkbox" @bind="Ranking.LeftTopImage.Visible" @bind:after="NotifyAfter" /> 表示</label>
+                    <input class="text" @bind-value="Ranking.LeftTopImage.Alt" @bind-value:event="oninput" @bind-value:after="NotifyAfter" placeholder="alt" />
                 </div>
             </div>
             <div class="field">
-                <label>右画像</label>
+                <label>右上装飾画像</label>
                 <div class="image-row">
-                    <input class="text" @bind-value="Ranking.ImageRight" @bind-value:event="oninput" @bind-value:after="NotifyAfter" />
+                    <input class="text" @bind-value="Ranking.RightTopImage.Src" @bind-value:event="oninput" @bind-value:after="NotifyAfter" placeholder="images/xxx.png" />
                     <InputFile OnChange="OnImageRightSelected" accept="image/*" />
+                </div>
+                <div class="text-options">
+                    <label class="check"><input type="checkbox" @bind="Ranking.RightTopImage.Visible" @bind:after="NotifyAfter" /> 表示</label>
+                    <input class="text" @bind-value="Ranking.RightTopImage.Alt" @bind-value:event="oninput" @bind-value:after="NotifyAfter" placeholder="alt" />
                 </div>
             </div>
         </div>
@@ -242,12 +125,15 @@
         Ranking.HeaderLabels ??= new List<string>();
         Ranking.TitleLines ??= new List<StyledTextItem>();
         Ranking.SubtitleLines ??= new List<StyledTextItem>();
+        Ranking.LeftTopImage ??= new RankingDecorImageModel();
+        Ranking.RightTopImage ??= new RankingDecorImageModel();
         EnsureHeaderDefaults();
         EnsureTitleSubtitleDefaults();
         EnsureSingleLine(Ranking.TitleLines);
         EnsureSingleLine(Ranking.SubtitleLines);
         EnsureNotesDefaults();
         EnsureSubtitleUnderDefaults();
+        EnsureRankingRefDefaults();
         EnsureStyledTextIds(Ranking.TitleLines);
         EnsureStyledTextIds(Ranking.SubtitleLines);
         EnsureStyledTextIds(Ranking.NotesItems);
@@ -394,6 +280,47 @@
         {
             Ranking.SubtitleLines.Add(new StyledTextItem { Text = Ranking.Subtitle ?? string.Empty, Align = "center" });
         }
+    }
+
+    private void EnsureRankingRefDefaults()
+    {
+        if (string.IsNullOrWhiteSpace(Ranking.Title))
+        {
+            Ranking.Title = Ranking.TitleLines.FirstOrDefault()?.Text ?? "最新順位はこちら";
+        }
+        if (string.IsNullOrWhiteSpace(Ranking.CampaignName))
+        {
+            Ranking.CampaignName = string.IsNullOrWhiteSpace(Ranking.Subtitle)
+                ? Ranking.SubtitleLines.FirstOrDefault()?.Text ?? string.Empty
+                : Ranking.Subtitle;
+        }
+        if (string.IsNullOrWhiteSpace(Ranking.LeftTopImage.Src))
+        {
+            Ranking.LeftTopImage.Src = Ranking.ImageLeft;
+        }
+        if (string.IsNullOrWhiteSpace(Ranking.RightTopImage.Src))
+        {
+            Ranking.RightTopImage.Src = Ranking.ImageRight;
+        }
+    }
+
+    private async Task OnTitleChanged()
+    {
+        if (Ranking.TitleLines.Count > 0)
+        {
+            Ranking.TitleLines[0].Text = Ranking.Title ?? string.Empty;
+        }
+        await NotifyAfter();
+    }
+
+    private async Task OnCampaignNameChanged()
+    {
+        Ranking.Subtitle = Ranking.CampaignName ?? string.Empty;
+        if (Ranking.SubtitleLines.Count > 0)
+        {
+            Ranking.SubtitleLines[0].Text = Ranking.CampaignName ?? string.Empty;
+        }
+        await NotifyAfter();
     }
 
     private void EnsureSingleLine(List<StyledTextItem> lines)

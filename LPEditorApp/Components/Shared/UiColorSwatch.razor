@@ -1,0 +1,18 @@
+<div class="ui-color">
+    <input class="ui-color__input" type="color" value="@ColorValue" @onchange="OnChange" />
+    <div class="ui-color__value">@ColorValue</div>
+</div>
+
+@code {
+    [Parameter] public string? Value { get; set; }
+    [Parameter] public EventCallback<string?> ValueChanged { get; set; }
+
+    private string ColorValue => string.IsNullOrWhiteSpace(Value) ? "#ffffff" : Value!;
+
+    private async Task OnChange(ChangeEventArgs e)
+    {
+        var next = e?.Value?.ToString();
+        Value = next;
+        await ValueChanged.InvokeAsync(next);
+    }
+}

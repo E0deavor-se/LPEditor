@@ -4,6 +4,37 @@ window.lpPreview = {
     if (!iframe) return;
     iframe.srcdoc = window.lpPreview._injectPreviewDebug(html || "");
   },
+  setHtmlWithScroll: function (frameId, html, scrollTop) {
+    const iframe = document.getElementById(frameId);
+    if (!iframe) return;
+    const nextScroll = Number.isFinite(scrollTop) ? scrollTop : 0;
+    const restore = () => {
+      try {
+        const doc = iframe.contentDocument;
+        if (!doc) return;
+        doc.documentElement.scrollTop = nextScroll;
+        doc.body && (doc.body.scrollTop = nextScroll);
+      } catch (e) {
+        return;
+      }
+    };
+    iframe.onload = restore;
+    iframe.srcdoc = window.lpPreview._injectPreviewDebug(html || "");
+  },
+  getScrollTop: function (frameId) {
+    const iframe = document.getElementById(frameId);
+    if (!iframe || !iframe.contentDocument) return 0;
+    const doc = iframe.contentDocument;
+    return doc.documentElement.scrollTop || (doc.body ? doc.body.scrollTop : 0) || 0;
+  },
+  setScrollTop: function (frameId, value) {
+    const iframe = document.getElementById(frameId);
+    if (!iframe || !iframe.contentDocument) return;
+    const doc = iframe.contentDocument;
+    const next = Number.isFinite(value) ? value : 0;
+    doc.documentElement.scrollTop = next;
+    doc.body && (doc.body.scrollTop = next);
+  },
   registerDebugListener: function () {
     if (window.__lpPreviewDebugListenerRegistered) return;
     window.__lpPreviewDebugListenerRegistered = true;
@@ -143,6 +174,8 @@ window.lpPreview = {
       const scale = Math.min(1, availableWidth / width);
 
       wrapper.style.setProperty("--preview-scale", String(scale));
+      wrapper.style.setProperty("--preview-scaled-width", (width * scale).toFixed(2) + "px");
+      wrapper.style.setProperty("--preview-scaled-height", (height * scale).toFixed(2) + "px");
       wrapper.dataset.responsiveWidth = width.toString();
       wrapper.dataset.responsiveHeight = height.toString();
       wrapper.dataset.responsiveDpr = Math.max(1, Number(dpr) || 1).toString();
@@ -173,6 +206,92 @@ window.lpPreview = {
     const wrapper = document.getElementById("previewFrameWrapper");
     if (wrapper) {
       wrapper.style.removeProperty("--preview-scale");
+      wrapper.style.removeProperty("--preview-scaled-width");
+      wrapper.style.removeProperty("--preview-scaled-height");
+    }
+  }
+};
+
+window.lpDesignColors = {
+  load: function () {
+    try {
+      const raw = window.localStorage.getItem("lp-design-colors");
+      if (!raw) return [];
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch (e) {
+      return [];
+    }
+  },
+  save: function (colors) {
+    try {
+      const list = Array.isArray(colors) ? colors.slice(0, 8) : [];
+      window.localStorage.setItem("lp-design-colors", JSON.stringify(list));
+    } catch (e) {
+      return;
+    }
+  }
+};
+
+window.lpCardColors = {
+  load: function () {
+    try {
+      const raw = window.localStorage.getItem("lp-card-colors");
+      if (!raw) return [];
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch (e) {
+      return [];
+    }
+  },
+  save: function (colors) {
+    try {
+      const list = Array.isArray(colors) ? colors.slice(0, 8) : [];
+      window.localStorage.setItem("lp-card-colors", JSON.stringify(list));
+    } catch (e) {
+      return;
+    }
+  }
+};
+
+window.lpFramePresets = {
+  loadFavorites: function () {
+    try {
+      const raw = window.localStorage.getItem("lp-frame-preset-favorites");
+      if (!raw) return [];
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch (e) {
+      return [];
+    }
+  },
+  saveFavorites: function (items) {
+    try {
+      const list = Array.isArray(items) ? items : [];
+      window.localStorage.setItem("lp-frame-preset-favorites", JSON.stringify(list));
+    } catch (e) {
+      return;
+    }
+  }
+};
+
+window.lpBackgroundPresets = {
+  loadFavorites: function () {
+    try {
+      const raw = window.localStorage.getItem("lp-background-preset-favorites");
+      if (!raw) return [];
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch (e) {
+      return [];
+    }
+  },
+  saveFavorites: function (items) {
+    try {
+      const list = Array.isArray(items) ? items : [];
+      window.localStorage.setItem("lp-background-preset-favorites", JSON.stringify(list));
+    } catch (e) {
+      return;
     }
   }
 };
@@ -195,13 +314,50 @@ window.sectionSort = {
       window.sectionSort._instances.delete(containerId);
     }
 
+    let lastPointerY = 0;
+    let scrollRaf = null;
+    const scrollEdge = 40;
+    const scrollSpeed = 14;
+
+    const scheduleAutoScroll = () => {
+      if (scrollRaf) return;
+      scrollRaf = window.requestAnimationFrame(() => {
+        scrollRaf = null;
+        const rect = container.getBoundingClientRect();
+        if (!rect.height) return;
+        if (lastPointerY < rect.top + scrollEdge) {
+          container.scrollTop -= scrollSpeed;
+        } else if (lastPointerY > rect.bottom - scrollEdge) {
+          container.scrollTop += scrollSpeed;
+        }
+      });
+    };
+
     $container.sortable({
       items: ".item",
       cancel: "input, label, button, textarea, select",
       handle: ".drag-handle",
-      placeholder: "drag-placeholder",
+      placeholder: "drag-placeholder-line",
+      forcePlaceholderSize: true,
       axis: "y",
-      opacity: 0.5,
+      tolerance: "pointer",
+      helper: function (event, ui) {
+        const helper = ui.clone();
+        helper.addClass("drag-ghost");
+        helper.width(ui.outerWidth());
+        return helper;
+      },
+      start: function (event, ui) {
+        ui.item.addClass("is-dragging");
+      },
+      stop: function (event, ui) {
+        ui.item.removeClass("is-dragging");
+      },
+      sort: function (event) {
+        const origin = event.originalEvent || event;
+        lastPointerY = origin && typeof origin.clientY === "number" ? origin.clientY : lastPointerY;
+        scheduleAutoScroll();
+      },
       update: function () {
         const order = $container.find(".item")
           .map(function () { return window.jQuery(this).attr("data-id"); })
@@ -215,6 +371,79 @@ window.sectionSort = {
 
     $container.disableSelection();
     window.sectionSort._instances.set(containerId, $container);
+  }
+};
+
+window.sectionNav = {
+  _instances: new Map(),
+  setup: function (frameId, dotnetRef) {
+    const iframe = document.getElementById(frameId);
+    if (!iframe) return;
+
+    const attach = () => {
+      const doc = iframe.contentDocument;
+      const win = iframe.contentWindow;
+      if (!doc || !win) return;
+
+      const sections = Array.from(doc.querySelectorAll(".section-group[data-section]"));
+      if (!sections.length) return;
+
+      const state = window.sectionNav._instances.get(frameId) || {};
+      state.sections = sections;
+      state.win = win;
+      state.dotnetRef = dotnetRef;
+
+      if (state.onScroll) {
+        doc.removeEventListener("scroll", state.onScroll, { passive: true });
+      }
+
+      let rafId = null;
+      const handle = () => {
+        rafId = null;
+        let best = null;
+        let bestScore = Number.POSITIVE_INFINITY;
+        for (const section of sections) {
+          const rect = section.getBoundingClientRect();
+          const score = Math.abs(rect.top);
+          if (score < bestScore) {
+            bestScore = score;
+            best = section;
+          }
+        }
+        if (!best) return;
+        const key = best.getAttribute("data-section");
+        if (!key) return;
+        if (dotnetRef && typeof dotnetRef.invokeMethodAsync === "function") {
+          dotnetRef.invokeMethodAsync("OnPreviewSectionChanged", key);
+        }
+      };
+
+      state.onScroll = () => {
+        if (rafId) return;
+        rafId = win.requestAnimationFrame(handle);
+      };
+
+      doc.addEventListener("scroll", state.onScroll, { passive: true });
+      window.sectionNav._instances.set(frameId, state);
+      state.onScroll();
+    };
+
+    if (iframe.contentDocument && iframe.contentDocument.readyState === "complete") {
+      attach();
+    } else {
+      iframe.addEventListener("load", attach, { once: true });
+    }
+  },
+  scrollRow: function (listId, rowId) {
+    if (!listId || !rowId) return;
+    const list = document.getElementById(listId);
+    const row = document.getElementById(rowId);
+    if (!list || !row) return;
+    const listRect = list.getBoundingClientRect();
+    const rowRect = row.getBoundingClientRect();
+    if (rowRect.top < listRect.top || rowRect.bottom > listRect.bottom) {
+      row.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }
   }
 };
 

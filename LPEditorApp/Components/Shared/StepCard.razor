@@ -1,0 +1,29 @@
+<div class="lp-step-card">
+    <div class="lp-step-card-header">
+        <div class="lp-step-card-title">
+            <span class="lp-step-badge">@StepLabel</span>
+            <div>
+                <div class="lp-step-title">@Title</div>
+                @if (!string.IsNullOrWhiteSpace(Subtitle))
+                {
+                    <div class="lp-step-subtitle">@Subtitle</div>
+                }
+            </div>
+        </div>
+        @if (HeaderActions is not null)
+        {
+            <div class="lp-step-actions">@HeaderActions</div>
+        }
+    </div>
+    <div class="lp-step-card-body">
+        @ChildContent
+    </div>
+</div>
+
+@code {
+    [Parameter] public string StepLabel { get; set; } = "STEP";
+    [Parameter] public string Title { get; set; } = string.Empty;
+    [Parameter] public string? Subtitle { get; set; }
+    [Parameter] public RenderFragment? HeaderActions { get; set; }
+    [Parameter] public RenderFragment ChildContent { get; set; } = default!;
+}

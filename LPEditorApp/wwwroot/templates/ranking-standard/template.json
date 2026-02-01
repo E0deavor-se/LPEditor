@@ -1,0 +1,7 @@
+{
+  "name": "ランキング標準テンプレート",
+  "description": "ランキングLP向けの標準7セクション構成テンプレート",
+  "tags": ["ranking", "standard", "lp"],
+  "thumbnail": "images/thumbnail.svg",
+  "version": "1.0.0"
+}

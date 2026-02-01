@@ -1,0 +1,11 @@
+<div class="ui-row">
+    <div class="ui-row__label">@Label</div>
+    <div class="ui-row__content">
+        @ChildContent
+    </div>
+</div>
+
+@code {
+    [Parameter] public string Label { get; set; } = string.Empty;
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+}

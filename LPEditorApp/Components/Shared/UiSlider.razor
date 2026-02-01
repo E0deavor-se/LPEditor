@@ -1,0 +1,36 @@
+@typeparam TValue
+
+<div class="ui-slider">
+    <input class="ui-slider__input" type="range" min="@Min" max="@Max" step="@Step"
+           value="@Value" @oninput="OnInput" />
+    <div class="ui-slider__value">@DisplayValue</div>
+</div>
+
+@code {
+    [Parameter] public TValue? Value { get; set; }
+    [Parameter] public EventCallback<TValue?> ValueChanged { get; set; }
+    [Parameter] public string Min { get; set; } = "0";
+    [Parameter] public string Max { get; set; } = "1";
+    [Parameter] public string Step { get; set; } = "0.05";
+    [Parameter] public string? DisplayValue { get; set; }
+
+    private async Task OnInput(ChangeEventArgs e)
+    {
+        var raw = e?.Value?.ToString();
+        if (typeof(TValue) == typeof(double?) || typeof(TValue) == typeof(double))
+        {
+            var parsed = double.TryParse(raw, out var dbl) ? (TValue)(object)dbl : default;
+            Value = parsed;
+            await ValueChanged.InvokeAsync(parsed);
+            return;
+        }
+
+        if (typeof(TValue) == typeof(int?) || typeof(TValue) == typeof(int))
+        {
+            var parsed = int.TryParse(raw, out var number) ? (TValue)(object)number : default;
+            Value = parsed;
+            await ValueChanged.InvokeAsync(parsed);
+            return;
+        }
+    }
+}

@@ -1,0 +1,96 @@
+:root {
+  --lp-bg: #f8fafc;
+  --lp-text: #111827;
+  --lp-muted: #64748b;
+  --lp-border: #e5e7eb;
+  --lp-accent: #1e3a8a;
+}
+
+body {
+  margin: 0;
+  font-family: "Noto Sans JP", "Yu Gothic", "Hiragino Kaku Gothic ProN", sans-serif;
+  color: var(--lp-text);
+  background: var(--lp-bg);
+}
+
+.section-group {
+  max-width: 1100px;
+  margin: 24px auto;
+  background: #fff;
+  border: 1px solid var(--lp-border);
+  border-radius: 20px;
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.08);
+  padding: 28px;
+}
+
+.section-title {
+  font-size: 1.4rem;
+  font-weight: 700;
+  margin-bottom: 12px;
+}
+
+.section-body {
+  font-size: 1rem;
+  color: var(--lp-text);
+}
+
+.ranking-section {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.ranking-table {
+  width: 100%;
+  border-collapse: collapse;
+  border: 1px solid var(--lp-border);
+  overflow: hidden;
+  border-radius: 14px;
+}
+
+.ranking-table thead th {
+  background: var(--lp-accent);
+  color: #fff;
+  padding: 12px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.ranking-table tbody td {
+  padding: 12px;
+  border-top: 1px solid var(--lp-border);
+  text-align: center;
+}
+
+.ranking-table tbody tr:nth-child(even) td {
+  background: #f8fafc;
+}
+
+.king.-number {
+  position: relative;
+  padding-left: 28px;
+}
+
+.king.king-01::before,
+.king.king-02::before,
+.king.king-03::before {
+  content: "";
+  position: absolute;
+  left: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 18px;
+  height: 18px;
+  background-size: contain;
+  background-repeat: no-repeat;
+}
+
+.king.king-01::before { background-image: url("../../images/icon-king-01.svg"); }
+.king.king-02::before { background-image: url("../../images/icon-king-02.svg"); }
+.king.king-03::before { background-image: url("../../images/icon-king-03.svg"); }
+
+.c-notes-list {
+  margin: 12px 0 0;
+  padding-left: 20px;
+  color: var(--lp-muted);
+}

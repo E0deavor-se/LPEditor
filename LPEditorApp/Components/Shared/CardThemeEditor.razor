@@ -1,0 +1,442 @@
+@using LPEditorApp.Models
+
+<div class="lp-design-editor lp-card-theme">
+    <div class="lp-step-indicator">
+        <div class="lp-step-chip is-active">@ScopeLabel</div>
+        <div class="lp-step-chip">@ScopeNote</div>
+    </div>
+
+    @if (EnableAnimationTab)
+    {
+        <div class="lp-pill-tabs">
+            <button type="button" class="lp-pill @(IsEditorTab("design") ? "is-active" : "")" @onclick='() => SetEditorTab("design")'>デザイン</button>
+            <button type="button" class="lp-pill @(IsEditorTab("animation") ? "is-active" : "")" @onclick='() => SetEditorTab("animation")'>アニメーション</button>
+        </div>
+    }
+
+    @if (!EnableAnimationTab || IsEditorTab("design"))
+    {
+        <div class="frame-preset-panel">
+            <div class="frame-preset-header">
+                <div>
+                    <div class="frame-preset-title">フレームプリセット</div>
+                    <div class="frame-preset-sub">クリックで即適用・編集はそのまま</div>
+                </div>
+                <div class="frame-preset-actions">
+                    <span class="frame-preset-current">現在: @CurrentPresetLabel</span>
+                    <button type="button" class="lp-btn ghost" @onclick="ClearPresetSelection">Customに戻す</button>
+                    <button type="button" class="lp-btn ghost" disabled="@(!CanUndo)" @onclick="UndoPresetAsync">1つ前に戻す</button>
+                    <button type="button" class="lp-btn" @onclick="TogglePresetPanel">@(PresetPanelOpen ? "閉じる" : "開く")</button>
+                </div>
+            </div>
+
+            <div class="frame-preset-rules">
+                <div class="frame-preset-rule">
+                    <span class="frame-preset-rule-label">上書き</span>
+                    <span>背景 / 枠 / 角丸 / 影 / 余白</span>
+                </div>
+                <div class="frame-preset-rule">
+                    <span class="frame-preset-rule-label">維持</span>
+                    <span>フォント / 文字サイズ / 文字色 / 帯画像</span>
+                </div>
+            </div>
+
+            @if (!string.IsNullOrWhiteSpace(PresetLoadError))
+            {
+                <div class="frame-preset-error">@PresetLoadError</div>
+            }
+
+            @if (PresetPanelOpen)
+            {
+                <div class="frame-preset-toolbar">
+                    <input type="text" class="lp-input" placeholder="名前・説明で検索" @bind="PresetSearch" @bind:event="oninput" />
+                    <div class="frame-preset-chips">
+                        <button type="button" class="tab-btn @(IsPresetCategory("all") ? "active" : "")" @onclick='() => SetPresetCategory("all")'>すべて</button>
+                        <button type="button" class="tab-btn @(IsPresetCategory("favorites") ? "active" : "")" @onclick='() => SetPresetCategory("favorites")'>★ お気に入り</button>
+                        @foreach (var category in PresetCategories)
+                        {
+                            <button type="button" class="tab-btn @(IsPresetCategory(category) ? "active" : "")" @onclick='() => SetPresetCategory(category)'>@GetPresetCategoryLabel(category)</button>
+                        }
+                    </div>
+                </div>
+
+                <div class="frame-preset-grid">
+                    @if (FilteredPresets.Count == 0)
+                    {
+                        <div class="frame-preset-empty">条件に一致するプリセットがありません。</div>
+                    }
+                    else
+                    {
+                        @foreach (var preset in FilteredPresets)
+                        {
+                            <div class="frame-preset-item @(IsPresetSelected(preset.Id) ? "is-selected" : "")" @onclick="() => ApplyPresetAsync(preset)">
+                                <div class="frame-preset-preview" data-preset="@preset.Id" style="@GetPresetPreviewStyle(preset)"></div>
+                                <div class="frame-preset-meta">
+                                    <div class="frame-preset-name">@preset.Name</div>
+                                    <div class="frame-preset-desc">@preset.Description</div>
+                                </div>
+                                <button type="button" class="frame-preset-fav @(IsFavorite(preset.Id) ? "is-on" : "")" title="お気に入り" @onclick="() => ToggleFavoriteAsync(preset.Id)" @onclick:stopPropagation>★</button>
+                            </div>
+                        }
+                    }
+                </div>
+            }
+        </div>
+    }
+
+    @if (EnableAnimationTab && IsEditorTab("animation"))
+    {
+        <div class="anim-panel">
+            <div class="anim-panel-header">
+                <div>
+                    <div class="anim-panel-title">アニメーションプリセット</div>
+                    <div class="anim-panel-sub">対象を選んでアニメを適用</div>
+                </div>
+                <div class="anim-panel-actions">
+                    <label class="lp-toggle">
+                        <input type="checkbox" checked="@AnimationPreviewEnabled" @onchange="OnAnimationPreviewToggle" />
+                        <span>アニメON</span>
+                    </label>
+                    <button type="button" class="lp-btn ghost" @onclick="ResetAnimationTarget">リセット</button>
+                </div>
+            </div>
+
+            <div class="anim-panel-row">
+                <div class="lp-form-row">
+                    <label>適用対象</label>
+                    <select class="lp-select" @bind="SelectedAnimTarget" @bind:after="OnAnimTargetChanged">
+                        @foreach (var target in AnimationTargetOptions)
+                        {
+                            <option value="@target.Key">@target.Value</option>
+                        }
+                    </select>
+                </div>
+
+                @if (ShowAnimationScopeToggle)
+                {
+                    <div class="lp-form-row">
+                        <label>適用範囲</label>
+                        <div class="anim-scope-tabs">
+                            <button type="button" class="tab-btn @(AnimationScope == "per" ? "active" : "")" @onclick='() => SetAnimationScope("per")'>このフレームだけ</button>
+                            <button type="button" class="tab-btn @(AnimationScope == "all" ? "active" : "")" @onclick='() => SetAnimationScope("all")'>すべてのフレーム</button>
+                        </div>
+                    </div>
+                }
+            </div>
+
+            <div class="anim-preset-toolbar">
+                <input type="text" class="lp-input" placeholder="名前・用途で検索" @bind="AnimSearch" @bind:event="oninput" />
+                <div class="anim-chip-row">
+                    <button type="button" class="tab-btn @(IsAnimCategory("all") ? "active" : "")" @onclick='() => SetAnimCategory("all")'>すべて</button>
+                    @foreach (var category in AnimCategories)
+                    {
+                        <button type="button" class="tab-btn @(IsAnimCategory(category) ? "active" : "")" @onclick='() => SetAnimCategory(category)'>@GetAnimCategoryLabel(category)</button>
+                    }
+                </div>
+            </div>
+
+            <div class="anim-grid">
+                @if (FilteredAnimPresets.Count == 0)
+                {
+                    <div class="frame-preset-empty">条件に一致するプリセットがありません。</div>
+                }
+                else
+                {
+                    @foreach (var preset in FilteredAnimPresets)
+                    {
+                        <button type="button" class="anim-card @(IsAnimPresetSelected(preset.Id) ? "is-selected" : "")" @onclick="() => ApplyAnimPresetAsync(preset)">
+                            <div class="anim-preview @preset.CssClass" style="@GetAnimPreviewStyle(preset)"></div>
+                            <div class="anim-card-body">
+                                <div class="anim-card-title">@preset.DisplayName</div>
+                                <div class="anim-card-desc">@preset.RecommendedUse</div>
+                            </div>
+                        </button>
+                    }
+                }
+            </div>
+
+            <div class="anim-detail">
+                <div class="lp-form-grid">
+                    <div class="lp-slider-row">
+                        <div class="lp-color-label">Duration</div>
+                        <div class="lp-slider-controls">
+                            <input type="range" class="lp-slider" min="200" max="2400" step="50" @bind="AnimDuration" @bind:event="oninput" @bind:after="OnAnimDetailChanged" />
+                            <input type="number" class="lp-slider-input" @bind="AnimDuration" @bind:event="oninput" @bind:after="OnAnimDetailChanged" />
+                            <span class="lp-slider-unit">ms</span>
+                        </div>
+                    </div>
+
+                    <div class="lp-slider-row">
+                        <div class="lp-color-label">Delay</div>
+                        <div class="lp-slider-controls">
+                            <input type="range" class="lp-slider" min="0" max="2000" step="50" @bind="AnimDelay" @bind:event="oninput" @bind:after="OnAnimDetailChanged" />
+                            <input type="number" class="lp-slider-input" @bind="AnimDelay" @bind:event="oninput" @bind:after="OnAnimDetailChanged" />
+                            <span class="lp-slider-unit">ms</span>
+                        </div>
+                    </div>
+
+                    <div class="lp-form-row">
+                        <label>Easing</label>
+                        <select class="lp-select" @bind="AnimEasing" @bind:after="OnAnimDetailChanged">
+                            @foreach (var option in AnimEasingOptions)
+                            {
+                                <option value="@option.Key">@option.Value</option>
+                            }
+                        </select>
+                    </div>
+
+                    <div class="lp-form-row">
+                        <label>Trigger</label>
+                        <div class="anim-trigger-tabs">
+                            <button type="button" class="tab-btn @(AnimTrigger == "load" ? "active" : "")" @onclick='() => SetAnimTrigger("load")'>onLoad</button>
+                            <button type="button" class="tab-btn @(AnimTrigger == "scroll" ? "active" : "")" @onclick='() => SetAnimTrigger("scroll")'>onScroll</button>
+                            <button type="button" class="tab-btn @(AnimTrigger == "hover" ? "active" : "")" @onclick='() => SetAnimTrigger("hover")'>onHover</button>
+                        </div>
+                    </div>
+
+                    <label class="lp-toggle">
+                        <input type="checkbox" @bind="AnimLoop" @bind:after="OnAnimDetailChanged" />
+                        <span>ループ</span>
+                    </label>
+                </div>
+            </div>
+        </div>
+
+        @if (!string.IsNullOrWhiteSpace(AnimLoadError))
+        {
+            <div class="frame-preset-error">@AnimLoadError</div>
+        }
+    }
+
+    @if (!EnableAnimationTab || IsEditorTab("design"))
+    {
+    <StepCard StepLabel="STEP 1" Title="デザインタイプ" Subtitle="簡易プリセットから開始できます">
+        <div class="lp-option-grid">
+            <button type="button" class="@GetOptionClass(IsType("simple"))" @onclick="@(() => SetType("simple"))">
+                <span class="lp-option-card-icon">S</span>
+                <div>
+                    <div class="lp-option-card-title">シンプル</div>
+                    <div class="lp-option-card-desc">白背景 + 細い枠</div>
+                </div>
+            </button>
+            <button type="button" class="@GetOptionClass(IsType("color"))" @onclick="@(() => SetType("color"))">
+                <span class="lp-option-card-icon">C</span>
+                <div>
+                    <div class="lp-option-card-title">カラー</div>
+                    <div class="lp-option-card-desc">色背景 + 影</div>
+                </div>
+            </button>
+            <button type="button" class="@GetOptionClass(IsType("emphasis"))" @onclick="@(() => SetType("emphasis"))">
+                <span class="lp-option-card-icon">E</span>
+                <div>
+                    <div class="lp-option-card-title">強調</div>
+                    <div class="lp-option-card-desc">太枠 + ヘッダー強調</div>
+                </div>
+            </button>
+        </div>
+    </StepCard>
+
+    <StepCard StepLabel="STEP 2" Title="カード背景" Subtitle="色と透明度を設定します">
+        <div class="lp-form-grid">
+            <div class="lp-color-row">
+                <div class="lp-color-label">背景色</div>
+                <div class="lp-color-controls">
+                    <input type="color" class="lp-color-picker" @bind="Style.BackgroundColor" @bind:event="oninput" @bind:after="() => OnColorChangedAfter(Style.BackgroundColor)" />
+                    <input type="text" class="lp-color-input @(BackgroundColorInvalid ? "lp-field-error" : "")" @bind="Style.BackgroundColor" @bind:event="oninput" @bind:after="() => OnColorChangedAfter(Style.BackgroundColor)" placeholder="#ffffff" />
+                    <div class="lp-color-opacity">
+                        <input type="range" class="lp-color-opacity-range" min="0" max="100" @bind="BackgroundOpacityPercent" @bind:event="oninput" @bind:after="NotifyChanged" />
+                        <span class="lp-color-opacity-value">@BackgroundOpacityPercent%</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="lp-palette-block">
+            <div class="lp-palette-title">おすすめ</div>
+            <div class="lp-color-palette">
+                @foreach (var color in RecommendedColors)
+                {
+                    <button type="button" class="lp-color-swatch" style="@GetSwatchStyle(color)" @onclick="() => ApplyPaletteColor(color)"></button>
+                }
+            </div>
+        </div>
+
+        @if (RecentColors.Count > 0)
+        {
+            <div class="lp-palette-block">
+                <div class="lp-palette-title">最近使った色</div>
+                <div class="lp-color-palette">
+                    @foreach (var color in RecentColors)
+                    {
+                        <button type="button" class="lp-color-swatch" style="@GetSwatchStyle(color)" @onclick="() => ApplyPaletteColor(color)"></button>
+                    }
+                </div>
+            </div>
+        }
+    </StepCard>
+
+    <StepCard StepLabel="STEP 3" Title="枠・角丸・余白" Subtitle="カードの形を整えます">
+        <div class="lp-form-grid">
+            <div class="lp-color-row">
+                <div class="lp-color-label">枠線カラー</div>
+                <div class="lp-color-controls">
+                    <input type="color" class="lp-color-picker" @bind="Style.BorderColor" @bind:event="oninput" @bind:after="() => OnColorChangedAfter(Style.BorderColor)" />
+                    <input type="text" class="lp-color-input @(BorderColorInvalid ? "lp-field-error" : "")" @bind="Style.BorderColor" @bind:event="oninput" @bind:after="() => OnColorChangedAfter(Style.BorderColor)" placeholder="#dc2626" />
+                </div>
+            </div>
+
+            <div class="lp-slider-row">
+                <div class="lp-color-label">枠線太さ</div>
+                <div class="lp-slider-controls">
+                    <input type="range" class="lp-slider" min="0" max="12" @bind="BorderWidth" @bind:event="oninput" @bind:after="NotifyChanged" />
+                    <input type="number" class="lp-slider-input" @bind="BorderWidth" @bind:event="oninput" @bind:after="NotifyChanged" />
+                    <span class="lp-slider-unit">px</span>
+                </div>
+            </div>
+
+            <div class="lp-slider-row">
+                <div class="lp-color-label">角丸</div>
+                <div class="lp-slider-controls">
+                    <input type="range" class="lp-slider" min="0" max="32" @bind="BorderRadius" @bind:event="oninput" @bind:after="NotifyChanged" />
+                    <input type="number" class="lp-slider-input" @bind="BorderRadius" @bind:event="oninput" @bind:after="NotifyChanged" />
+                    <span class="lp-slider-unit">px</span>
+                </div>
+            </div>
+
+            <div class="lp-form-row">
+                <label>余白プリセット</label>
+                <select class="lp-select" @bind="Style.PaddingPreset" @bind:after="OnPaddingPresetChanged">
+                    <option value="compact">コンパクト</option>
+                    <option value="normal">標準</option>
+                    <option value="spacious">ゆったり</option>
+                    <option value="custom">カスタム</option>
+                </select>
+            </div>
+
+            <div class="lp-slider-row">
+                <div class="lp-color-label">内側 横</div>
+                <div class="lp-slider-controls">
+                    <input type="range" class="lp-slider" min="0" max="48" @bind="PaddingX" @bind:event="oninput" @bind:after="NotifyChanged" />
+                    <input type="number" class="lp-slider-input" @bind="PaddingX" @bind:event="oninput" @bind:after="NotifyChanged" />
+                    <span class="lp-slider-unit">px</span>
+                </div>
+            </div>
+
+            <div class="lp-slider-row">
+                <div class="lp-color-label">内側 縦</div>
+                <div class="lp-slider-controls">
+                    <input type="range" class="lp-slider" min="0" max="48" @bind="PaddingY" @bind:event="oninput" @bind:after="NotifyChanged" />
+                    <input type="number" class="lp-slider-input" @bind="PaddingY" @bind:event="oninput" @bind:after="NotifyChanged" />
+                    <span class="lp-slider-unit">px</span>
+                </div>
+            </div>
+
+            <div class="lp-form-row">
+                <div class="lp-color-label">影</div>
+                <div class="lp-chip-group">
+                    @foreach (var option in ShadowOptions)
+                    {
+                        <button type="button" class="@GetChipClass(IsShadow(option.Key))" @onclick="() => SetShadow(option.Key)">@option.Value</button>
+                    }
+                </div>
+            </div>
+
+            <div class="lp-slider-row">
+                <div class="lp-color-label">最大幅</div>
+                <div class="lp-slider-controls">
+                    <input type="range" class="lp-slider" min="520" max="900" step="10" @bind="MaxWidthPx" @bind:event="oninput" @bind:after="NotifyChanged" />
+                    <input type="number" class="lp-slider-input" @bind="MaxWidthPx" @bind:event="oninput" @bind:after="NotifyChanged" />
+                    <span class="lp-slider-unit">px</span>
+                </div>
+            </div>
+
+            <label class="lp-toggle">
+                <input type="checkbox" @bind="Style.Centered" @bind:after="NotifyChanged" />
+                <span>中央寄せ</span>
+            </label>
+        </div>
+    </StepCard>
+
+    <StepCard StepLabel="STEP 4" Title="ヘッダー帯" Subtitle="見出し帯の色・高さを調整します">
+        <div class="lp-form-grid">
+            <div class="lp-color-row">
+                <div class="lp-color-label">背景色</div>
+                <div class="lp-color-controls">
+                    <input type="color" class="lp-color-picker" @bind="Style.HeaderBackgroundColor" @bind:event="oninput" @bind:after="() => OnBandColorChangedAfter(Style.HeaderBackgroundColor)" />
+                    <input type="text" class="lp-color-input @(HeaderBackgroundInvalid ? "lp-field-error" : "")" @bind="Style.HeaderBackgroundColor" @bind:event="oninput" @bind:after="() => OnBandColorChangedAfter(Style.HeaderBackgroundColor)" placeholder="#dc2626" />
+                </div>
+            </div>
+
+            <div class="lp-color-row">
+                <div class="lp-color-label">文字色</div>
+                <div class="lp-color-controls">
+                    <input type="color" class="lp-color-picker" @bind="Style.HeaderTextColor" @bind:event="oninput" @bind:after="() => OnBandColorChangedAfter(Style.HeaderTextColor)" />
+                    <input type="text" class="lp-color-input @(HeaderTextInvalid ? "lp-field-error" : "")" @bind="Style.HeaderTextColor" @bind:event="oninput" @bind:after="() => OnBandColorChangedAfter(Style.HeaderTextColor)" placeholder="#ffffff" />
+                </div>
+            </div>
+
+            <div class="lp-slider-row">
+                <div class="lp-color-label">高さ</div>
+                <div class="lp-slider-controls">
+                    <input type="range" class="lp-slider" min="28" max="80" @bind="HeaderHeightPx" @bind:event="oninput" @bind:after="NotifyBandChanged" />
+                    <input type="number" class="lp-slider-input" @bind="HeaderHeightPx" @bind:event="oninput" @bind:after="NotifyBandChanged" />
+                    <span class="lp-slider-unit">px</span>
+                </div>
+            </div>
+
+            <label class="lp-toggle">
+                <input type="checkbox" @bind="Style.HeaderRadiusTop" @bind:after="NotifyBandChanged" />
+                <span>上だけ角丸</span>
+            </label>
+        </div>
+    </StepCard>
+
+    <StepCard StepLabel="STEP 5" Title="タイトル・本文の文字" Subtitle="サイズやフォントを整えます">
+        <div class="lp-form-grid">
+            <div class="lp-slider-row">
+                <div class="lp-color-label">タイトル文字サイズ</div>
+                <div class="lp-slider-controls">
+                    <input type="range" class="lp-slider" min="12" max="36" @bind="HeaderFontSizePx" @bind:event="oninput" @bind:after="NotifyBandChanged" />
+                    <input type="number" class="lp-slider-input" @bind="HeaderFontSizePx" @bind:event="oninput" @bind:after="NotifyBandChanged" />
+                    <span class="lp-slider-unit">px</span>
+                </div>
+            </div>
+
+            <div class="lp-form-row">
+                <label>タイトルフォント</label>
+                <select class="lp-select" @bind="Style.HeaderFontFamily" @bind:after="NotifyBandChanged">
+                    <option value="">継承（テンプレート）</option>
+                    @foreach (var font in FontOptions)
+                    {
+                        <option value="@font.Value">@font.Label</option>
+                    }
+                </select>
+            </div>
+
+            <div class="lp-slider-row">
+                <div class="lp-color-label">本文文字サイズ</div>
+                <div class="lp-slider-controls">
+                    <input type="range" class="lp-slider" min="12" max="28" @bind="BodyFontSizePx" @bind:event="oninput" @bind:after="NotifyChanged" />
+                    <input type="number" class="lp-slider-input" @bind="BodyFontSizePx" @bind:event="oninput" @bind:after="NotifyChanged" />
+                    <span class="lp-slider-unit">px</span>
+                </div>
+            </div>
+
+            <div class="lp-form-row">
+                <label>本文フォント</label>
+                <select class="lp-select" @bind="Style.BodyFontFamily" @bind:after="NotifyChanged">
+                    <option value="">継承（テンプレート）</option>
+                    @foreach (var font in FontOptions)
+                    {
+                        <option value="@font.Value">@font.Label</option>
+                    }
+                </select>
+            </div>
+        </div>
+    </StepCard>
+
+    <div class="lp-step-actions">
+        <button type="button" class="lp-btn ghost" @onclick="OnReset">このカードテーマをリセット</button>
+    </div>
+    }
+</div>

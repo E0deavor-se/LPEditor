@@ -1,0 +1,53 @@
+<div class="lp-slider-row">
+    <label class="lp-slider-label">@Label</label>
+    <div class="lp-slider-controls">
+        <input class="lp-slider" type="range" min="@Min" max="@Max" step="@Step" value="@ValueText" @oninput="OnSliderChanged" />
+        <input class="lp-slider-input" value="@ValueText" @oninput="OnInputChanged" />
+        <span class="lp-slider-unit">@Unit</span>
+    </div>
+    @if (!IsValid)
+    {
+        <div class="lp-field-error">@ErrorText</div>
+    }
+</div>
+
+@code {
+    [Parameter] public string Label { get; set; } = string.Empty;
+    [Parameter] public int Min { get; set; }
+    [Parameter] public int Max { get; set; } = 100;
+    [Parameter] public int Step { get; set; } = 1;
+    [Parameter] public int? Value { get; set; }
+    [Parameter] public string Unit { get; set; } = "px";
+    [Parameter] public EventCallback<int?> ValueChanged { get; set; }
+
+    private bool IsValid { get; set; } = true;
+    private string ErrorText { get; set; } = string.Empty;
+
+    private string ValueText => (Value ?? Min).ToString();
+
+    private async Task OnSliderChanged(ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out var value))
+        {
+            var clamped = Math.Max(Min, Math.Min(Max, value));
+            IsValid = true;
+            ErrorText = string.Empty;
+            await ValueChanged.InvokeAsync(clamped);
+        }
+    }
+
+    private async Task OnInputChanged(ChangeEventArgs e)
+    {
+        if (!int.TryParse(e.Value?.ToString(), out var value))
+        {
+            IsValid = false;
+            ErrorText = $"{Min}〜{Max} の数値で入力してください。";
+            return;
+        }
+
+        var clamped = Math.Max(Min, Math.Min(Max, value));
+        IsValid = true;
+        ErrorText = string.Empty;
+        await ValueChanged.InvokeAsync(clamped);
+    }
+}

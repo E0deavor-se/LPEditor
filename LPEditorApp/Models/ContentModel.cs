@@ -26,7 +26,7 @@ public class CampaignModel
     public bool ShowCountdown { get; set; } = true;
 
     [JsonPropertyName("endedMessage")]
-    public string EndedMessage { get; set; } = "キャンペーン終了しました";
+    public string EndedMessage { get; set; } = "";
 
     [JsonPropertyName("footerFontFamily")]
     public string? FooterFontFamily { get; set; }
@@ -311,6 +311,168 @@ public class CouponPeriodModel
     public string? TextAlign { get; set; }
 }
 
+public class CouponFlowSlideModel
+{
+    [JsonPropertyName("image")]
+    public string Image { get; set; } = string.Empty;
+
+    [JsonPropertyName("alt")]
+    public string Alt { get; set; } = string.Empty;
+}
+
+public class CouponFlowSectionModel
+{
+    [JsonPropertyName("enabled")]
+    public bool Enabled { get; set; }
+
+    [JsonPropertyName("title")]
+    public string Title { get; set; } = "クーポン利用の流れ";
+
+    [JsonPropertyName("lead")]
+    public string Lead { get; set; } = "＊必ずクーポンを獲得してからau PAY（コード支払い）でお支払いください。";
+
+    [JsonPropertyName("slides")]
+    public List<CouponFlowSlideModel> Slides { get; set; } = new();
+
+    [JsonPropertyName("note")]
+    public string Note { get; set; } = "※画面はイメージです。";
+
+    [JsonPropertyName("buttonLabel")]
+    public string ButtonLabel { get; set; } = "クーポンを獲得する";
+
+    [JsonPropertyName("buttonUrl")]
+    public string ButtonUrl { get; set; } = string.Empty;
+
+    [JsonPropertyName("items")]
+    public List<TextItemModel> Items { get; set; } = new();
+
+    [JsonPropertyName("fontFamily")]
+    public string? FontFamily { get; set; }
+
+    [JsonPropertyName("textAlign")]
+    public string? TextAlign { get; set; }
+}
+
+public enum StickyBlockType
+{
+    RichText,
+    Image,
+    ImageWithCaption,
+    Divider
+}
+
+public class StickyBlockModel
+{
+    [JsonPropertyName("type")]
+    [JsonConverter(typeof(JsonStringEnumConverter))]
+    public StickyBlockType Type { get; set; } = StickyBlockType.RichText;
+
+    [JsonPropertyName("richTextHtml")]
+    public string RichTextHtml { get; set; } = string.Empty;
+
+    [JsonPropertyName("imageSrc")]
+    public string ImageSrc { get; set; } = string.Empty;
+
+    [JsonPropertyName("caption")]
+    public string Caption { get; set; } = string.Empty;
+}
+
+public class StickyTabModel
+{
+    [JsonPropertyName("title")]
+    public string Title { get; set; } = string.Empty;
+
+    [JsonPropertyName("color")]
+    public string Color { get; set; } = string.Empty;
+
+    [JsonPropertyName("textColor")]
+    public string TextColor { get; set; } = string.Empty;
+
+    [JsonPropertyName("contentBlocks")]
+    public List<StickyBlockModel> ContentBlocks { get; set; } = new();
+}
+
+public class StickyTabsSectionModel
+{
+    [JsonPropertyName("enabled")]
+    public bool Enabled { get; set; }
+
+    [JsonPropertyName("tabs")]
+    public List<StickyTabModel> Tabs { get; set; } = new();
+
+    [JsonPropertyName("fontFamily")]
+    public string? FontFamily { get; set; }
+
+    [JsonPropertyName("textAlign")]
+    public string? TextAlign { get; set; }
+}
+
+public class PaymentHistorySectionModel
+{
+    [JsonPropertyName("enabled")]
+    public bool Enabled { get; set; }
+
+    [JsonPropertyName("titleImage")]
+    public string TitleImage { get; set; } = "images/title-cp06.png";
+
+    [JsonPropertyName("titleText")]
+    public string TitleText { get; set; } = "決済履歴の確認方法";
+
+    [JsonPropertyName("titleAlt")]
+    public string TitleAlt { get; set; } = "決済履歴の確認方法";
+
+    [JsonPropertyName("titleFontSize")]
+    public int? TitleFontSize { get; set; } = 28;
+
+    [JsonPropertyName("titleColor")]
+    public string? TitleColor { get; set; } = "#ffffff";
+
+    [JsonPropertyName("titleBold")]
+    public bool TitleBold { get; set; } = true;
+
+    [JsonPropertyName("text")]
+    public string Text { get; set; } = "現在の決済金額については、au PAY アプリ内の「取引履歴」をご確認ください。<br class=\"_view-md-high\">取引履歴の確認方法については<a href=\"#contact\">こちら</a>までお問い合わせください。";
+
+    [JsonPropertyName("textFontSize")]
+    public int? TextFontSize { get; set; } = 22;
+
+    [JsonPropertyName("textColor")]
+    public string? TextColor { get; set; }
+
+    [JsonPropertyName("textBold")]
+    public bool TextBold { get; set; } = true;
+
+    [JsonPropertyName("importantText")]
+    public string ImportantText { get; set; } = "なお、店頭や問い合わせ窓口での現在の順位や金額、<br class=\"_view-md-high\">当選結果についてのご質問にはお答えできません。";
+
+    [JsonPropertyName("importantFontSize")]
+    public int? ImportantFontSize { get; set; } = 22;
+
+    [JsonPropertyName("importantColor")]
+    public string? ImportantColor { get; set; } = "#BF1D20";
+
+    [JsonPropertyName("importantBold")]
+    public bool ImportantBold { get; set; } = true;
+
+    [JsonPropertyName("image")]
+    public string Image { get; set; } = "images/img-02.png";
+
+    [JsonPropertyName("imageAlt")]
+    public string ImageAlt { get; set; } = "スマートフォン画像";
+
+    [JsonPropertyName("decoImage")]
+    public string DecoImage { get; set; } = "images/deco-06.png";
+
+    [JsonPropertyName("decoAlt")]
+    public string DecoAlt { get; set; } = string.Empty;
+
+    [JsonPropertyName("fontFamily")]
+    public string? FontFamily { get; set; }
+
+    [JsonPropertyName("textAlign")]
+    public string? TextAlign { get; set; }
+}
+
 public class StoreSearchModel
 {
     [JsonPropertyName("enabled")]
@@ -460,6 +622,18 @@ public class RankingTextItemModel
     public bool Visible { get; set; } = true;
 }
 
+public class RankingDecorImageModel
+{
+    [JsonPropertyName("src")]
+    public string Src { get; set; } = string.Empty;
+
+    [JsonPropertyName("alt")]
+    public string Alt { get; set; } = string.Empty;
+
+    [JsonPropertyName("visible")]
+    public bool Visible { get; set; } = true;
+}
+
 public partial class RankingSectionModel
 {
     [JsonPropertyName("enabled")]
@@ -470,6 +644,9 @@ public partial class RankingSectionModel
 
     [JsonPropertyName("subtitle")]
     public string Subtitle { get; set; } = string.Empty;
+
+    [JsonPropertyName("campaignName")]
+    public string CampaignName { get; set; } = string.Empty;
 
     [JsonPropertyName("titleLines")]
     public List<StyledTextItem> TitleLines { get; set; } = new();
@@ -488,6 +665,12 @@ public partial class RankingSectionModel
 
     [JsonPropertyName("imageRight")]
     public string ImageRight { get; set; } = "images/ranking-right.png";
+
+    [JsonPropertyName("leftTopImage")]
+    public RankingDecorImageModel LeftTopImage { get; set; } = new();
+
+    [JsonPropertyName("rightTopImage")]
+    public RankingDecorImageModel RightTopImage { get; set; } = new();
 
     [JsonPropertyName("rankLabel")]
     public string RankLabel { get; set; } = "順位";
@@ -798,6 +981,9 @@ public class SectionGroupModel
     [JsonPropertyName("key")]
     public string Key { get; set; } = string.Empty;
 
+    [JsonPropertyName("displayName")]
+    public string? DisplayName { get; set; }
+
     [JsonPropertyName("enabled")]
     public bool Enabled { get; set; } = true;
 }
@@ -810,11 +996,20 @@ public class SectionsModel
     [JsonPropertyName("couponPeriod")]
     public CouponPeriodModel CouponPeriod { get; set; } = new();
 
+    [JsonPropertyName("couponFlow")]
+    public CouponFlowSectionModel CouponFlow { get; set; } = new();
+
+    [JsonPropertyName("stickyTabs")]
+    public StickyTabsSectionModel StickyTabs { get; set; } = new();
+
     [JsonPropertyName("storeSearch")]
     public StoreSearchModel StoreSearch { get; set; } = new();
 
     [JsonPropertyName("couponNotes")]
     public CouponNotesModel CouponNotes { get; set; } = new();
+
+    [JsonPropertyName("paymentHistory")]
+    public PaymentHistorySectionModel PaymentHistory { get; set; } = new();
 
     [JsonPropertyName("ranking")]
     public RankingSectionModel Ranking { get; set; } = new();
@@ -835,7 +1030,7 @@ public class ContentModel
     public string TemplateId { get; set; } = "coupon_lp_0122";
 
     [JsonPropertyName("sectionsOrder")]
-    public List<string> SectionsOrder { get; set; } = new() { "campaignContent", "couponPeriod", "storeSearch", "couponNotes", "ranking", "countdown" };
+    public List<string> SectionsOrder { get; set; } = new() { "campaignContent", "couponPeriod", "storeSearch", "couponFlow", "couponNotes", "stickyTabs", "ranking", "paymentHistory", "countdown" };
 
     [JsonPropertyName("sectionGroups")]
     public List<SectionGroupModel> SectionGroups { get; set; } = new();
@@ -863,6 +1058,15 @@ public class ContentModel
 
     [JsonPropertyName("campaignStyle")]
     public CampaignStyleModel CampaignStyle { get; set; } = new();
+
+    [JsonPropertyName("cardThemeStyle")]
+    public FrameStyle CardThemeStyle { get; set; } = new();
+
+    [JsonPropertyName("frameDefaultStyle")]
+    public FrameStyle? FrameDefaultStyle { get; set; }
+
+    [JsonPropertyName("animationPreviewEnabled")]
+    public bool AnimationPreviewEnabled { get; set; } = true;
 
     [JsonPropertyName("lpBackground")]
     public LpBackgroundModel LpBackground { get; set; } = new();

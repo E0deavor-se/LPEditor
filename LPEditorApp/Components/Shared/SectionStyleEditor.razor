@@ -1,0 +1,49 @@
+@using LPEditorApp.Models
+
+<UiPanel Title="枠・角丸・影">
+    <div class="ui-grid">
+        <UiRow Label="枠色">
+            <UiColorSwatch Value="Style.BorderColor" ValueChanged="OnBorderColorChanged" />
+        </UiRow>
+        <UiRow Label="枠幅">
+            <UiSelect TValue="int?" Value="Style.BorderWidth" OnChanged="Notify">
+                <option value="">なし</option>
+                <option value="1">1px</option>
+                <option value="2">2px</option>
+                <option value="3">3px</option>
+                <option value="4">4px</option>
+            </UiSelect>
+        </UiRow>
+        <UiRow Label="角丸">
+            <input type="number" class="text" @bind-value="Style.Radius" @bind-value:event="oninput" @bind-value:after="Notify" />
+        </UiRow>
+        <UiRow Label="影">
+            <UiSelect TValue="string" Value="Style.Shadow" OnChanged="Notify">
+                <option value="">なし</option>
+                <option value="sm">弱</option>
+                <option value="md">中</option>
+                <option value="lg">強</option>
+            </UiSelect>
+        </UiRow>
+    </div>
+</UiPanel>
+
+@code {
+    [Parameter] public SectionStyleModel Style { get; set; } = new();
+    [Parameter] public EventCallback OnChanged { get; set; }
+
+    private Task Notify()
+    {
+        Style.PaddingTop = Style.Layout.PaddingTop;
+        Style.PaddingRight = Style.Layout.PaddingRight;
+        Style.PaddingBottom = Style.Layout.PaddingBottom;
+        Style.PaddingLeft = Style.Layout.PaddingLeft;
+        return OnChanged.InvokeAsync();
+    }
+
+    private async Task OnBorderColorChanged(string? value)
+    {
+        Style.BorderColor = value ?? string.Empty;
+        await Notify();
+    }
+}

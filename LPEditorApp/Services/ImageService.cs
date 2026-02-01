@@ -1,10 +1,5 @@
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.Formats;
-using SixLabors.ImageSharp.Formats.Png;
-using SixLabors.ImageSharp.Processing;
 using LPEditorApp.Utils;
 using ILogger = LPEditorApp.Utils.ILogger;
-using AppImageProcessingException = LPEditorApp.Utils.ImageProcessingException;
 
 namespace LPEditorApp.Services;
 
@@ -19,37 +14,9 @@ public class ImageService
 
     public async Task<byte[]> ResizePngAsync(byte[] input, int maxWidth)
     {
-        try
-        {
-            using var inputStream = new MemoryStream(input);
-            using var image = await Image.LoadAsync(inputStream);
-
-            if (image.Width > maxWidth)
-            {
-                var resizeOptions = new ResizeOptions
-                {
-                    Mode = ResizeMode.Max,
-                    Size = new Size(maxWidth, 0)
-                };
-
-                image.Mutate(x => x.Resize(resizeOptions));
-            }
-
-            var encoder = new PngEncoder
-            {
-                CompressionLevel = PngCompressionLevel.Level6,
-                FilterMethod = PngFilterMethod.Adaptive
-            };
-
-            using var ms = new MemoryStream();
-            await image.SaveAsync(ms, encoder);
-            return ms.ToArray();
-        }
-        catch (Exception ex)
-        {
-            _logger.Error($"PNG処理に失敗: {ex.Message}");
-            throw new AppImageProcessingException("PNGのリサイズに失敗しました", ex);
-        }
+        await Task.CompletedTask;
+        _logger.Warn("画像加工は無効化されています。元画像をそのまま使用します。");
+        return input;
     }
 
     public ImageMeta GetImageInfo(byte[] input, string? path = null)
@@ -104,23 +71,12 @@ public class ImageService
                 };
             }
 
-            using var inputStream = new MemoryStream(input);
-            var format = Image.DetectFormat(inputStream);
-            inputStream.Position = 0;
-            var imageInfo = Image.Identify(inputStream);
-            if (imageInfo is null)
-            {
-                throw new InvalidOperationException("画像情報を取得できませんでした");
-            }
-
             return new ImageMeta
             {
-                Width = imageInfo.Width,
-                Height = imageInfo.Height,
+                Width = 0,
+                Height = 0,
                 Bytes = input.LongLength,
-                Format = !string.IsNullOrWhiteSpace(format?.Name)
-                    ? format.Name
-                    : (Path.GetExtension(path ?? string.Empty).TrimStart('.').ToUpperInvariant())
+                Format = Path.GetExtension(path ?? string.Empty).TrimStart('.').ToUpperInvariant()
             };
         }
         catch (Exception ex)

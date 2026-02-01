@@ -1,0 +1,34 @@
+@using LPEditorApp.Models
+
+<UiPanel Title="レイアウト">
+    <div class="ui-grid">
+        <UiRow Label="上余白">
+            <input class="text" type="number" @bind-value="Layout.PaddingTop" @bind-value:event="oninput" @bind-value:after="Notify" />
+        </UiRow>
+        <UiRow Label="右余白">
+            <input class="text" type="number" @bind-value="Layout.PaddingRight" @bind-value:event="oninput" @bind-value:after="Notify" />
+        </UiRow>
+        <UiRow Label="下余白">
+            <input class="text" type="number" @bind-value="Layout.PaddingBottom" @bind-value:event="oninput" @bind-value:after="Notify" />
+        </UiRow>
+        <UiRow Label="左余白">
+            <input class="text" type="number" @bind-value="Layout.PaddingLeft" @bind-value:event="oninput" @bind-value:after="Notify" />
+        </UiRow>
+        <UiRow Label="ギャップ">
+            <input class="text" type="number" @bind-value="Layout.Gap" @bind-value:event="oninput" @bind-value:after="Notify" />
+        </UiRow>
+        <UiRow Label="最大幅">
+            <input class="text" type="number" @bind-value="Layout.MaxWidth" @bind-value:event="oninput" @bind-value:after="Notify" />
+        </UiRow>
+    </div>
+</UiPanel>
+
+@code {
+    [Parameter] public SectionLayoutSettings Layout { get; set; } = new();
+    [Parameter] public EventCallback OnChanged { get; set; }
+
+    private Task Notify()
+    {
+        return OnChanged.InvokeAsync();
+    }
+}

@@ -1,45 +1,182 @@
 [
   {
-    "key": "universal",
-    "label": "黄×白×薄ドット（汎用）",
-    "description": "読みやすい明るめ",
-    "pageBackground": {
-      "color": "#fffdf2",
-      "imageUrl": "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24'><circle cx='6' cy='6' r='2' fill='%23f1c75b' fill-opacity='0.35'/><circle cx='18' cy='18' r='2' fill='%23f1c75b' fill-opacity='0.35'/></svg>",
-      "repeat": "repeat",
-      "position": "center top",
-      "size": "custom",
-      "sizeCustom": "24px 24px",
-      "attachment": "scroll",
-      "transparentSections": false
-    }
+    "id": "paper-grid-1",
+    "name": "方眼紙（細）",
+    "category": "paper",
+    "description": "読みやすい基本の紙面",
+    "cssClass": "bg--paper-grid-1",
+    "defaults": { "base": "#f8fafc", "accent": "#cbd5f5", "opacity": 1, "scale": 1 },
+    "recommendedUse": "情報量多め"
   },
   {
-    "key": "luxury",
-    "label": "赤×金（豪華）",
-    "description": "高級感のある配色",
-    "pageBackground": {
-      "color": "#7a0d12",
-      "imageUrl": "",
-      "repeat": "no-repeat",
-      "position": "center top",
-      "size": "cover",
-      "attachment": "scroll",
-      "transparentSections": false
-    }
+    "id": "paper-grid-2",
+    "name": "方眼紙（太）",
+    "category": "paper",
+    "description": "メリハリのある罫線",
+    "cssClass": "bg--paper-grid-2",
+    "defaults": { "base": "#fefefe", "accent": "#d6d3ff", "opacity": 0.9, "scale": 1 },
+    "recommendedUse": "整理された印象"
   },
   {
-    "key": "cool",
-    "label": "青×白（クール）",
-    "description": "爽やかなブルー",
-    "pageBackground": {
-      "color": "#e8f1ff",
-      "imageUrl": "",
-      "repeat": "repeat",
-      "position": "center top",
-      "size": "cover",
-      "attachment": "scroll",
-      "transparentSections": false
-    }
+    "id": "paper-cross",
+    "name": "クロスガイド",
+    "category": "paper",
+    "description": "細い十字が繰り返される",
+    "cssClass": "bg--paper-cross",
+    "defaults": { "base": "#f9fafb", "accent": "#c7d2fe", "opacity": 0.9, "scale": 1 },
+    "recommendedUse": "資料風"
+  },
+  {
+    "id": "dot-soft",
+    "name": "ソフトドット",
+    "category": "dot",
+    "description": "やわらかな粒感",
+    "cssClass": "bg--dot-soft",
+    "defaults": { "base": "#f8fafc", "accent": "#94a3b8", "opacity": 0.7, "scale": 1 },
+    "recommendedUse": "ナチュラル"
+  },
+  {
+    "id": "dot-polka",
+    "name": "ポルカドット",
+    "category": "dot",
+    "description": "可愛らしいドット",
+    "cssClass": "bg--dot-polka",
+    "defaults": { "base": "#fff7ed", "accent": "#fb923c", "opacity": 0.85, "scale": 1 },
+    "recommendedUse": "かわいい"
+  },
+  {
+    "id": "stripe-thin",
+    "name": "ストライプ（細）",
+    "category": "stripe",
+    "description": "控えめな縞模様",
+    "cssClass": "bg--stripe-thin",
+    "defaults": { "base": "#f8fafc", "accent": "#e2e8f0", "opacity": 0.9, "scale": 1 },
+    "recommendedUse": "シンプル"
+  },
+  {
+    "id": "stripe-bold",
+    "name": "ストライプ（太）",
+    "category": "stripe",
+    "description": "存在感のある縞",
+    "cssClass": "bg--stripe-bold",
+    "defaults": { "base": "#f0f9ff", "accent": "#38bdf8", "opacity": 0.9, "scale": 1 },
+    "recommendedUse": "爽やか"
+  },
+  {
+    "id": "diagonal-1",
+    "name": "斜めストライプ 1",
+    "category": "stripe",
+    "description": "微細な斜めライン",
+    "cssClass": "bg--diagonal-1",
+    "defaults": { "base": "#f8fafc", "accent": "#94a3b8", "opacity": 0.85, "scale": 1 },
+    "recommendedUse": "落ち着き"
+  },
+  {
+    "id": "diagonal-2",
+    "name": "斜めストライプ 2",
+    "category": "stripe",
+    "description": "太さ違いの斜めライン",
+    "cssClass": "bg--diagonal-2",
+    "defaults": { "base": "#fdf2f8", "accent": "#f472b6", "opacity": 0.8, "scale": 1 },
+    "recommendedUse": "華やか"
+  },
+  {
+    "id": "diagonal-3",
+    "name": "斜めストライプ 3",
+    "category": "stripe",
+    "description": "高コントラストの斜線",
+    "cssClass": "bg--diagonal-3",
+    "defaults": { "base": "#ecfeff", "accent": "#22d3ee", "opacity": 0.85, "scale": 1 },
+    "recommendedUse": "清涼感"
+  },
+  {
+    "id": "zigzag",
+    "name": "ジグザグ",
+    "category": "geometric",
+    "description": "連続するジグザグ",
+    "cssClass": "bg--zigzag",
+    "defaults": { "base": "#f8fafc", "accent": "#64748b", "opacity": 0.85, "scale": 1 },
+    "recommendedUse": "アクティブ"
+  },
+  {
+    "id": "zigzag-3d",
+    "name": "ジグザグ 3D",
+    "category": "geometric",
+    "description": "立体感のあるジグザグ",
+    "cssClass": "bg--zigzag-3d",
+    "defaults": { "base": "#f8fafc", "accent": "#94a3b8", "opacity": 0.8, "scale": 1 },
+    "recommendedUse": "動き"
+  },
+  {
+    "id": "rhombus",
+    "name": "ひし形",
+    "category": "geometric",
+    "description": "ひし形が連なる",
+    "cssClass": "bg--rhombus",
+    "defaults": { "base": "#fefce8", "accent": "#facc15", "opacity": 0.85, "scale": 1 },
+    "recommendedUse": "個性"
+  },
+  {
+    "id": "triangle",
+    "name": "トライアングル",
+    "category": "geometric",
+    "description": "三角形の連続パターン",
+    "cssClass": "bg--triangle",
+    "defaults": { "base": "#f0fdf4", "accent": "#34d399", "opacity": 0.8, "scale": 1 },
+    "recommendedUse": "フレッシュ"
+  },
+  {
+    "id": "isometric",
+    "name": "アイソメ",
+    "category": "geometric",
+    "description": "立方体を想起させる",
+    "cssClass": "bg--isometric",
+    "defaults": { "base": "#f1f5f9", "accent": "#94a3b8", "opacity": 0.75, "scale": 1 },
+    "recommendedUse": "テック"
+  },
+  {
+    "id": "wave",
+    "name": "ウェーブ",
+    "category": "fancy",
+    "description": "流れる波形",
+    "cssClass": "bg--wave",
+    "defaults": { "base": "#ecfeff", "accent": "#0ea5e9", "opacity": 0.8, "scale": 1 },
+    "recommendedUse": "リラックス"
+  },
+  {
+    "id": "moon",
+    "name": "ムーン",
+    "category": "fancy",
+    "description": "半月を散りばめる",
+    "cssClass": "bg--moon",
+    "defaults": { "base": "#f5f3ff", "accent": "#a78bfa", "opacity": 0.8, "scale": 1 },
+    "recommendedUse": "やさしい"
+  },
+  {
+    "id": "circle",
+    "name": "サークル",
+    "category": "fancy",
+    "description": "円形の連続パターン",
+    "cssClass": "bg--circle",
+    "defaults": { "base": "#fff7ed", "accent": "#fb923c", "opacity": 0.75, "scale": 1 },
+    "recommendedUse": "ポップ"
+  },
+  {
+    "id": "box",
+    "name": "ボックス",
+    "category": "minimal",
+    "description": "角丸ボックスが整列",
+    "cssClass": "bg--box",
+    "defaults": { "base": "#f8fafc", "accent": "#cbd5f5", "opacity": 0.9, "scale": 1 },
+    "recommendedUse": "クリーン"
+  },
+  {
+    "id": "cross",
+    "name": "クロス",
+    "category": "minimal",
+    "description": "小さなクロスが点在",
+    "cssClass": "bg--cross",
+    "defaults": { "base": "#f8fafc", "accent": "#94a3b8", "opacity": 0.8, "scale": 1 },
+    "recommendedUse": "ミニマル"
   }
 ]

@@ -1,0 +1,61 @@
+<div class="sectionNav">
+    <div class="sectionNav__controls">
+        <div class="sectionNav__search">
+            <span class="sectionNav__icon" aria-hidden="true">🔍</span>
+            <input class="text sectionNav__input" placeholder="セクションを検索" value="@Search" @oninput="OnSearchInput" />
+        </div>
+        <div class="sectionNav__filters">
+            <div class="sectionNav__segmented">
+                <button type="button" class="sectionNav__segBtn @(VisibilityFilter == "all" ? "is-active" : "")" @onclick='() => SetVisibilityFilter("all")'>すべて</button>
+                <button type="button" class="sectionNav__segBtn @(VisibilityFilter == "visible" ? "is-active" : "")" @onclick='() => SetVisibilityFilter("visible")'>表示中</button>
+                <button type="button" class="sectionNav__segBtn @(VisibilityFilter == "hidden" ? "is-active" : "")" @onclick='() => SetVisibilityFilter("hidden")'>非表示</button>
+            </div>
+            <select class="sectionNav__select" value="@TypeFilter" @onchange="OnTypeChanged">
+                <option value="all">種類: すべて</option>
+                @foreach (var option in TypeOptions)
+                {
+                    <option value="@option.Key">@option.Value</option>
+                }
+            </select>
+            <label class="sectionNav__follow">
+                <input type="checkbox" checked="@FollowActive" @onchange="OnFollowChanged" />
+                <span>現在位置を追従</span>
+            </label>
+        </div>
+    </div>
+
+    <div class="sectionNav__body">
+        <MiniMap Sections="MiniMapSections" ActiveId="ActiveId" OnSelect="OnMiniMapSelect" />
+        <div id="sectionList" class="sectionNav__list">
+            @ChildContent
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter] public string Search { get; set; } = string.Empty;
+    [Parameter] public EventCallback<string> SearchChanged { get; set; }
+    [Parameter] public string VisibilityFilter { get; set; } = "all";
+    [Parameter] public EventCallback<string> VisibilityFilterChanged { get; set; }
+    [Parameter] public string TypeFilter { get; set; } = "all";
+    [Parameter] public EventCallback<string> TypeFilterChanged { get; set; }
+    [Parameter] public IReadOnlyList<KeyValuePair<string, string>> TypeOptions { get; set; } = Array.Empty<KeyValuePair<string, string>>();
+    [Parameter] public IReadOnlyList<MiniMap.MiniMapSection> MiniMapSections { get; set; } = Array.Empty<MiniMap.MiniMapSection>();
+    [Parameter] public string ActiveId { get; set; } = string.Empty;
+    [Parameter] public EventCallback<string> OnMiniMapSelect { get; set; }
+    [Parameter] public bool FollowActive { get; set; }
+    [Parameter] public EventCallback<bool> FollowActiveChanged { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+
+    private Task OnSearchInput(ChangeEventArgs e)
+        => SearchChanged.InvokeAsync(e.Value?.ToString() ?? string.Empty);
+
+    private Task OnTypeChanged(ChangeEventArgs e)
+        => TypeFilterChanged.InvokeAsync(e.Value?.ToString() ?? "all");
+
+    private Task SetVisibilityFilter(string value)
+        => VisibilityFilterChanged.InvokeAsync(value);
+
+    private Task OnFollowChanged(ChangeEventArgs e)
+        => FollowActiveChanged.InvokeAsync(e?.Value is bool isOn ? isOn : bool.TryParse(e?.Value?.ToString(), out var parsed) && parsed);
+}

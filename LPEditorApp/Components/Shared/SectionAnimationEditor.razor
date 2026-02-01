@@ -1,0 +1,92 @@
+@using LPEditorApp.Models
+
+<UiAccordion Title="アニメーション" Open="true">
+    <div class="ui-grid">
+        <UiRow Label="タイプ">
+            <UiSelect TValue="string" Value="Animation.Type" OnChanged="Notify">
+                <option value="none">なし</option>
+                <option value="fade">フェード</option>
+                <option value="slide-up">スライド（上）</option>
+                <option value="slide-down">スライド（下）</option>
+                <option value="slide-left">スライド（左）</option>
+                <option value="slide-right">スライド（右）</option>
+                <option value="zoom">ズーム</option>
+                <option value="pop">ポップ</option>
+            </UiSelect>
+        </UiRow>
+        <UiRow Label="イージング">
+            <UiSelect TValue="string" Value="Animation.Easing" OnChanged="Notify">
+                <option value="ease">ease</option>
+                <option value="linear">linear</option>
+                <option value="ease-in">ease-in</option>
+                <option value="ease-out">ease-out</option>
+                <option value="ease-in-out">ease-in-out</option>
+            </UiSelect>
+        </UiRow>
+        <UiRow Label="時間(ms)">
+            <input type="number" class="text" @bind-value="Animation.Duration" @bind-value:event="oninput" @bind-value:after="Notify" />
+        </UiRow>
+        <UiRow Label="強度">
+            <div class="ui-stack">
+                <UiSlider TValue="int?" Value="Animation.Intensity" ValueChanged="OnIntensityChanged" Min="10" Max="80" Step="2" DisplayValue="@(Animation.Intensity?.ToString())" />
+                <div class="ui-chip-row">
+                    <button type="button" class="chip" @onclick='() => SetIntensity(16)'>弱</button>
+                    <button type="button" class="chip" @onclick='() => SetIntensity(28)'>中</button>
+                    <button type="button" class="chip" @onclick='() => SetIntensity(44)'>強</button>
+                </div>
+            </div>
+        </UiRow>
+        <UiRow Label="遅延(ms)">
+            <input type="number" class="text" @bind-value="Animation.Delay" @bind-value:event="oninput" @bind-value:after="Notify" />
+        </UiRow>
+        <UiRow Label="トリガー">
+            <UiSelect TValue="string" Value="Animation.Trigger" OnChanged="Notify">
+                <option value="scroll">スクロール</option>
+                <option value="load">ロード</option>
+            </UiSelect>
+        </UiRow>
+        <UiRow Label="繰り返し">
+            <UiSelect TValue="string" Value="Animation.Repeat" OnChanged="Notify">
+                <option value="none">なし</option>
+                <option value="loop">ループ</option>
+                <option value="yoyo">往復</option>
+            </UiSelect>
+        </UiRow>
+        <UiRow Label="1回だけ">
+            <label class="check"><input type="checkbox" @bind="Animation.Once" @bind:after="Notify" /> 有効</label>
+        </UiRow>
+    </div>
+</UiAccordion>
+
+@code {
+    [Parameter] public SectionAnimationModel Animation { get; set; } = new();
+    [Parameter] public EventCallback OnChanged { get; set; }
+
+    protected override void OnParametersSet()
+    {
+        Animation.Type ??= "none";
+        Animation.Easing ??= "ease";
+        Animation.Trigger ??= "scroll";
+        Animation.Repeat ??= "none";
+        Animation.Duration ??= 600;
+        Animation.Delay ??= 0;
+        Animation.Intensity ??= 24;
+    }
+
+    private Task Notify()
+    {
+        return OnChanged.InvokeAsync();
+    }
+
+    private async Task SetIntensity(int value)
+    {
+        Animation.Intensity = value;
+        await Notify();
+    }
+
+    private async Task OnIntensityChanged(int? value)
+    {
+        Animation.Intensity = value;
+        await Notify();
+    }
+}

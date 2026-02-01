@@ -1,0 +1,201 @@
+@using LPEditorApp.Models
+
+<UiPanel Title="背景">
+    <UiRow Label="モード">
+        <UiSegment TValue="string" Value="Mode" ValueChanged="OnModeChanged" Options="ModeOptions" />
+    </UiRow>
+
+    @if (string.Equals(Mode, "color", StringComparison.OrdinalIgnoreCase))
+    {
+        <UiRow Label="カラー">
+            <UiColorSwatch Value="Background.Color" ValueChanged="OnColorChanged" />
+        </UiRow>
+        <UiRow Label="不透明度">
+            <UiSlider TValue="double?" Value="Background.ColorOpacity" ValueChanged="OnOpacityChanged" Min="0" Max="1" Step="0.05" DisplayValue="@(FormatOpacity(Background.ColorOpacity))" />
+        </UiRow>
+    }
+    else if (string.Equals(Mode, "gradient", StringComparison.OrdinalIgnoreCase))
+    {
+        <UiRow Label="カラーA">
+            <UiColorSwatch Value="Background.GradientColorA" ValueChanged="OnGradientAChanged" />
+        </UiRow>
+        <UiRow Label="カラーB">
+            <UiColorSwatch Value="Background.GradientColorB" ValueChanged="OnGradientBChanged" />
+        </UiRow>
+        <UiRow Label="方向">
+            <UiSegment TValue="string" Value="GradientPreset" ValueChanged="OnGradientPresetChanged" Options="GradientOptions" />
+        </UiRow>
+        <UiRow Label="不透明度">
+            <UiSlider TValue="double?" Value="Background.GradientOpacity" ValueChanged="OnGradientOpacityChanged" Min="0" Max="1" Step="0.05" DisplayValue="@(FormatOpacity(Background.GradientOpacity))" />
+        </UiRow>
+        <UiAccordion Title="詳細" Open="false">
+            <UiRow Label="種類">
+                <UiSelect TValue="string" Value="Background.GradientType" OnChanged="Notify">
+                    <option value="linear">Linear</option>
+                    <option value="radial">Radial</option>
+                </UiSelect>
+            </UiRow>
+            <UiRow Label="角度">
+                <input class="text" type="number" @bind-value="Background.GradientAngle" @bind-value:event="oninput" @bind-value:after="Notify" />
+            </UiRow>
+        </UiAccordion>
+    }
+    else if (string.Equals(Mode, "image", StringComparison.OrdinalIgnoreCase))
+    {
+        <UiRow Label="画像URL">
+            <input class="text" @bind-value="Background.ImageUrl" @bind-value:event="oninput" @bind-value:after="Notify" placeholder="images/bg.png" />
+        </UiRow>
+        @if (OnImageSelected.HasDelegate)
+        {
+            <UiRow Label="アップロード">
+                <InputFile OnChange="OnImageSelected" accept="image/*" />
+            </UiRow>
+        }
+        <UiRow Label="フィット">
+            <UiSelect TValue="string" Value="Background.Size" OnChanged="Notify">
+                <option value="cover">cover</option>
+                <option value="contain">contain</option>
+                <option value="auto">auto</option>
+                <option value="custom">custom</option>
+            </UiSelect>
+        </UiRow>
+        @if (string.Equals(Background.Size, "custom", StringComparison.OrdinalIgnoreCase))
+        {
+            <UiRow Label="サイズ">
+                <input class="text" @bind-value="Background.SizeCustom" @bind-value:event="oninput" @bind-value:after="Notify" placeholder="1200px auto" />
+            </UiRow>
+        }
+        <UiRow Label="位置">
+            <UiSelect TValue="string" Value="Background.Position" OnChanged="Notify">
+                <option value="center top">上中央</option>
+                <option value="center center">中央</option>
+                <option value="center bottom">下中央</option>
+                <option value="left top">左上</option>
+                <option value="right top">右上</option>
+                <option value="custom">custom</option>
+            </UiSelect>
+        </UiRow>
+        @if (string.Equals(Background.Position, "custom", StringComparison.OrdinalIgnoreCase))
+        {
+            <UiRow Label="位置">
+                <input class="text" @bind-value="Background.PositionCustom" @bind-value:event="oninput" @bind-value:after="Notify" placeholder="50% 20%" />
+            </UiRow>
+        }
+        <UiRow Label="リピート">
+            <UiSelect TValue="string" Value="Background.Repeat" OnChanged="Notify">
+                <option value="repeat">repeat</option>
+                <option value="no-repeat">no-repeat</option>
+                <option value="repeat-x">repeat-x</option>
+                <option value="repeat-y">repeat-y</option>
+            </UiSelect>
+        </UiRow>
+        <UiAccordion Title="詳細" Open="false">
+            <UiRow Label="アタッチメント">
+                <UiSelect TValue="string" Value="Background.Attachment" OnChanged="Notify">
+                    <option value="scroll">scroll</option>
+                    <option value="fixed">fixed</option>
+                </UiSelect>
+            </UiRow>
+        </UiAccordion>
+    }
+</UiPanel>
+
+@code {
+    [Parameter] public SectionBackgroundSettings Background { get; set; } = new();
+    [Parameter] public EventCallback OnChanged { get; set; }
+    [Parameter] public EventCallback<InputFileChangeEventArgs> OnImageSelected { get; set; }
+
+    private string Mode => string.IsNullOrWhiteSpace(Background.Mode) ? "inherit" : Background.Mode;
+
+    private IReadOnlyList<UiSegment<string>.UiSegmentOption<string>> ModeOptions => new List<UiSegment<string>.UiSegmentOption<string>>
+    {
+        new("単色", "color"),
+        new("グラデ", "gradient"),
+        new("画像", "image")
+    };
+
+    private IReadOnlyList<UiSegment<string>.UiSegmentOption<string>> GradientOptions => new List<UiSegment<string>.UiSegmentOption<string>>
+    {
+        new("→", "right"),
+        new("↘", "down-right"),
+        new("↓", "down"),
+        new("↙", "down-left"),
+        new("←", "left")
+    };
+
+    private string GradientPreset => ResolveGradientPreset();
+
+    private async Task OnModeChanged(string? mode)
+    {
+        Background.Mode = mode ?? "inherit";
+        await Notify();
+    }
+
+    private async Task OnColorChanged(string? value)
+    {
+        Background.Color = value ?? string.Empty;
+        await Notify();
+    }
+
+    private async Task OnOpacityChanged(double? value)
+    {
+        Background.ColorOpacity = value;
+        await Notify();
+    }
+
+    private async Task OnGradientAChanged(string? value)
+    {
+        Background.GradientColorA = value ?? string.Empty;
+        await Notify();
+    }
+
+    private async Task OnGradientBChanged(string? value)
+    {
+        Background.GradientColorB = value ?? string.Empty;
+        await Notify();
+    }
+
+    private async Task OnGradientOpacityChanged(double? value)
+    {
+        Background.GradientOpacity = value;
+        await Notify();
+    }
+
+    private async Task OnGradientPresetChanged(string? preset)
+    {
+        Background.GradientAngle = preset switch
+        {
+            "right" => 0,
+            "down-right" => 45,
+            "down" => 90,
+            "down-left" => 135,
+            "left" => 180,
+            _ => Background.GradientAngle
+        };
+        await Notify();
+    }
+
+    private string ResolveGradientPreset()
+    {
+        var angle = Background.GradientAngle ?? 135;
+        return angle switch
+        {
+            0 => "right",
+            45 => "down-right",
+            90 => "down",
+            135 => "down-left",
+            180 => "left",
+            _ => "down-left"
+        };
+    }
+
+    private Task Notify()
+    {
+        return OnChanged.InvokeAsync();
+    }
+
+    private static string FormatOpacity(double? value)
+    {
+        return value.HasValue ? $"{value.Value:0.##}" : "1";
+    }
+}

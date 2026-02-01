@@ -1,0 +1,62 @@
+@using LPEditorApp.Models
+
+<UiPanel Title="タイポグラフィ">
+    <div class="ui-grid">
+        <UiRow Label="フォント">
+            <UiSelect TValue="string" Value="Typography.FontFamily" OnChanged="Notify">
+                <option value="">標準</option>
+                @foreach (var font in FontFamilyOptions)
+                {
+                    <option value="@font.Value">@font.Label</option>
+                }
+            </UiSelect>
+        </UiRow>
+        <UiRow Label="サイズ">
+            <UiSelect TValue="int?" Value="Typography.FontSize" OnChanged="Notify">
+                <option value="">標準</option>
+                @foreach (var size in FontSizeOptions)
+                {
+                    <option value="@size">@($"{size}px")</option>
+                }
+            </UiSelect>
+        </UiRow>
+        <UiRow Label="太さ">
+            <UiSelect TValue="int?" Value="Typography.FontWeight" OnChanged="Notify">
+                <option value="">標準</option>
+                <option value="400">標準</option>
+                <option value="500">中</option>
+                <option value="600">やや太</option>
+                <option value="700">太字</option>
+            </UiSelect>
+        </UiRow>
+        <UiRow Label="色">
+            <UiColorSwatch Value="Typography.Color" ValueChanged="OnColorChanged" />
+        </UiRow>
+        <UiRow Label="整列">
+            <UiSelect TValue="string" Value="Typography.Align" OnChanged="Notify">
+                <option value="">標準</option>
+                <option value="left">左</option>
+                <option value="center">中央</option>
+                <option value="right">右</option>
+            </UiSelect>
+        </UiRow>
+    </div>
+</UiPanel>
+
+@code {
+    [Parameter] public SectionTypographySettings Typography { get; set; } = new();
+    [Parameter] public int[] FontSizeOptions { get; set; } = Array.Empty<int>();
+    [Parameter] public FontFamilyOption[] FontFamilyOptions { get; set; } = Array.Empty<FontFamilyOption>();
+    [Parameter] public EventCallback OnChanged { get; set; }
+
+    private Task Notify()
+    {
+        return OnChanged.InvokeAsync();
+    }
+
+    private async Task OnColorChanged(string? value)
+    {
+        Typography.Color = value;
+        await Notify();
+    }
+}

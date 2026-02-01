@@ -1,0 +1,17 @@
+<label class="ui-toggle">
+    <input type="checkbox" checked="@Value" @onchange="OnChanged" />
+    <span class="ui-toggle__label">@Label</span>
+</label>
+
+@code {
+    [Parameter] public string Label { get; set; } = string.Empty;
+    [Parameter] public bool Value { get; set; }
+    [Parameter] public EventCallback<bool> ValueChanged { get; set; }
+
+    private async Task OnChanged(ChangeEventArgs e)
+    {
+        var next = e?.Value is bool b && b;
+        Value = next;
+        await ValueChanged.InvokeAsync(next);
+    }
+}

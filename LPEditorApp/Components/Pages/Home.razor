@@ -15,6 +15,7 @@
 @inject ImageService ImageService
 @inject BackgroundPresetService BackgroundPresetService
 @inject EditorState State
+@inject IHighlightService HighlightService
 @inject IJSRuntime JS
 
 <PageTitle>LP Editor</PageTitle>
@@ -26,7 +27,7 @@
 			<button class="btn @(ActiveTab == "basic" ? "primary" : "")" type="button" @onclick='() => SetTab("basic")'>基本</button>
 			<button class="btn @(ActiveTab == "content" ? "primary" : "")" type="button" @onclick='() => SetTab("content")'>入力</button>
 			<button class="btn @(ActiveTab == "images" ? "primary" : "")" type="button" @onclick='() => SetTab("images")'>画像</button>
-			<button class="btn @(ActiveTab == "background" ? "primary" : "")" type="button" @onclick='() => SetTab("background")'>背景</button>
+			<button class="btn @(ActiveTab == "design" ? "primary" : "")" type="button" @onclick='() => SetTab("design")'>デザイン/背景</button>
 		</div>
 		<StepNavigator Steps="GetStepItems()" OnStepSelected="OnStepSelected" />
 
@@ -288,7 +289,7 @@
 			</div>
 		}
 
-		@if (ActiveTab == "background")
+	@if (ActiveTab == "design")
 		{
 			<div class="tab-content">
 				<section class="panel">
@@ -303,44 +304,61 @@
 						                       PreviewLabel="ページ背景"
 						                       PreviewCaption="LP全体に反映されます"
 						                       ShowPreset="false" />
+						<PageBackgroundPresetEditor Selection="PageBackgroundSetting.Preset"
+						                           Presets="BackgroundPresets"
+						                           OnChanged="OnPageBackgroundChanged" />
 					}
 				</section>
 
 				<section class="panel">
 					<div class="sub-header">
-						<strong>セクション背景</strong>
-						<button type="button" class="accordion-toggle @(IsSectionOpen("background-sections") ? "is-open" : "")" @onclick='() => ToggleSection("background-sections")'>@(IsSectionOpen("background-sections") ? "閉じる" : "開く")</button>
+						<strong>フレーム設定</strong>
+						<button type="button" class="accordion-toggle @(IsSectionOpen("card-theme-editor") ? "is-open" : "")" @onclick='() => ToggleSection("card-theme-editor")'>@(IsSectionOpen("card-theme-editor") ? "閉じる" : "開く")</button>
 					</div>
-					@if (IsSectionOpen("background-sections"))
+					@if (IsSectionOpen("card-theme-editor"))
 					{
-						<div class="field">
-							<label>セクション選択</label>
-							<InputSelect class="text-option-select" @bind-Value="SelectedBackgroundSectionKey" @bind-Value:after="OnBackgroundSectionChanged">
-								@foreach (var option in GetBackgroundSectionOptions())
-								{
-									<option value="@option.Key">@option.Label</option>
-								}
-							</InputSelect>
+						<div class="frame-scope-tabs">
+							<button type="button" class="tab-btn @(FrameThemeTab == "common" ? "active" : "")" @onclick='() => SetFrameThemeTab("common")'>フレーム（共通）</button>
+							<button type="button" class="tab-btn @(FrameThemeTab == "per" ? "active" : "")" @onclick='() => SetFrameThemeTab("per")'>フレーム（個別）</button>
 						</div>
-
-						@if (IsFixedWhiteBackgroundSection(SelectedBackgroundSectionKey))
+						@if (FrameThemeTab == "per")
 						{
-							<div class="text text-readonly">このセクションは白固定です（ロゴ帯 / conditions-contact-banners）。背景は変更できません。</div>
-						}
-						else
-						{
-							<BackgroundSettingEditor Setting="SectionBackgroundSetting"
-							                       OnChanged="OnSectionBackgroundChanged"
-							                       PreviewLabel="@GetSectionDisplayName(SelectedBackgroundSectionKey)"
-							                       PreviewCaption="このセクションに反映されます" />
-							<div class="bg-apply-actions">
-								<button type="button" class="btn primary" @onclick="ApplySectionBackground">このセクションに適用</button>
-								<button type="button" class="btn" @onclick="ApplySectionBackgroundToAll">全セクションに適用</button>
+							<div class="frame-scope-select">
+								<label>対象セクション</label>
+								<select class="text" @bind="FrameThemeSectionKey" @bind:after="OnFrameThemeSectionChanged">
+									@if (DesignSectionOptions.Count == 0)
+									{
+										<option value="">セクションがありません</option>
+									}
+									else
+									{
+										@foreach (var option in DesignSectionOptions)
+										{
+											<option value="@option.Key">@option.Value</option>
+										}
+									}
+								</select>
 							</div>
 						}
+						<CardThemeEditor
+							Style="GetFrameThemeEditorStyle()"
+							AnimationStyle="GetFrameAnimationStyle()"
+							FontOptions="FontFamilyOptions"
+							RecentColors="RecentCardColors"
+							OnColorUsed="OnCardColorUsed"
+							OnChanged="OnCardThemeChanged"
+							OnBandChanged="OnBandThemeChanged"
+							OnReset="ResetFrameThemeEditor"
+							ScopeLabel="@(FrameThemeTab == "per" ? "フレーム（個別）" : "フレーム（共通）")"
+							ScopeNote="@(FrameThemeTab == "per" ? "選択セクションのみ反映" : "全セクションに適用")"
+							EnableAnimationTab="@(FrameThemeTab == "per")"
+							ShowAnimationScopeToggle="true"
+							AnimationScope="@FrameAnimationScope"
+							OnAnimationScopeChanged="OnAnimationScopeChanged"
+							AnimationPreviewEnabled="@State.Content.AnimationPreviewEnabled"
+							OnAnimationPreviewToggled="OnAnimationPreviewToggled" />
 					}
 				</section>
-
 			</div>
 		}
 
@@ -380,9 +398,9 @@
 									<div class="field">
 										<label>@block.TagName <span class="import-hint">@block.SelectorHint</span></label>
 										<textarea class="text" rows="2" @bind-value="block.Text" @bind-value:event="oninput" @bind-value:after="OnImportInputAsync"></textarea>
-									</div>
-								}
-							</div>
+													</div>
+												}
+											</div>
 
 							<div class="import-block-group">
 								<h4>画像</h4>
@@ -504,39 +522,54 @@
 					</div>
 					@if (IsSectionOpen("section-list"))
 					{
-					<div id="sectionList" class="section-editor-list">
-						@if (State.Content.SectionGroups.Count == 0)
-						{
-							<div class="text">未登録</div>
-						}
-						else
-						{
-							@for (var i = 0; i < State.Content.SectionGroups.Count; i++)
+						<SectionNavigator Search="SectionSearch"
+						                 SearchChanged="value => SectionSearch = value"
+						                 VisibilityFilter="SectionVisibilityFilter"
+						                 VisibilityFilterChanged="value => SectionVisibilityFilter = value"
+						                 TypeFilter="SectionTypeFilter"
+						                 TypeFilterChanged="value => SectionTypeFilter = value"
+						                 TypeOptions="GetSectionTypeOptions()"
+						                 MiniMapSections="GetMiniMapSections()"
+						                 ActiveId="CurrentPreviewSectionId"
+						                 OnMiniMapSelect="OnMiniMapSelectAsync"
+						                 FollowActive="FollowActiveSection"
+						                 FollowActiveChanged="value => FollowActiveSection = value">
+							@if (FilteredSectionGroups.Count == 0)
 							{
-								var group = State.Content.SectionGroups[i];
-								var openKey = $"group-{group.Key}";
-								var keyLower = group.Key?.ToLowerInvariant() ?? string.Empty;
-								var customSection = State.Content.CustomSections.FirstOrDefault(x => string.Equals(x.Key, group.Key, StringComparison.OrdinalIgnoreCase));
-								if (!IsEditorManagedSectionKey(group.Key))
+								<div class="text">該当するセクションがありません。</div>
+							}
+							else
+							{
+								@foreach (var group in FilteredSectionGroups)
 								{
-									continue;
-								}
-								<div class="section-card item" @key="group.Key" data-id="@group.Key">
-									<div class="section-card-header">
-										<span class="drag-handle">⠿</span>
-										<div class="section-card-title" @onclick="() => SelectSection(group.Key)">@GetSectionDisplayName(group.Key)</div>
-										<SectionListRowActions OnAction="action => OnSectionRowActionAsync(group, action)" />
-										<label class="toggle-switch">
-											<input type="checkbox" @bind="group.Enabled" @bind:after="OnSectionGroupChanged" />
-											<span class="toggle-label">表示</span>
-										</label>
-										<button type="button" class="accordion-toggle @(IsSectionOpen(openKey) ? "is-open" : "")" @onclick='() => ToggleSection(openKey)'>@(IsSectionOpen(openKey) ? "閉じる" : "開く")</button>
-										<button type="button" class="btn small danger" @onclick="() => RemoveSectionGroupAsync(group.Key ?? string.Empty)" disabled="@(string.IsNullOrWhiteSpace(group.Key))">削除</button>
-									</div>
-									@if (IsSectionOpen(openKey))
-									{
-										<div class="section-card-body">
-											@if (keyLower == "campaign-content")
+									var openKey = $"group-{group.Key}";
+									var keyLower = group.Key?.ToLowerInvariant() ?? string.Empty;
+									var customSection = State.Content.CustomSections.FirstOrDefault(x => string.Equals(x.Key, group.Key, StringComparison.OrdinalIgnoreCase));
+									var normalizedKey = NormalizeSectionKey(group.Key);
+									var isCurrent = string.Equals(CurrentPreviewSectionId, normalizedKey, StringComparison.OrdinalIgnoreCase);
+									var isSelected = string.Equals(SelectedSectionId, group.Key, StringComparison.OrdinalIgnoreCase);
+									var title = GetSectionDisplayName(group.Key, group.DisplayName);
+									var icon = GetSectionIcon(group.Key, customSection is not null);
+									var iconLabel = GetSectionIconLabel(group.Key, customSection is not null);
+									var subText = GetSectionSubInfo(group);
+									<SectionRow Group="group"
+									           RowId="@GetSectionRowId(normalizedKey)"
+									           Title="@title"
+									           SubText="@subText"
+									           Icon="@icon"
+									           IconLabel="@iconLabel"
+									           IsCurrent="@isCurrent"
+									           IsSelected="@isSelected"
+									           IsVisible="@group.Enabled"
+									           IsHidden="@(!group.Enabled)"
+									           IsOpen="@IsSectionOpen(openKey)"
+									           OnSelect="() => OnSectionRowSelectedAsync(group)"
+									           OnEdit="() => OnSectionEditClickedAsync(group, openKey)"
+									           OnToggleChanged="e => OnSectionVisibilityChanged(group, e)"
+									           OnToggleOpen="() => ToggleSection(openKey)"
+									           OnQuickAction="action => OnSectionRowActionAsync(group, action)"
+									           OnMenuAction="action => OnSectionMenuActionAsync(group, action)">
+										@if (normalizedKey == "campaigncontent")
 											{
 												<div class="field">
 													<label>セクションタイトル</label>
@@ -548,71 +581,21 @@
 												</div>
 												<div class="field list-field">
 													<label>注意事項</label>
-													<div class="bulk-style">
-														<span>フォント</span>
-														<InputSelect class="text-option-select" @bind-Value="State.Content.Sections.CampaignContent.FontFamily" @bind-Value:after="OnAnyInputAfter">
-															@foreach (var font in FontFamilyOptions)
-															{
-																<option value="@font.Value">@font.Label</option>
-															}
-														</InputSelect>
-														<label class="check"><input type="checkbox" @bind="CampaignNotesBulk.Bold" /> 太字</label>
-														<label class="check"><input type="checkbox" @bind="CampaignNotesBulk.UseColor" /> 色</label>
-														@if (CampaignNotesBulk.UseColor)
-														{
-															<input type="color" class="text-option-color" value="@GetColorValue(CampaignNotesBulk.Color)" @onchange="e => CampaignNotesBulk.Color = e.Value?.ToString()" />
-														}
-														<InputSelect class="text-option-select" @bind-Value="CampaignNotesBulk.FontSize">
-															<option value="">サイズ</option>
-															@foreach (var size in FontSizeOptions)
-															{
-																<option value="@size">@($"{size}px")</option>
-															}
-														</InputSelect>
-														<button type="button" class="btn small" @onclick="() => ApplyBulkStyle(State.Content.Sections.CampaignContent.Notes, CampaignNotesBulk)">一括適用</button>
-													</div>
 													@foreach (var item in State.Content.Sections.CampaignContent.Notes)
 													{
 														<div class="list-row">
 															<input class="text" @bind-value="item.Text" @bind-value:event="oninput" />
-															<div class="text-options">
-																<label class="check"><input type="checkbox" @bind="item.Emphasis" @bind:after="OnAnyInputAfter" /> 強調</label>
-																<label class="check"><input type="checkbox" @bind="item.Bold" @bind:after="OnAnyInputAfter" /> 太字</label>
-																<label class="check"><input type="checkbox" checked="@item.UseColor" @onchange="async e => await ToggleUseColor(item, e)" /> 色</label>
-																@if (item.UseColor)
-																{
-																	<input type="color" class="text-option-color" value="@GetColorValue(item.Color)" @onchange="async e => { item.Color = e.Value?.ToString(); await OnAnyInput(e); }" />
-																}
-																<InputSelect class="text-option-select" @bind-Value="item.FontSize" @bind-Value:after="OnAnyInputAfter">
-																	<option value="">標準</option>
-																	@foreach (var size in FontSizeOptions)
-																	{
-																		<option value="@size">@($"{size}px")</option>
-																	}
-																</InputSelect>
-															</div>
 															<button type="button" class="btn small" @onclick="() => RemoveItem(State.Content.Sections.CampaignContent.Notes, item)">削除</button>
 														</div>
 													}
 													<button type="button" class="btn small" @onclick="() => AddItem(State.Content.Sections.CampaignContent.Notes)">行追加</button>
 												</div>
 											}
-											else if (keyLower == "coupon-period")
+											else if (normalizedKey == "couponperiod")
 											{
 												<div class="field">
 													<label>セクションタイトル</label>
 													<input class="text" @bind-value="State.Content.Sections.CouponPeriod.Title" @bind-value:event="oninput" />
-												</div>
-												<div class="field">
-													<label>フォント</label>
-													<div class="bulk-style">
-														<InputSelect class="text-option-select" @bind-Value="State.Content.Sections.CouponPeriod.FontFamily" @bind-Value:after="OnAnyInputAfter">
-															@foreach (var font in FontFamilyOptions)
-															{
-																<option value="@font.Value">@font.Label</option>
-															}
-														</InputSelect>
-													</div>
 												</div>
 												<div class="field">
 													<label>テキスト</label>
@@ -643,7 +626,198 @@
 													}
 												</div>
 											}
-											else if (keyLower == "store-search" || keyLower == "storesearch" || keyLower.StartsWith("store-search"))
+											else if (normalizedKey == "couponflow")
+											{
+												<div class="field">
+													<label>セクションタイトル</label>
+													<input class="text" @bind-value="State.Content.Sections.CouponFlow.Title" @bind-value:event="oninput" />
+												</div>
+												<div class="field">
+													<label>リード文</label>
+													<textarea class="text" rows="2" @bind-value="State.Content.Sections.CouponFlow.Lead" @bind-value:event="oninput"></textarea>
+													<div class="hint">&lt;strong&gt;...&lt;/strong&gt;などのHTMLが使用できます。</div>
+												</div>
+												<div class="field list-field">
+													<label>スライド</label>
+													@foreach (var slide in State.Content.Sections.CouponFlow.Slides)
+													{
+														<div class="list-row">
+															<div class="input-row">
+																<input class="text" @bind-value="slide.Image" @bind-value:event="oninput" />
+																<InputFile OnChange="e => OnImageSelected(e, slide.Image)" accept="image/*" />
+															</div>
+															<input class="text" placeholder="代替テキスト" @bind-value="slide.Alt" @bind-value:event="oninput" />
+															<button type="button" class="btn small" @onclick="() => RemoveCouponFlowSlide(slide)">削除</button>
+														</div>
+													}
+													<button type="button" class="btn small" @onclick="AddCouponFlowSlide">スライド追加</button>
+												</div>
+												<div class="field">
+													<label>注記</label>
+													<input class="text" @bind-value="State.Content.Sections.CouponFlow.Note" @bind-value:event="oninput" />
+												</div>
+												<div class="field">
+													<label>ボタンラベル</label>
+													<input class="text" @bind-value="State.Content.Sections.CouponFlow.ButtonLabel" @bind-value:event="oninput" />
+												</div>
+												<div class="field">
+													<label>ボタンURL</label>
+													<input class="text" @bind-value="State.Content.Sections.CouponFlow.ButtonUrl" @bind-value:event="oninput" placeholder="https://..." />
+												</div>
+												<div class="field list-field">
+													<label>注意書き</label>
+													@foreach (var item in State.Content.Sections.CouponFlow.Items)
+													{
+														<div class="list-row">
+															<input class="text" @bind-value="item.Text" @bind-value:event="oninput" />
+															<button type="button" class="btn small" @onclick="() => RemoveItem(State.Content.Sections.CouponFlow.Items, item)">削除</button>
+														</div>
+													}
+													<button type="button" class="btn small" @onclick="() => AddItem(State.Content.Sections.CouponFlow.Items)">行追加</button>
+												</div>
+											}
+											else if (normalizedKey == "stickytabs")
+											{
+												var stickyTabs = State.Content.Sections.StickyTabs;
+														<div class="sticky-tabs-editor">
+															<div class="sticky-tabs-editor__tabbar">
+																<div class="sticky-tabs-editor__tabs">
+																	@for (var tabIndex = 0; tabIndex < stickyTabs.Tabs.Count; tabIndex++)
+																	{
+																		var currentIndex = tabIndex;
+																		var tab = stickyTabs.Tabs[currentIndex];
+																		var isActive = currentIndex == SelectedStickyTabIndex;
+																		var tabBg = string.IsNullOrWhiteSpace(tab.Color) ? "#e5e7eb" : tab.Color;
+																		var tabTextColor = ResolveStickyTabEditorTextColor(tabBg, tab.TextColor);
+																		<button type="button" class="sticky-tabs-editor__tab@(isActive ? " is-active" : string.Empty)" style="--tab-bg:@tabBg; --tab-color:@tabTextColor;" title="@tab.Title" @onclick="() => SelectStickyTab(currentIndex)">
+																			<span class="sticky-tabs-editor__tabTitle">@tab.Title</span>
+																			@if (isActive)
+																			{
+																				<span class="sticky-tabs-editor__tabActions">
+																					<span class="sticky-tabs-editor__icon" role="button" tabindex="0" title="左へ" @onclick:stopPropagation="true" @onclick="() => MoveStickyTab(currentIndex, -1)">←</span>
+																					<span class="sticky-tabs-editor__icon" role="button" tabindex="0" title="右へ" @onclick:stopPropagation="true" @onclick="() => MoveStickyTab(currentIndex, 1)">→</span>
+																					<span class="sticky-tabs-editor__icon" role="button" tabindex="0" title="複製" @onclick:stopPropagation="true" @onclick="() => DuplicateStickyTab(currentIndex)">⧉</span>
+																					<span class="sticky-tabs-editor__icon is-danger" role="button" tabindex="0" title="削除" @onclick:stopPropagation="true" @onclick="() => RemoveStickyTabWithConfirm(currentIndex)">🗑</span>
+																				</span>
+																			}
+																		</button>
+																	}
+																	<button type="button" class="sticky-tabs-editor__addTab" @onclick="AddStickyTab">＋ タブ追加</button>
+																</div>
+															</div>
+
+															@if (stickyTabs.Tabs.Count == 0)
+															{
+																<div class="text text-readonly">タブを追加してください。</div>
+															}
+															else
+															{
+																var activeIndex = Math.Clamp(SelectedStickyTabIndex, 0, stickyTabs.Tabs.Count - 1);
+																var activeTab = stickyTabs.Tabs[activeIndex];
+																<div class="sticky-tabs-editor__layout">
+																	<div class="sticky-tabs-editor__blocks">
+																		<div class="sticky-tabs-editor__sectionTitle">Blocks</div>
+																		@for (var blockIndex = 0; blockIndex < activeTab.ContentBlocks.Count; blockIndex++)
+																		{
+																			var currentBlockIndex = blockIndex;
+																			var block = activeTab.ContentBlocks[currentBlockIndex];
+																			<div class="sticky-tabs-editor__blockCard">
+																				<div class="sticky-tabs-editor__blockHeader">
+																					<span class="sticky-tabs-editor__blockType">@GetStickyBlockTypeLabel(block.Type)</span>
+																					<div class="sticky-tabs-editor__blockActions">
+																						<button type="button" class="sticky-tabs-editor__icon" title="上へ" @onclick="() => MoveStickyBlock(activeTab, currentBlockIndex, -1)">↑</button>
+																						<button type="button" class="sticky-tabs-editor__icon" title="下へ" @onclick="() => MoveStickyBlock(activeTab, currentBlockIndex, 1)">↓</button>
+																						<button type="button" class="sticky-tabs-editor__icon" title="複製" @onclick="() => DuplicateStickyBlock(activeTab, currentBlockIndex)">⧉</button>
+																						<button type="button" class="sticky-tabs-editor__icon is-danger" title="削除" @onclick="() => RemoveStickyBlock(activeTab, currentBlockIndex)">🗑</button>
+																					</div>
+																				</div>
+																				<div class="sticky-tabs-editor__blockBody">
+																					<select class="sticky-tabs-editor__select" @bind-value="block.Type" @bind-value:event="onchange">
+																						<option value="RichText">リッチテキスト</option>
+																						<option value="Image">画像</option>
+																						<option value="ImageWithCaption">画像+キャプション</option>
+																						<option value="Divider">区切り線</option>
+																					</select>
+
+																					@if (block.Type == StickyBlockType.RichText)
+																					{
+																						<textarea class="sticky-tabs-editor__textarea" rows="5" @bind-value="block.RichTextHtml" @bind-value:event="oninput"></textarea>
+																						<div class="sticky-tabs-editor__hint">改行は自動で&lt;br&gt;になります。</div>
+																					}
+
+																					else if (block.Type == StickyBlockType.Image || block.Type == StickyBlockType.ImageWithCaption)
+																					{
+																						<div class="sticky-tabs-editor__imageRow">
+																							<input class="sticky-tabs-editor__input" @bind-value="block.ImageSrc" @bind-value:event="oninput" placeholder="images/example.png" />
+																							<InputFile OnChange="e => OnImageSelected(e, block.ImageSrc)" accept="image/*" />
+																						</div>
+																						@if (block.Type == StickyBlockType.ImageWithCaption)
+																						{
+																							<input class="sticky-tabs-editor__input" placeholder="キャプション" @bind-value="block.Caption" @bind-value:event="oninput" />
+																						}
+																					}
+
+																					else
+																					{
+																						<div class="sticky-tabs-editor__note">区切り線を表示します。</div>
+																					}
+																				</div>
+																			</div>
+																		}
+
+																		<div class="sticky-tabs-editor__blockAdd">
+																			<select class="sticky-tabs-editor__select" @bind-value="NewStickyBlockType" @bind-value:event="onchange">
+																				<option value="RichText">リッチテキスト</option>
+																				<option value="Image">画像</option>
+																				<option value="ImageWithCaption">画像+キャプション</option>
+																				<option value="Divider">区切り線</option>
+																			</select>
+																			<button type="button" class="sticky-tabs-editor__addBlock" @onclick="() => AddStickyBlock(activeTab, NewStickyBlockType)">＋ ブロック追加</button>
+																	</div>
+																</div>
+
+																<div class="sticky-tabs-editor__props">
+																	<div class="sticky-tabs-editor__sectionTitle">Properties</div>
+																	<div class="sticky-tabs-editor__propCard">
+																		<label class="sticky-tabs-editor__label">選択タブタイトル</label>
+																		<input class="sticky-tabs-editor__input" @bind-value="activeTab.Title" @bind-value:event="oninput" />
+																		<div class="sticky-tabs-editor__divider"></div>
+
+																		<label class="sticky-tabs-editor__label">タブ背景色</label>
+																		<div class="sticky-tabs-editor__colorRow">
+																			<input class="sticky-tabs-editor__input" @bind-value="activeTab.Color" @bind-value:event="oninput" placeholder="#d91f2a" />
+																			<input type="color" value="@ToColorPickerValue(activeTab.Color)" @oninput="(e) => SetStickyTabColor(activeTab, e?.Value?.ToString())" />
+																		</div>
+																		<div class="sticky-tabs-editor__swatches">
+																			@foreach (var paletteColor in StickyTabPalette)
+																			{
+																				<button type="button" class="sticky-tabs-editor__swatch" style="background:@paletteColor" title="@paletteColor" @onclick="() => SetStickyTabColor(activeTab, paletteColor)"></button>
+																			}
+																		</div>
+
+																		<label class="sticky-tabs-editor__label">タブ文字色</label>
+																		<div class="sticky-tabs-editor__row">
+																			<label class="sticky-tabs-editor__checkbox">
+																				<input type="checkbox" checked="@IsStickyTabTextAuto(activeTab)" @onchange="(e) => SetStickyTabTextColorMode(activeTab, e)" />
+																				<span>自動</span>
+																			</label>
+																			@if (!IsStickyTabTextAuto(activeTab))
+																			{
+																				<button type="button" class="sticky-tabs-editor__textBtn" @onclick='() => SetStickyTabTextColor(activeTab, "#111827")'>濃色</button>
+																				<button type="button" class="sticky-tabs-editor__textBtn" @onclick='() => SetStickyTabTextColor(activeTab, "#ffffff")'>白</button>
+																			}
+																		</div>
+
+																		<div class="sticky-tabs-editor__danger">
+																			<button type="button" class="sticky-tabs-editor__dangerBtn" @onclick="() => RemoveStickyTabWithConfirm(activeIndex)">タブを削除</button>
+																		</div>
+																	</div>
+																</div>
+															</div>
+														}
+													</div>
+											}
+											else if (normalizedKey.StartsWith("storesearch"))
 											{
 												<div class="field">
 													<label>セクションタイトル</label>
@@ -678,7 +852,7 @@
 																<StoreTargetLabelManager Labels="State.Content.Sections.StoreSearch.TargetLabels" OnChanged="OnAnyInputAfter" />
 															}
 											}
-											else if (keyLower == "coupon-notes")
+											else if (normalizedKey == "couponnotes")
 											{
 												<div class="field">
 													<label>セクションタイトル</label>
@@ -693,7 +867,7 @@
 															                 FontFamilyOptions="FontFamilyOptions"
 															                 GetColorValue="GetColorValue" />
 											}
-											else if (keyLower == "ranking")
+											else if (normalizedKey == "ranking")
 											{
 												var headerCount = GetRankingHeaderCount();
 												<RankingEditor
@@ -703,92 +877,64 @@
 													AddRankingHeader="AddRankingHeader"
 													AddRankingRow="AddRankingRow"
 													RemoveRankingRow="RemoveRankingRow"
-													OnImageLeftSelected="e => OnImageSelected(e, State.Content.Sections.Ranking.ImageLeft)"
-													OnImageRightSelected="e => OnImageSelected(e, State.Content.Sections.Ranking.ImageRight)"
+													OnImageLeftSelected="OnRankingLeftImageSelected"
+													OnImageRightSelected="OnRankingRightImageSelected"
 													FontFamilyOptions="FontFamilyOptions"
 													FontSizeOptions="FontSizeOptions"
 													GetColorValue="GetColorValue" />
 											}
-											else if (keyLower.Contains("conditions-contact-banners"))
+											else if (normalizedKey == "paymenthistory")
 											{
 												<div class="field">
-													<label>条件セクション フォント</label>
-													<div class="bulk-style">
-														<InputSelect class="text-option-select" @bind-Value="State.Content.Sections.Conditions.FontFamily" @bind-Value:after="OnAnyInputAfter">
-															@foreach (var font in FontFamilyOptions)
-															{
-																<option value="@font.Value">@font.Label</option>
-															}
-														</InputSelect>
+													<label>見出しテキスト</label>
+													<input class="text" @bind-value="State.Content.Sections.PaymentHistory.TitleText" @bind-value:event="oninput" />
+												</div>
+												<div class="field">
+													<label>本文</label>
+													<textarea class="text" rows="3" @bind-value="State.Content.Sections.PaymentHistory.Text" @bind-value:event="oninput"></textarea>
+													<div class="hint">改行は&lt;br&gt;、問い合わせリンクは&lt;a href=&quot;#contact&quot;&gt;...&lt;/a&gt;で記述できます。</div>
+												</div>
+												<div class="field">
+													<label>強調文</label>
+													<textarea class="text" rows="2" @bind-value="State.Content.Sections.PaymentHistory.ImportantText" @bind-value:event="oninput"></textarea>
+												</div>
+												<div class="field">
+													<label>画像</label>
+													<div class="input-row">
+														<input class="text" @bind-value="State.Content.Sections.PaymentHistory.Image" @bind-value:event="oninput" />
+														<InputFile OnChange="e => OnImageSelected(e, State.Content.Sections.PaymentHistory.Image)" accept="image/*" />
 													</div>
 												</div>
 												<div class="field">
-													<label>お問い合わせ フォント</label>
-													<div class="bulk-style">
-														<InputSelect class="text-option-select" @bind-Value="State.Content.Sections.Contact.FontFamily" @bind-Value:after="OnAnyInputAfter">
-															@foreach (var font in FontFamilyOptions)
-															{
-																<option value="@font.Value">@font.Label</option>
-															}
-														</InputSelect>
+													<label>画像代替テキスト</label>
+													<input class="text" @bind-value="State.Content.Sections.PaymentHistory.ImageAlt" @bind-value:event="oninput" />
+												</div>
+												<div class="field">
+													<label>装飾画像</label>
+													<div class="input-row">
+														<input class="text" @bind-value="State.Content.Sections.PaymentHistory.DecoImage" @bind-value:event="oninput" />
+														<InputFile OnChange="e => OnImageSelected(e, State.Content.Sections.PaymentHistory.DecoImage)" accept="image/*" />
 													</div>
 												</div>
 												<div class="field">
-													<label>バナー フォント</label>
-													<div class="bulk-style">
-														<InputSelect class="text-option-select" @bind-Value="State.Content.Sections.Banners.FontFamily" @bind-Value:after="OnAnyInputAfter">
-															@foreach (var font in FontFamilyOptions)
-															{
-																<option value="@font.Value">@font.Label</option>
-															}
-														</InputSelect>
-													</div>
+													<label>装飾画像代替テキスト</label>
+													<input class="text" @bind-value="State.Content.Sections.PaymentHistory.DecoAlt" @bind-value:event="oninput" />
 												</div>
+											}
+											else if (normalizedKey.Contains("conditionscontactbanners"))
+											{
 												<div class="text text-readonly">詳細設定は未対応です。</div>
 											}
-											else if (keyLower == "conditions")
+											else if (normalizedKey == "conditions")
 											{
-												<div class="field">
-													<label>フォント</label>
-													<div class="bulk-style">
-														<InputSelect class="text-option-select" @bind-Value="State.Content.Sections.Conditions.FontFamily" @bind-Value:after="OnAnyInputAfter">
-															@foreach (var font in FontFamilyOptions)
-															{
-																<option value="@font.Value">@font.Label</option>
-															}
-														</InputSelect>
-													</div>
-												</div>
 												<div class="text text-readonly">詳細設定は未対応です。</div>
 											}
 											else if (keyLower == "contact")
 											{
-												<div class="field">
-													<label>フォント</label>
-													<div class="bulk-style">
-														<InputSelect class="text-option-select" @bind-Value="State.Content.Sections.Contact.FontFamily" @bind-Value:after="OnAnyInputAfter">
-															@foreach (var font in FontFamilyOptions)
-															{
-																<option value="@font.Value">@font.Label</option>
-															}
-														</InputSelect>
-													</div>
-												</div>
 												<div class="text text-readonly">詳細設定は未対応です。</div>
 											}
 											else if (keyLower.Contains("banners") || keyLower.Contains("banner"))
 											{
-												<div class="field">
-													<label>フォント</label>
-													<div class="bulk-style">
-														<InputSelect class="text-option-select" @bind-Value="State.Content.Sections.Banners.FontFamily" @bind-Value:after="OnAnyInputAfter">
-															@foreach (var font in FontFamilyOptions)
-															{
-																<option value="@font.Value">@font.Label</option>
-															}
-														</InputSelect>
-													</div>
-												</div>
 												<div class="text text-readonly">バナー周辺のテキストに適用します。</div>
 											}
 											else if (keyLower == "countdown")
@@ -816,17 +962,6 @@
 													<label>終了メッセージ</label>
 													<input class="text" @bind-value="State.Content.Campaign.EndedMessage" @bind-value:event="oninput" />
 												</div>
-												<div class="field">
-													<label>フォント</label>
-													<div class="bulk-style">
-														<InputSelect class="text-option-select" @bind-Value="State.Content.Campaign.FooterFontFamily" @bind-Value:after="OnAnyInputAfter">
-															@foreach (var font in FontFamilyOptions)
-															{
-																<option value="@font.Value">@font.Label</option>
-															}
-														</InputSelect>
-													</div>
-												</div>
 														@* Campaign.EndedMessage(旧単行) -> Campaign.FooterLines(StyledTextItem) *@
 														<TextLinesEditor Title="フッターテキスト"
 														                 Items="State.Content.Campaign.FooterLines"
@@ -838,7 +973,6 @@
 											}
 											else if (customSection is not null)
 											{
-												EnsureCustomSectionGalleryState(customSection);
 												<div class="field">
 													<label>セクションタイトル</label>
 													<input class="text" @bind-value="customSection.Title" @bind-value:event="oninput" />
@@ -856,75 +990,16 @@
 													                 GetColorValue="GetColorValue" />
 												</div>
 												<div class="field">
-													<label>表示形式</label>
-													<InputSelect class="text-option-select" @bind-Value="customSection.GalleryMode" @bind-Value:after="OnAnyInputAfter">
-														<option value="single">単体</option>
-														<option value="carousel">カルーセル</option>
-														<option value="grid">グリッド</option>
-													</InputSelect>
-													<div class="hint">images が空の場合は imagePath を表示します。</div>
-												</div>
-												<div class="field">
-													<label>画像（単体 / 互換）</label>
+													<label>画像</label>
 													<div class="image-row">
 														<input class="text" @bind-value="customSection.ImagePath" @bind-value:event="oninput" />
 														<InputFile OnChange="e => OnImageSelected(e, customSection.ImagePath)" accept="image/*" />
 													</div>
 												</div>
 												<div class="field">
-													<label>画像代替テキスト（単体）</label>
+													<label>画像代替テキスト</label>
 													<input class="text" @bind-value="customSection.ImageAlt" @bind-value:event="oninput" />
 												</div>
-												@if (IsGalleryMode(customSection, "carousel") || IsGalleryMode(customSection, "grid"))
-												{
-													<div class="field">
-														<label>画像ギャラリー</label>
-														<InputFile OnChange="e => OnCustomSectionImagesSelected(e, customSection)" accept="image/*" multiple />
-														<div class="hint">複数選択アップロードに対応しています。</div>
-													</div>
-													@if (customSection.Images.Count == 0)
-													{
-														<div class="text text-readonly">画像が未登録の場合は、単体画像が表示されます。</div>
-													}
-													else
-													{
-														<div class="gallery-editor">
-															@foreach (var image in customSection.Images)
-															{
-																<div class="gallery-item">
-																	<img class="thumb" src="@GetImagePreviewSrc(image.Src)" alt="@image.Alt" />
-																	<div class="gallery-fields">
-																		<label>src</label>
-																		<input class="text" @bind-value="image.Src" @bind-value:event="oninput" @bind-value:after="OnAnyInputAfter" />
-																		<label>alt</label>
-																		<input class="text" @bind-value="image.Alt" @bind-value:event="oninput" @bind-value:after="OnAnyInputAfter" />
-																		<label>link</label>
-																		<input class="text" @bind-value="image.Link" @bind-value:event="oninput" @bind-value:after="OnAnyInputAfter" placeholder="https://..." />
-																	</div>
-																	<div class="gallery-actions">
-																		<button type="button" class="btn small" @onclick="() => MoveCustomSectionImage(customSection, image, -1)">↑</button>
-																		<button type="button" class="btn small" @onclick="() => MoveCustomSectionImage(customSection, image, 1)">↓</button>
-																		<button type="button" class="btn small danger" @onclick="() => RemoveCustomSectionImage(customSection, image)">削除</button>
-																	</div>
-																</div>
-															}
-														</div>
-													}
-													<button type="button" class="btn small" @onclick="() => AddCustomSectionImage(customSection)">画像追加</button>
-													<details class="gallery-options">
-														<summary>オプション</summary>
-														<div class="field">
-															<label class="check"><input type="checkbox" @bind="customSection.GalleryShowArrows" @bind:after="OnAnyInputAfter" /> 矢印</label>
-															<label class="check"><input type="checkbox" @bind="customSection.GalleryShowDots" @bind:after="OnAnyInputAfter" /> ドット</label>
-															<label class="check"><input type="checkbox" @bind="customSection.GalleryLoop" @bind:after="OnAnyInputAfter" /> ループ</label>
-															<label class="check"><input type="checkbox" @bind="customSection.GalleryAutoplay" @bind:after="OnAnyInputAfter" /> 自動再生</label>
-														</div>
-														<div class="field">
-															<label>interval(ms)</label>
-															<input class="text" type="number" min="1000" step="500" @bind-value="customSection.GalleryIntervalMs" @bind-value:event="oninput" @bind-value:after="OnAnyInputAfter" />
-														</div>
-													</details>
-												}
 												<div class="field">
 													<label>画像下の注意事項</label>
 													<TextLinesEditor Title=""
@@ -950,15 +1025,16 @@
 												<div class="text text-readonly">このセクションは詳細設定がありません。</div>
 											}
 
-										</div>
+										</SectionRow>
 									}
-								</div>
-							}
-						}
-					</div>
+								}
+						</SectionNavigator>
 					}
 					<div class="actions" style="margin-top:12px;">
 						<button type="button" class="btn small" @onclick="AddRankingSection">ランキングセクション追加</button>
+						<button type="button" class="btn small" @onclick="AddPaymentHistorySection">決済履歴の確認方法セクション追加</button>
+						<button type="button" class="btn small" @onclick="AddCouponFlowSection">クーポン利用方法セクション追加</button>
+						<button type="button" class="btn small" @onclick="AddStickyTabsSection">付箋タブセクション追加</button>
 						<button type="button" class="btn small" @onclick="AddCustomSection">通常セクション追加</button>
 						<button type="button" class="btn small" @onclick="AddStoreSearchSection">店舗検索セクション追加</button>
 					</div>
@@ -1081,9 +1157,9 @@
 				}
 			</div>
 		</div>
-		<div id="previewFrameWrapper" class="preview-frame-wrapper @(IsResponsivePreview ? "is-responsive" : (State.PreviewIsMobile ? "is-mobile" : "is-pc"))" style="--responsive-width: @($"{EffectiveResponsiveWidth}px"); --responsive-height: @($"{EffectiveResponsiveHeight}px");">
+		<div id="previewFrameWrapper" class="preview-frame-wrapper @(IsResponsivePreview ? "is-responsive" : (State.PreviewIsMobile ? "is-mobile" : "is-pc"))" style="--responsive-width: @($"{EffectiveResponsiveWidth}px"); --responsive-height: @($"{EffectiveResponsiveHeight}px"); --preview-scale: 1; --preview-scaled-width: @($"{EffectiveResponsiveWidth}px"); --preview-scaled-height: @($"{EffectiveResponsiveHeight}px");">
 			<div class="preview-device @(IsResponsivePreview ? "responsive" : (State.PreviewIsMobile ? "mobile" : "pc"))">
-				<iframe id="previewFrame" allow="geolocation" class="preview-frame @(IsResponsivePreview ? "responsive" : (State.PreviewIsMobile ? "mobile" : "pc"))" style="@GetPreviewFrameStyle()"></iframe>
+				<iframe id="previewFrame" allow="geolocation" class="preview-frame @(IsResponsivePreview ? "responsive" : (State.PreviewIsMobile ? "mobile" : "pc"))" style="@GetPreviewFrameStyle()" srcdoc="@State.PreviewHtml" @key="PreviewVersion"></iframe>
 			</div>
 		</div>
 	</div>
@@ -1128,21 +1204,25 @@
 		new("中央", "center"),
 		new("右", "right")
 	};
+	private readonly List<string> RecentCardColors = new();
+	private CancellationTokenSource? _designPreviewCts;
+	private Action<HighlightRequest>? _highlightHandler;
+	private bool _pendingBandHighlight;
 	private int? TemplateTextFontSize;
 	private bool IsPreviewLoading;
+	private int PreviewVersion;
 	private bool IsResponsivePreview;
 	private bool IsLandscape;
 	private int ResponsiveWidth = 375;
 	private int ResponsiveHeight = 667;
 	private double ResponsiveDpr = 1;
 	private string SelectedResponsiveDevice = string.Empty;
-	private string SelectedBackgroundSectionKey = "campaign-content";
 	private BackgroundSetting PageBackgroundSetting = new();
-	private BackgroundSetting SectionBackgroundSetting = new();
 	private bool UseViewportSizing;
+	private bool HasPreviewModeSelection;
 	private const int PcPreviewWidth = 1280;
 	private const int PcPreviewHeight = 800;
-	private const int SpPreviewWidth = 375;
+	private const int SpPreviewWidth = 390;
 	private const int SpPreviewHeight = 667;
 	private static readonly ResponsiveDeviceOption[] ResponsiveDevices =
 	{
@@ -1173,6 +1253,15 @@
 	private bool _footerLinesInitialized;
 	private readonly HashSet<string> _customSectionLinesInitialized = new(StringComparer.OrdinalIgnoreCase);
 	private string SelectedSectionId = string.Empty;
+	private string CurrentPreviewSectionId = string.Empty;
+	private string SectionSearch = string.Empty;
+	private string SectionVisibilityFilter = "all";
+	private string SectionTypeFilter = "all";
+	private bool FollowActiveSection = true;
+	private string FrameThemeTab = "common";
+	private string FrameThemeSectionKey = string.Empty;
+	private IReadOnlyList<KeyValuePair<string, string>> DesignSectionOptions = Array.Empty<KeyValuePair<string, string>>();
+	private string FrameAnimationScope = "per";
 	private string PreviewMode = "edit";
 	private LpImportSession? ImportSession;
 	private LpImportProject? ImportProject;
@@ -1189,15 +1278,19 @@
 		SetupEditContext();
 		InitializeAccordionDefaults();
 		EnsureSectionTextLines();
-		EnsureBackgroundSectionSelection();
 		EnsureSectionSelection();
+		RefreshDesignSectionOptions();
+		EnsureFrameThemeSectionKey();
+		EnsureFrameDefaultStyle();
+		CleanFrameOverrideData();
 		SyncPageBackgroundSetting();
-		SyncSectionBackgroundSetting();
+		RegisterHighlightListener();
 		BackgroundPresets = await BackgroundPresetService.GetPresetsAsync();
 	}
 
 	private void EnsureSectionSelection()
 	{
+		RefreshDesignSectionOptions();
 		if (string.IsNullOrWhiteSpace(SelectedSectionId))
 		{
 			SelectedSectionId = State.Content.SectionGroups.FirstOrDefault()?.Key ?? string.Empty;
@@ -1210,10 +1303,33 @@
 		EditContext.OnFieldChanged += async (_, _) => await UpdatePreviewAsync();
 	}
 
+	private void RegisterHighlightListener()
+	{
+		if (_highlightHandler is not null)
+		{
+			return;
+		}
+
+		_highlightHandler = request => _ = InvokeAsync(async () =>
+		{
+			try
+			{
+				await JS.InvokeVoidAsync("lpHighlight.request", "previewFrame", request);
+			}
+			catch
+			{
+				// no-op
+			}
+		});
+
+		HighlightService.OnRequested += _highlightHandler;
+	}
+
 	private void SetTab(string tab)
 	{
 		ActiveTab = tab;
 	}
+
 
 	private IReadOnlyList<StepNavItem> GetStepItems()
 	{
@@ -1229,7 +1345,7 @@
 			new() { Id = "template", Index = 1, Label = "テンプレ選択", IsComplete = templateReady, IsActive = ActiveTab == "basic" },
 			new() { Id = "content", Index = 2, Label = "セクション内容編集", IsComplete = contentReady, IsActive = ActiveTab == "content" },
 			new() { Id = "decor", Index = 3, Label = "セクション装飾", IsComplete = decorReady, IsActive = ActiveTab == "content" },
-			new() { Id = "background", Index = 4, Label = "背景調整", IsComplete = !string.IsNullOrWhiteSpace(State.Content.LpBackground.Color) || !string.IsNullOrWhiteSpace(State.Content.LpBackground.ImageUrl), IsActive = ActiveTab == "background" },
+			new() { Id = "background", Index = 4, Label = "背景調整", IsComplete = !string.IsNullOrWhiteSpace(State.Content.LpBackground.Color) || !string.IsNullOrWhiteSpace(State.Content.LpBackground.ImageUrl), IsActive = ActiveTab == "design" },
 			new() { Id = "check", Index = 5, Label = "出力チェック", IsComplete = GetSafetyIssues().Count == 0, IsActive = ActiveTab == "basic" }
 		};
 	}
@@ -1269,7 +1385,7 @@
 				}
 				break;
 			case "background":
-				SetTab("background");
+				SetTab("design");
 				await ScrollToEditorAsync("[data-step='background']");
 				await TriggerHighlightAsync(string.Empty, "background");
 				break;
@@ -1291,8 +1407,101 @@
 
 	private async Task TriggerHighlightAsync(string sectionKey, string kind)
 	{
-		await JS.InvokeVoidAsync("lpHighlight.flash", "previewFrame", sectionKey ?? string.Empty, kind ?? string.Empty);
+		HighlightService.Trigger(BuildHighlightRequest(sectionKey, kind));
+		await Task.CompletedTask;
 	}
+
+	private HighlightRequest BuildHighlightRequest(string? sectionKey, string? kind)
+	{
+		var normalizedKind = kind?.Trim().ToLowerInvariant() ?? string.Empty;
+		return normalizedKind switch
+		{
+			"background" => new HighlightRequest
+			{
+				ScopeType = "page",
+				Style = "wash",
+				DurationMs = 320
+			},
+			"decor" => new HighlightRequest
+			{
+				ScopeType = "section",
+				Id = NormalizeHighlightId(sectionKey),
+				Style = "outline",
+				DurationMs = 320
+			},
+			_ => new HighlightRequest
+			{
+				ScopeType = "section",
+				Id = NormalizeHighlightId(sectionKey),
+				Style = "glow",
+				DurationMs = 320
+			}
+		};
+	}
+
+	private void TriggerPageHighlight()
+	{
+		HighlightService.Trigger(new HighlightRequest
+		{
+			ScopeType = "page",
+			Style = "wash",
+			DurationMs = 320
+		});
+	}
+
+	private void TriggerSectionHighlight(string? sectionKey, string style = "glow")
+	{
+		if (string.IsNullOrWhiteSpace(sectionKey))
+		{
+			TriggerPageHighlight();
+			return;
+		}
+		var normalized = NormalizeHighlightId(sectionKey);
+		if (string.IsNullOrWhiteSpace(normalized))
+		{
+			TriggerPageHighlight();
+			return;
+		}
+		HighlightService.Trigger(new HighlightRequest
+		{
+			ScopeType = "section",
+			Id = normalized,
+			Style = style,
+			DurationMs = 320
+		});
+	}
+
+	private void TriggerSlotHighlight(string slotId, string style = "glow")
+	{
+		if (string.IsNullOrWhiteSpace(slotId))
+		{
+			return;
+		}
+		HighlightService.Trigger(new HighlightRequest
+		{
+			ScopeType = "slot",
+			Id = slotId,
+			Style = style,
+			DurationMs = 320
+		});
+	}
+
+	private static string NormalizeHighlightId(string? key)
+	{
+		if (string.IsNullOrWhiteSpace(key))
+		{
+			return string.Empty;
+		}
+		return Regex.Replace(key.Trim().ToLowerInvariant(), "[^a-z0-9]", string.Empty);
+	}
+
+	// 動作確認メモ:
+	// - 背景変更でページ全体(wash)が点灯する
+	// - フレーム変更で選択セクション(glow)が点灯する
+	// - 帯変更でヘッダー帯(outline)のみ点灯する
+	// - タブ変更でタブ領域(glow)のみ点灯する
+	// - 連続操作でも過剰に点滅せず追従する
+	// - セクション切替/プレビュー再描画後もハイライトが機能する
 
 	private async Task ScrollPreviewToSectionAsync(string sectionKey)
 	{
@@ -1301,6 +1510,252 @@
 			return;
 		}
 		await JS.InvokeVoidAsync("lpHighlight.scrollToSection", "previewFrame", sectionKey);
+	}
+
+	private async Task OnSectionRowSelectedAsync(SectionGroupModel group)
+	{
+		if (group is null || string.IsNullOrWhiteSpace(group.Key))
+		{
+			return;
+		}
+
+		SelectedSectionId = group.Key;
+		await ScrollPreviewToSectionAsync(group.Key);
+		await TriggerHighlightAsync(group.Key, "section");
+	}
+
+	private async Task OnMiniMapSelectAsync(string key)
+	{
+		if (string.IsNullOrWhiteSpace(key))
+		{
+			return;
+		}
+		SelectedSectionId = key;
+		await ScrollPreviewToSectionAsync(key);
+	}
+
+	private async Task OnSectionVisibilityChanged(SectionGroupModel group, ChangeEventArgs e)
+	{
+		if (group is null)
+		{
+			return;
+		}
+
+		if (e?.Value is bool isVisible)
+		{
+			group.Enabled = isVisible;
+		}
+		else if (bool.TryParse(e?.Value?.ToString(), out var parsed))
+		{
+			group.Enabled = parsed;
+		}
+
+		await OnSectionGroupChanged();
+	}
+
+	private IReadOnlyList<MiniMap.MiniMapSection> GetMiniMapSections()
+	{
+		return State.Content.SectionGroups
+			.Where(group => IsEditorManagedSectionKey(group.Key))
+			.Select(group => new MiniMap.MiniMapSection
+			{
+				Key = group.Key ?? string.Empty,
+				NormalizedKey = NormalizeSectionKey(group.Key),
+				Title = GetSectionDisplayName(group.Key, group.DisplayName),
+				IsEnabled = group.Enabled
+			})
+			.ToList();
+	}
+
+	private static string GetSectionIcon(string? key, bool isCustom)
+	{
+		if (isCustom)
+		{
+			return "🧩";
+		}
+		return NormalizeSectionKey(key) switch
+		{
+			"campaigncontent" => "📝",
+			"couponperiod" => "📅",
+			"couponflow" => "🧭",
+			"couponnotes" => "🧾",
+			"stickytabs" => "📌",
+			"ranking" => "🏆",
+			"paymenthistory" => "💳",
+			"countdown" => "⏱",
+			"storesearch" => "🔎",
+			_ => "📦"
+		};
+	}
+
+	private static string GetSectionIconLabel(string? key, bool isCustom)
+	{
+		if (isCustom)
+		{
+			return "カスタムセクション";
+		}
+		return NormalizeSectionKey(key) switch
+		{
+			"campaigncontent" => "キャンペーン内容",
+			"couponperiod" => "クーポン期間",
+			"couponflow" => "クーポン導線",
+			"couponnotes" => "クーポン注意事項",
+			"stickytabs" => "タブセクション",
+			"ranking" => "ランキング",
+			"paymenthistory" => "決済履歴",
+			"countdown" => "カウントダウン",
+			"storesearch" => "店舗検索",
+			_ => "セクション"
+		};
+	}
+
+	private string GetSectionSubInfo(SectionGroupModel group)
+	{
+		if (string.IsNullOrWhiteSpace(group.Key))
+		{
+			return string.Empty;
+		}
+		var isCustom = State.Content.CustomSections.Any(section => string.Equals(section.Key, group.Key, StringComparison.OrdinalIgnoreCase));
+		var typeLabel = GetSectionTypeLabel(group.Key, isCustom);
+		var visibility = group.Enabled ? "表示中" : "非表示";
+		return $"{typeLabel} · {visibility}";
+	}
+
+	private IEnumerable<SectionGroupModel> GetFilteredSectionGroups()
+	{
+		IEnumerable<SectionGroupModel> query = State.Content.SectionGroups
+			.Where(group => IsEditorManagedSectionKey(group.Key));
+
+		if (!string.IsNullOrWhiteSpace(SectionSearch))
+		{
+			var keyword = SectionSearch.Trim();
+			query = query.Where(group =>
+				GetSectionDisplayName(group.Key, group.DisplayName).Contains(keyword, StringComparison.OrdinalIgnoreCase)
+				|| (group.Key?.Contains(keyword, StringComparison.OrdinalIgnoreCase) ?? false));
+		}
+
+		switch (SectionVisibilityFilter)
+		{
+			case "visible":
+				query = query.Where(group => group.Enabled);
+				break;
+			case "hidden":
+				query = query.Where(group => !group.Enabled);
+				break;
+		}
+
+		if (!string.Equals(SectionTypeFilter, "all", StringComparison.OrdinalIgnoreCase))
+		{
+			query = query.Where(group =>
+			{
+				var isCustom = State.Content.CustomSections.Any(section => string.Equals(section.Key, group.Key, StringComparison.OrdinalIgnoreCase));
+				return string.Equals(GetSectionTypeKey(group.Key, isCustom), SectionTypeFilter, StringComparison.OrdinalIgnoreCase);
+			});
+		}
+
+		return query;
+	}
+
+	private IReadOnlyList<SectionGroupModel> FilteredSectionGroups
+		=> GetFilteredSectionGroups().ToList();
+
+	private IReadOnlyList<KeyValuePair<string, string>> GetSectionTypeOptions()
+	{
+		var order = new[] { "campaign", "coupon", "tabs", "ranking", "payment", "countdown", "store", "custom", "other" };
+		var map = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+		foreach (var group in State.Content.SectionGroups.Where(group => IsEditorManagedSectionKey(group.Key)))
+		{
+			var isCustom = State.Content.CustomSections.Any(section => string.Equals(section.Key, group.Key, StringComparison.OrdinalIgnoreCase));
+			var key = GetSectionTypeKey(group.Key, isCustom);
+			if (!map.ContainsKey(key))
+			{
+				map[key] = GetSectionTypeLabel(group.Key, isCustom);
+			}
+		}
+		return order.Where(map.ContainsKey)
+			.Select(key => new KeyValuePair<string, string>(key, map[key]))
+			.ToList();
+	}
+
+	private static string GetSectionTypeKey(string? key, bool isCustom)
+	{
+		if (isCustom)
+		{
+			return "custom";
+		}
+		return NormalizeSectionKey(key) switch
+		{
+			"campaigncontent" => "campaign",
+			"couponperiod" => "coupon",
+			"couponflow" => "coupon",
+			"couponnotes" => "coupon",
+			"stickytabs" => "tabs",
+			"ranking" => "ranking",
+			"paymenthistory" => "payment",
+			"countdown" => "countdown",
+			"storesearch" => "store",
+			_ => "other"
+		};
+	}
+
+	private static string GetSectionTypeLabel(string? key, bool isCustom)
+	{
+		if (isCustom)
+		{
+			return "カスタム";
+		}
+		return NormalizeSectionKey(key) switch
+		{
+			"campaigncontent" => "キャンペーン",
+			"couponperiod" => "クーポン",
+			"couponflow" => "クーポン",
+			"couponnotes" => "クーポン",
+			"stickytabs" => "タブ",
+			"ranking" => "ランキング",
+			"paymenthistory" => "決済履歴",
+			"countdown" => "カウントダウン",
+			"storesearch" => "店舗検索",
+			_ => "その他"
+		};
+	}
+
+	private static string GetSectionRowId(string normalizedKey)
+		=> string.IsNullOrWhiteSpace(normalizedKey) ? string.Empty : $"section-row-{normalizedKey}";
+
+	private async Task OnSectionEditClickedAsync(SectionGroupModel group, string openKey)
+	{
+		if (group is null || string.IsNullOrWhiteSpace(group.Key))
+		{
+			return;
+		}
+
+		SelectedSectionId = group.Key;
+		if (IsSectionOpen(openKey))
+		{
+			ToggleSection(openKey);
+		}
+		else
+		{
+			OpenSection(openKey);
+		}
+		SetTab("content");
+		await ScrollToEditorAsync($"[data-id='{group.Key}']");
+		await ScrollPreviewToSectionAsync(group.Key);
+		await TriggerHighlightAsync(group.Key, "section");
+	}
+
+	private async Task OnSectionMenuActionAsync(SectionGroupModel group, string action)
+	{
+		if (group is null)
+		{
+			return;
+		}
+		switch (action)
+		{
+			case "delete":
+				await RemoveSectionGroupAsync(group.Key ?? string.Empty);
+				break;
+		}
 	}
 
 	private async Task ScrollToEditorAsync(string selector)
@@ -1321,6 +1776,10 @@
 		await ScrollToEditorAsync($"[data-id='{group.Key}']");
 		switch (action)
 		{
+			case "scroll":
+				await ScrollPreviewToSectionAsync(group.Key ?? string.Empty);
+				await TriggerHighlightAsync(group.Key ?? string.Empty, "section");
+				break;
 			case "text":
 				SetTab("content");
 				await ScrollPreviewToSectionAsync(group.Key ?? string.Empty);
@@ -1332,8 +1791,7 @@
 				await TriggerHighlightAsync(group.Key ?? string.Empty, "decor");
 				break;
 			case "background":
-				SelectedBackgroundSectionKey = group.Key ?? SelectedBackgroundSectionKey;
-				SetTab("background");
+				SetTab("design");
 				await TriggerHighlightAsync(group.Key ?? string.Empty, "background");
 				break;
 			case "toggle":
@@ -1437,16 +1895,94 @@
 		}
 	}
 
-	private static string GetSectionDisplayName(string? key)
+	private static string GetSectionDisplayName(string? key, string? displayName = null)
 	{
 		if (string.IsNullOrWhiteSpace(key))
 		{
 			return "-";
 		}
 
+		if (!string.IsNullOrWhiteSpace(displayName))
+		{
+			return displayName;
+		}
+
+		if (key.StartsWith("custom-section", StringComparison.OrdinalIgnoreCase))
+		{
+			return "通常セクション";
+		}
+		if (key.StartsWith("store-search", StringComparison.OrdinalIgnoreCase)
+			|| string.Equals(key, "storeSearch", StringComparison.OrdinalIgnoreCase))
+		{
+			return "店舗検索";
+		}
+		if (key.Contains("conditions-contact-banners", StringComparison.OrdinalIgnoreCase))
+		{
+			return "条件・お問い合わせ・バナー";
+		}
+		if (key.Contains("banner", StringComparison.OrdinalIgnoreCase))
+		{
+			return "バナー";
+		}
+
+		if (string.Equals(key, "payment-history", StringComparison.OrdinalIgnoreCase)
+			|| string.Equals(key, "paymentHistory", StringComparison.OrdinalIgnoreCase))
+		{
+			return "決済履歴の確認方法";
+		}
+		if (string.Equals(key, "campaign-content", StringComparison.OrdinalIgnoreCase)
+			|| string.Equals(key, "campaignContent", StringComparison.OrdinalIgnoreCase))
+		{
+			return "キャンペーン内容";
+		}
+		if (string.Equals(key, "coupon-period", StringComparison.OrdinalIgnoreCase)
+			|| string.Equals(key, "couponPeriod", StringComparison.OrdinalIgnoreCase))
+		{
+			return "キャンペーン期間";
+		}
+		if (string.Equals(key, "coupon-flow", StringComparison.OrdinalIgnoreCase)
+			|| string.Equals(key, "couponFlow", StringComparison.OrdinalIgnoreCase))
+		{
+			return "クーポン利用方法";
+		}
+		if (string.Equals(key, "sticky-tabs", StringComparison.OrdinalIgnoreCase)
+			|| string.Equals(key, "stickyTabs", StringComparison.OrdinalIgnoreCase))
+		{
+			return "付箋タブ（注意事項/特典/FAQ）";
+		}
+		if (string.Equals(key, "coupon-notes", StringComparison.OrdinalIgnoreCase)
+			|| string.Equals(key, "couponNotes", StringComparison.OrdinalIgnoreCase))
+		{
+			return "注意事項";
+		}
+		if (string.Equals(key, "ranking", StringComparison.OrdinalIgnoreCase))
+		{
+			return "ランキング";
+		}
+		if (string.Equals(key, "conditions", StringComparison.OrdinalIgnoreCase))
+		{
+			return "利用条件";
+		}
+		if (string.Equals(key, "contact", StringComparison.OrdinalIgnoreCase))
+		{
+			return "お問い合わせ";
+		}
+
 		return string.Equals(key, "countdown", StringComparison.OrdinalIgnoreCase)
-			? "footer"
+			? "フッター"
 			: key;
+	}
+
+	private string? GetSectionGroupDisplayName(string? key)
+	{
+		if (string.IsNullOrWhiteSpace(key))
+		{
+			return null;
+		}
+
+		return State.Content.SectionGroups
+			.FirstOrDefault(group => string.Equals(group.Key, key, StringComparison.OrdinalIgnoreCase))
+			?.DisplayName;
 	}
 
 	private bool IsEditorManagedSectionKey(string? key)
@@ -1465,8 +2001,11 @@
 		{
 			"campaigncontent" => true,
 			"couponperiod" => true,
+			"couponflow" => true,
 			"couponnotes" => true,
+			"stickytabs" => true,
 			"ranking" => true,
+			"paymenthistory" => true,
 			"countdown" => true,
 			"storesearch" => true,
 			_ => false
@@ -1514,10 +2053,10 @@
 			EnsureCouponPeriodDefaults();
 			ResetSectionTextLines();
 			EnsureSectionTextLines();
-			EnsureBackgroundSectionSelection();
 			EnsureSectionSelection();
+			EnsureFrameDefaultStyle();
+			CleanFrameOverrideData();
 			SyncPageBackgroundSetting();
-			SyncSectionBackgroundSetting();
 			SetupEditContext();
 			await UpdatePreviewAsync();
 		}
@@ -1876,10 +2415,10 @@
 			}
 			ApplyDefaultFontSizeToAllItems();
 			EnsureCouponPeriodDefaults();
-			EnsureBackgroundSectionSelection();
 			EnsureSectionSelection();
+			EnsureFrameDefaultStyle();
+			CleanFrameOverrideData();
 			SyncPageBackgroundSetting();
-			SyncSectionBackgroundSetting();
 			SetupEditContext();
 			await UpdatePreviewAsync();
 		}
@@ -1994,6 +2533,30 @@
 		{
 			State.Error.SetError("画像処理に失敗", ex.Message);
 		}
+	}
+
+	private async Task SaveCustomSectionImageAsync(string path, byte[] bytes)
+	{
+		if (string.IsNullOrWhiteSpace(path))
+		{
+			return;
+		}
+
+		var ext = Path.GetExtension(path).ToLowerInvariant();
+		if (ext == ".png")
+		{
+			var maxWidth = GetMaxWidth(path);
+			var resized = await ImageService.ResizePngAsync(bytes, maxWidth);
+			State.ImageOverrides[path] = resized;
+			UpdateImageMeta(path, resized);
+		}
+		else
+		{
+			State.ImageOverrides[path] = bytes;
+			UpdateImageMeta(path, bytes);
+		}
+
+		RemoveDeletedImage(path);
 	}
 
 	private async Task OnEndDateChanged()
@@ -2441,10 +3004,35 @@
 		State.Content.Sections.Ranking.Enabled = true;
 		EnsureSectionGroupKey("ranking", "couponNotes", "coupon-notes");
 		MoveSectionGroupAfter("ranking", "couponNotes", "coupon-notes");
-		if (State.Content.Sections.Ranking.Rows.Count == 0)
-		{
-			State.Content.Sections.Ranking.Rows.Add(new RankingRowModel());
-		}
+		EnsureRankingRefDefaults();
+		await UpdatePreviewAsync();
+	}
+
+	private async void AddPaymentHistorySection()
+	{
+		State.Content.Sections.PaymentHistory.Enabled = true;
+		EnsureSectionGroupKey("payment-history", "ranking");
+		MoveSectionGroupAfter("payment-history", "ranking");
+		EnsurePaymentHistoryDefaults();
+		await UpdatePreviewAsync();
+	}
+
+	private async void AddCouponFlowSection()
+	{
+		State.Content.Sections.CouponFlow.Enabled = true;
+		EnsureSectionGroupKey("coupon-flow", "storeSearch", "store-search", "couponPeriod", "coupon-period");
+		MoveSectionGroupAfter("coupon-flow", "storeSearch", "store-search", "couponPeriod", "coupon-period");
+		EnsureCouponFlowDefaults();
+		await UpdatePreviewAsync();
+	}
+
+	private async void AddStickyTabsSection()
+	{
+		State.Content.Sections.StickyTabs.Enabled = true;
+		EnsureSectionGroupKey("sticky-tabs", "couponNotes", "coupon-notes");
+		MoveSectionGroupAfter("sticky-tabs", "couponNotes", "coupon-notes");
+		EnsureStickyTabsDefaults();
+		SelectedStickyTabIndex = 0;
 		await UpdatePreviewAsync();
 	}
 
@@ -2458,13 +3046,6 @@
 			Body = string.Empty,
 			ImagePath = $"images/{key}.png",
 			ImageAlt = string.Empty,
-			GalleryMode = "single",
-			Images = new List<CustomSectionImageModel>(),
-			GalleryShowArrows = true,
-			GalleryShowDots = true,
-			GalleryLoop = true,
-			GalleryAutoplay = false,
-			GalleryIntervalMs = 4000,
 			LinkUrl = string.Empty,
 			Notes = string.Empty,
 			BodyTextItems = new List<StyledTextItem>(),
@@ -2527,6 +3108,444 @@
 			MoveSectionGroupAfter(key, "couponNotes", "coupon-notes", "couponPeriod", "coupon-period");
 		}
 		await UpdatePreviewAsync();
+	}
+
+	private int SelectedStickyTabIndex { get; set; }
+	private StickyBlockType NewStickyBlockType { get; set; } = StickyBlockType.RichText;
+	private void TriggerStickyTabsHighlight()
+	{
+		TriggerSlotHighlight("tabs", "glow");
+	}
+	private static readonly string[] StickyTabPalette = new[]
+	{
+		"#E11D48",
+		"#F97316",
+		"#F59E0B",
+		"#10B981",
+		"#22C55E",
+		"#0EA5E9",
+		"#6366F1",
+		"#8B5CF6",
+		"#EC4899",
+		"#111827",
+		"#334155",
+		"#F87171"
+	};
+
+	private void SelectStickyTab(int index)
+	{
+		SelectedStickyTabIndex = index;
+	}
+
+	private static bool IsStickyTabTextAuto(StickyTabModel tab)
+	{
+		return string.IsNullOrWhiteSpace(tab.TextColor);
+	}
+
+	private static string ToColorPickerValue(string? color)
+	{
+		if (string.IsNullOrWhiteSpace(color))
+		{
+			return "#ffffff";
+		}
+
+		var trimmed = color.Trim();
+		if (trimmed.StartsWith('#') && trimmed.Length == 4)
+		{
+			return $"#{trimmed[1]}{trimmed[1]}{trimmed[2]}{trimmed[2]}{trimmed[3]}{trimmed[3]}";
+		}
+		if (trimmed.StartsWith('#') && trimmed.Length == 7)
+		{
+			return trimmed;
+		}
+
+		return "#ffffff";
+	}
+
+	private static string ResolveStickyTabEditorTextColor(string? backgroundColor, string? manualTextColor)
+	{
+		if (!string.IsNullOrWhiteSpace(manualTextColor))
+		{
+			return manualTextColor;
+		}
+
+		if (!TryParseHexColor(backgroundColor, out var r, out var g, out var b))
+		{
+			return "#111827";
+		}
+
+		var luminance = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255d;
+		return luminance > 0.6 ? "#111827" : "#ffffff";
+	}
+
+	private static bool TryParseHexColor(string? value, out int r, out int g, out int b)
+	{
+		r = g = b = 0;
+		if (string.IsNullOrWhiteSpace(value))
+		{
+			return false;
+		}
+
+		var hex = value.Trim();
+		if (hex.StartsWith('#'))
+		{
+			hex = hex[1..];
+		}
+
+		if (hex.Length == 3)
+		{
+			hex = string.Concat(hex[0], hex[0], hex[1], hex[1], hex[2], hex[2]);
+		}
+
+		if (hex.Length != 6)
+		{
+			return false;
+		}
+
+		return int.TryParse(hex.AsSpan(0, 2), System.Globalization.NumberStyles.HexNumber, System.Globalization.CultureInfo.InvariantCulture, out r)
+			&& int.TryParse(hex.AsSpan(2, 2), System.Globalization.NumberStyles.HexNumber, System.Globalization.CultureInfo.InvariantCulture, out g)
+			&& int.TryParse(hex.AsSpan(4, 2), System.Globalization.NumberStyles.HexNumber, System.Globalization.CultureInfo.InvariantCulture, out b);
+	}
+
+	private async void AddStickyTab()
+	{
+		var model = State.Content.Sections.StickyTabs;
+		model.Tabs.Add(new StickyTabModel
+		{
+			Title = "新しいタブ",
+			Color = string.Empty,
+			ContentBlocks = new List<StickyBlockModel>
+			{
+				new StickyBlockModel { Type = StickyBlockType.RichText, RichTextHtml = "テキストを入力してください" }
+			}
+		});
+		SelectedStickyTabIndex = model.Tabs.Count - 1;
+		await UpdatePreviewAsync();
+		TriggerStickyTabsHighlight();
+	}
+
+	private async void SetStickyTabColor(StickyTabModel tab, string? color)
+	{
+		tab.Color = color ?? string.Empty;
+		await UpdatePreviewAsync();
+		TriggerStickyTabsHighlight();
+	}
+
+	private async void SetStickyTabTextColorMode(StickyTabModel tab, ChangeEventArgs e)
+	{
+		var isAuto = e?.Value is bool b && b;
+		if (isAuto)
+		{
+			tab.TextColor = string.Empty;
+		}
+		else if (string.IsNullOrWhiteSpace(tab.TextColor))
+		{
+			tab.TextColor = "#111827";
+		}
+		await UpdatePreviewAsync();
+		TriggerStickyTabsHighlight();
+	}
+
+	private async void SetStickyTabTextColor(StickyTabModel tab, string? color)
+	{
+		tab.TextColor = color ?? string.Empty;
+		await UpdatePreviewAsync();
+		TriggerStickyTabsHighlight();
+	}
+
+	private async void RemoveStickyTabWithConfirm(int index)
+	{
+		var ok = await JS.InvokeAsync<bool>("confirm", "このタブを削除しますか？");
+		if (!ok)
+		{
+			return;
+		}
+		RemoveStickyTab(index);
+	}
+
+	private async void RemoveStickyTab(int index)
+	{
+		var model = State.Content.Sections.StickyTabs;
+		if (index < 0 || index >= model.Tabs.Count)
+		{
+			return;
+		}
+		model.Tabs.RemoveAt(index);
+		SelectedStickyTabIndex = Math.Clamp(SelectedStickyTabIndex, 0, Math.Max(0, model.Tabs.Count - 1));
+		await UpdatePreviewAsync();
+		TriggerStickyTabsHighlight();
+	}
+
+	private async void DuplicateStickyTab(int index)
+	{
+		var model = State.Content.Sections.StickyTabs;
+		if (index < 0 || index >= model.Tabs.Count)
+		{
+			return;
+		}
+		var source = model.Tabs[index];
+		var clone = new StickyTabModel
+		{
+			Title = string.IsNullOrWhiteSpace(source.Title) ? "新しいタブ" : $"{source.Title}（コピー）",
+			Color = source.Color,
+			TextColor = source.TextColor,
+			ContentBlocks = source.ContentBlocks.Select(CloneStickyBlock).ToList()
+		};
+		model.Tabs.Insert(index + 1, clone);
+		SelectedStickyTabIndex = index + 1;
+		await UpdatePreviewAsync();
+		TriggerStickyTabsHighlight();
+	}
+
+	private static StickyBlockModel CloneStickyBlock(StickyBlockModel block)
+	{
+		return new StickyBlockModel
+		{
+			Type = block.Type,
+			RichTextHtml = block.RichTextHtml,
+			ImageSrc = block.ImageSrc,
+			Caption = block.Caption
+		};
+	}
+
+	private async void MoveStickyTab(int index, int delta)
+	{
+		var model = State.Content.Sections.StickyTabs;
+		var next = index + delta;
+		if (index < 0 || index >= model.Tabs.Count || next < 0 || next >= model.Tabs.Count)
+		{
+			return;
+		}
+		var item = model.Tabs[index];
+		model.Tabs.RemoveAt(index);
+		model.Tabs.Insert(next, item);
+		SelectedStickyTabIndex = next;
+		await UpdatePreviewAsync();
+		TriggerStickyTabsHighlight();
+	}
+
+	private async void AddStickyBlock(StickyTabModel tab, StickyBlockType type)
+	{
+		tab.ContentBlocks.Add(CreateStickyBlock(type));
+		await UpdatePreviewAsync();
+	}
+
+	private async void RemoveStickyBlock(StickyTabModel tab, int index)
+	{
+		if (index < 0 || index >= tab.ContentBlocks.Count)
+		{
+			return;
+		}
+		tab.ContentBlocks.RemoveAt(index);
+		await UpdatePreviewAsync();
+	}
+
+	private async void DuplicateStickyBlock(StickyTabModel tab, int index)
+	{
+		if (index < 0 || index >= tab.ContentBlocks.Count)
+		{
+			return;
+		}
+		var clone = CloneStickyBlock(tab.ContentBlocks[index]);
+		tab.ContentBlocks.Insert(index + 1, clone);
+		await UpdatePreviewAsync();
+	}
+
+	private async void MoveStickyBlock(StickyTabModel tab, int index, int delta)
+	{
+		var next = index + delta;
+		if (index < 0 || index >= tab.ContentBlocks.Count || next < 0 || next >= tab.ContentBlocks.Count)
+		{
+			return;
+		}
+		var item = tab.ContentBlocks[index];
+		tab.ContentBlocks.RemoveAt(index);
+		tab.ContentBlocks.Insert(next, item);
+		await UpdatePreviewAsync();
+	}
+
+	private static StickyBlockModel CreateStickyBlock(StickyBlockType type)
+	{
+		return type switch
+		{
+			StickyBlockType.Image => new StickyBlockModel
+			{
+				Type = type,
+				ImageSrc = "images/benefit-sample.png"
+			},
+			StickyBlockType.ImageWithCaption => new StickyBlockModel
+			{
+				Type = type,
+				ImageSrc = "images/benefit-sample.png",
+				Caption = "特典内容のイメージです。"
+			},
+			StickyBlockType.Divider => new StickyBlockModel
+			{
+				Type = type
+			},
+			_ => new StickyBlockModel
+			{
+				Type = StickyBlockType.RichText,
+				RichTextHtml = "テキストを入力してください"
+			}
+		};
+	}
+
+	private static string GetStickyBlockTypeLabel(StickyBlockType type)
+	{
+		return type switch
+		{
+			StickyBlockType.Image => "画像",
+			StickyBlockType.ImageWithCaption => "画像＋キャプション",
+			StickyBlockType.Divider => "区切り線",
+			_ => "リッチテキスト"
+		};
+	}
+
+	private void EnsureStickyTabsDefaults()
+	{
+		var model = State.Content.Sections.StickyTabs;
+		if (model.Tabs.Count > 0)
+		{
+			return;
+		}
+		model.Tabs.AddRange(new[]
+		{
+			new StickyTabModel
+			{
+				Title = "本キャンペーン注意事項",
+				Color = "#d91f2a",
+				ContentBlocks = new List<StickyBlockModel>
+				{
+					new StickyBlockModel { Type = StickyBlockType.RichText, RichTextHtml = "・抽選・当選共に1au IDあたり1回です。\n・当選者の発表はポイントの加算をもって代えさせていただきます。\n・抽選結果についてはお問い合わせいただいても回答できません。" }
+				}
+			},
+			new StickyTabModel
+			{
+				Title = "特典内容",
+				Color = "#f4c44e",
+				ContentBlocks = new List<StickyBlockModel>
+				{
+					new StickyBlockModel { Type = StickyBlockType.ImageWithCaption, ImageSrc = "images/benefit-sample.png", Caption = "特典内容のイメージです。" },
+					new StickyBlockModel { Type = StickyBlockType.RichText, RichTextHtml = "特典内容の詳細を記載します。" }
+				}
+			}
+		});
+	}
+
+	private async void AddCouponFlowSlide()
+	{
+		State.Content.Sections.CouponFlow.Slides.Add(new CouponFlowSlideModel
+		{
+			Image = "images/slide-img.png",
+			Alt = string.Empty
+		});
+		await UpdatePreviewAsync();
+	}
+
+	private async void RemoveCouponFlowSlide(CouponFlowSlideModel slide)
+	{
+		State.Content.Sections.CouponFlow.Slides.Remove(slide);
+		await UpdatePreviewAsync();
+	}
+
+	private void EnsureCouponFlowDefaults()
+	{
+		var flow = State.Content.Sections.CouponFlow;
+		if (string.IsNullOrWhiteSpace(flow.Title))
+		{
+			flow.Title = "クーポン利用の流れ";
+		}
+		if (string.IsNullOrWhiteSpace(flow.Lead))
+		{
+			flow.Lead = "＊必ずクーポンを獲得してからau PAY（コード支払い）でお支払いください。";
+		}
+		if (flow.Slides.Count == 0)
+		{
+			flow.Slides.AddRange(new[]
+			{
+				new CouponFlowSlideModel { Image = "images/slide-img1.png", Alt = "1. au PAY アプリのホームの下のクーポンから獲得できます。「一覧」でクーポン画面に遷移します。" },
+				new CouponFlowSlideModel { Image = "images/slide-img2.png", Alt = "2. クーポン画面で、クーポンを獲得できる他、クーポンをタップするとクーポンの詳細画面を確認することができます。" },
+				new CouponFlowSlideModel { Image = "images/slide-img3.png", Alt = "3. クーポンの詳細画面でも獲得できます。" },
+				new CouponFlowSlideModel { Image = "images/slide-img4.png", Alt = "4. マイクーポンが自動で適応されます。" },
+				new CouponFlowSlideModel { Image = "images/slide-img5.png", Alt = "5. クーポン対象のお店で決済します。" },
+				new CouponFlowSlideModel { Image = "images/slide-img6.png", Alt = "6. マイクーポンが自動で適応されます。" }
+			});
+		}
+		if (string.IsNullOrWhiteSpace(flow.Note))
+		{
+			flow.Note = "※画面はイメージです。";
+		}
+		if (string.IsNullOrWhiteSpace(flow.ButtonLabel))
+		{
+			flow.ButtonLabel = "クーポンを獲得する";
+		}
+		if (string.IsNullOrWhiteSpace(flow.ButtonUrl))
+		{
+			flow.ButtonUrl = "https://app.adjust.com/8me24xf_8kvfv7e?deep_link=auwallet%3A%2F%2Fhttps%3A%2F%2Faupay.auone.jp%2Fcoupon%2Findex.html&adgroup&creative";
+		}
+		if (flow.Items.Count == 0)
+		{
+			flow.Items.AddRange(new[]
+			{
+				new TextItemModel { Text = "※スマートフォンもしくはタブレットからご確認ください" },
+				new TextItemModel { Text = "※上記「クーポンを獲得する」ボタンからアプリへ遷移できます。" },
+				new TextItemModel { Text = "※クーポンは、1月1日(木・祝)から獲得できます。" }
+			});
+		}
+	}
+
+	private void EnsurePaymentHistoryDefaults()
+	{
+		var history = State.Content.Sections.PaymentHistory;
+		if (string.IsNullOrWhiteSpace(history.TitleText))
+		{
+			history.TitleText = "決済履歴の確認方法";
+		}
+		if (string.IsNullOrWhiteSpace(history.TitleAlt))
+		{
+			history.TitleAlt = "決済履歴の確認方法";
+		}
+		if (history.TitleFontSize is null or <= 0)
+		{
+			history.TitleFontSize = 28;
+		}
+		if (string.IsNullOrWhiteSpace(history.TitleColor))
+		{
+			history.TitleColor = "#ffffff";
+		}
+		if (string.IsNullOrWhiteSpace(history.Text))
+		{
+			history.Text = "現在の決済金額については、au PAY アプリ内の「取引履歴」をご確認ください。<br class=\"_view-md-high\">取引履歴の確認方法については<a href=\"#contact\">こちら</a>までお問い合わせください。";
+		}
+		if (history.TextFontSize is null or <= 0)
+		{
+			history.TextFontSize = 22;
+		}
+		if (string.IsNullOrWhiteSpace(history.ImportantText))
+		{
+			history.ImportantText = "なお、店頭や問い合わせ窓口での現在の順位や金額、<br class=\"_view-md-high\">当選結果についてのご質問にはお答えできません。";
+		}
+		if (history.ImportantFontSize is null or <= 0)
+		{
+			history.ImportantFontSize = 22;
+		}
+		if (string.IsNullOrWhiteSpace(history.ImportantColor))
+		{
+			history.ImportantColor = "#BF1D20";
+		}
+		if (string.IsNullOrWhiteSpace(history.Image))
+		{
+			history.Image = "images/img-02.png";
+		}
+		if (string.IsNullOrWhiteSpace(history.ImageAlt))
+		{
+			history.ImageAlt = "スマートフォン画像";
+		}
+		if (string.IsNullOrWhiteSpace(history.DecoImage))
+		{
+			history.DecoImage = "images/deco-06.png";
+		}
 	}
 
 	private async Task OnStoreExcelSelected(InputFileChangeEventArgs e)
@@ -2730,7 +3749,57 @@
 		var headers = State.Content.Sections.Ranking.HeaderLabels;
 		if (headers is null || headers.Count == 0)
 		{
-			State.Content.Sections.Ranking.HeaderLabels = new List<string> { "順位", "決済金額" };
+			State.Content.Sections.Ranking.HeaderLabels = new List<string> { "順位", "決済金額", "品数" };
+		}
+	}
+
+	private void EnsureRankingRefDefaults()
+	{
+		var ranking = State.Content.Sections.Ranking;
+		if (string.IsNullOrWhiteSpace(ranking.Title))
+		{
+			ranking.Title = "最新順位はこちら";
+		}
+		if (string.IsNullOrWhiteSpace(ranking.CampaignName))
+		{
+			ranking.CampaignName = "キャンペーン名";
+		}
+		if (string.IsNullOrWhiteSpace(ranking.PeriodText))
+		{
+			ranking.PeriodText = "YYYY/MM/DD〜YYYY/MM/DD";
+		}
+		if (string.IsNullOrWhiteSpace(ranking.AsOfText))
+		{
+			ranking.AsOfText = "YYYY/MM/DD時点";
+		}
+		EnsureRankingHeaderLabels();
+		if (ranking.Rows.Count == 0)
+		{
+			ranking.Rows.AddRange(new[]
+			{
+				new RankingRowModel { Rank = "1", Amount = "000,000円", Items = "000品以上" },
+				new RankingRowModel { Rank = "2", Amount = "000,000円", Items = "000品以上" },
+				new RankingRowModel { Rank = "3", Amount = "000,000円", Items = "000品以上" },
+				new RankingRowModel { Rank = "4", Amount = "000,000円", Items = "000品以上" },
+				new RankingRowModel { Rank = "10", Amount = "000,000円", Items = "000品以上" },
+				new RankingRowModel { Rank = "100", Amount = "000,000円", Items = "000品以上" },
+				new RankingRowModel { Rank = "300", Amount = "000,000円", Items = "000品以上" },
+				new RankingRowModel { Rank = "1,000", Amount = "000,000円", Items = "000品以上" }
+			});
+		}
+		if (ranking.NotesItems.Count == 0)
+		{
+			ranking.NotesItems.Add(new StyledTextItem { Text = "※注意書きを入力してください", Align = "left", Visible = true, Id = Guid.NewGuid() });
+		}
+		ranking.LeftTopImage ??= new RankingDecorImageModel();
+		ranking.RightTopImage ??= new RankingDecorImageModel();
+		if (string.IsNullOrWhiteSpace(ranking.LeftTopImage.Src))
+		{
+			ranking.LeftTopImage.Src = "images/deco-04.png";
+		}
+		if (string.IsNullOrWhiteSpace(ranking.RightTopImage.Src))
+		{
+			ranking.RightTopImage.Src = "images/deco-05.png";
 		}
 	}
 
@@ -2780,109 +3849,6 @@
 			.Where(group => !string.Equals(group.Key, section.Key, StringComparison.OrdinalIgnoreCase))
 			.ToList();
 		await UpdatePreviewAsync();
-	}
-
-	private void EnsureCustomSectionGalleryState(CustomSectionModel section)
-	{
-		section.Images ??= new List<CustomSectionImageModel>();
-		if (string.IsNullOrWhiteSpace(section.GalleryMode))
-		{
-			section.GalleryMode = "single";
-		}
-		if (section.GalleryIntervalMs <= 0)
-		{
-			section.GalleryIntervalMs = 4000;
-		}
-	}
-
-	private static bool IsGalleryMode(CustomSectionModel section, string mode)
-	{
-		return string.Equals(section.GalleryMode, mode, StringComparison.OrdinalIgnoreCase);
-	}
-
-	private async Task OnCustomSectionImagesSelected(InputFileChangeEventArgs e, CustomSectionModel section)
-	{
-		EnsureCustomSectionGalleryState(section);
-		State.Error.Clear();
-		try
-		{
-			foreach (var file in e.GetMultipleFiles())
-			{
-				using var ms = new MemoryStream();
-				await file.OpenReadStream(long.MaxValue).CopyToAsync(ms);
-				var bytes = ms.ToArray();
-				var ext = Path.GetExtension(file.Name).ToLowerInvariant();
-				var path = $"images/custom/{section.Key}/{Guid.NewGuid()}{ext}";
-				await SaveCustomSectionImageAsync(path, bytes);
-				section.Images.Add(new CustomSectionImageModel
-				{
-					Src = path,
-					Alt = string.Empty,
-					Link = string.Empty
-				});
-			}
-
-			await UpdatePreviewAsync();
-		}
-		catch (Exception ex)
-		{
-			State.Error.SetError("画像アップロードに失敗", ex.Message);
-		}
-	}
-
-	private async Task SaveCustomSectionImageAsync(string path, byte[] bytes)
-	{
-		var ext = Path.GetExtension(path).ToLowerInvariant();
-		if (ext == ".png")
-		{
-			var maxWidth = GetMaxWidth(path);
-			var resized = await ImageService.ResizePngAsync(bytes, maxWidth);
-			State.ImageOverrides[path] = resized;
-			UpdateImageMeta(path, resized);
-		}
-		else
-		{
-			State.ImageOverrides[path] = bytes;
-			UpdateImageMeta(path, bytes);
-		}
-
-		RemoveDeletedImage(path);
-	}
-
-	private void AddCustomSectionImage(CustomSectionModel section)
-	{
-		EnsureCustomSectionGalleryState(section);
-		section.Images.Add(new CustomSectionImageModel());
-		_ = UpdatePreviewAsync();
-	}
-
-	private void MoveCustomSectionImage(CustomSectionModel section, CustomSectionImageModel image, int direction)
-	{
-		var list = section.Images;
-		var index = list.IndexOf(image);
-		if (index < 0)
-		{
-			return;
-		}
-		var target = index + direction;
-		if (target < 0 || target >= list.Count)
-		{
-			return;
-		}
-		list.RemoveAt(index);
-		list.Insert(target, image);
-		_ = UpdatePreviewAsync();
-	}
-
-	private void RemoveCustomSectionImage(CustomSectionModel section, CustomSectionImageModel image)
-	{
-		if (!string.IsNullOrWhiteSpace(image.Src))
-		{
-			State.ImageOverrides.Remove(image.Src);
-			RemoveDeletedImage(image.Src);
-		}
-		section.Images.Remove(image);
-		_ = UpdatePreviewAsync();
 	}
 
 	private void EnsureSectionGroupKey(string key, params string[] insertAfterKeys)
@@ -3093,9 +4059,51 @@
 		{
 			State.Content.Sections.Ranking.Enabled = false;
 		}
+		if (string.Equals(key, "payment-history", StringComparison.OrdinalIgnoreCase)
+			|| string.Equals(key, "paymentHistory", StringComparison.OrdinalIgnoreCase))
+		{
+			State.Content.Sections.PaymentHistory.Enabled = false;
+		}
 		if (key.StartsWith("store-search", StringComparison.OrdinalIgnoreCase))
 		{
 			State.Content.Sections.StoreSearch.Enabled = false;
+		}
+		if (string.Equals(key, "campaign-content", StringComparison.OrdinalIgnoreCase)
+			|| string.Equals(key, "campaignContent", StringComparison.OrdinalIgnoreCase))
+		{
+			State.Content.Sections.CampaignContent.Enabled = false;
+		}
+		if (string.Equals(key, "coupon-period", StringComparison.OrdinalIgnoreCase)
+			|| string.Equals(key, "couponPeriod", StringComparison.OrdinalIgnoreCase))
+		{
+			State.Content.Sections.CouponPeriod.Enabled = false;
+		}
+		if (string.Equals(key, "coupon-notes", StringComparison.OrdinalIgnoreCase)
+			|| string.Equals(key, "couponNotes", StringComparison.OrdinalIgnoreCase))
+		{
+			State.Content.Sections.CouponNotes.Enabled = false;
+		}
+		if (string.Equals(key, "conditions", StringComparison.OrdinalIgnoreCase))
+		{
+			State.Content.Sections.Conditions.Enabled = false;
+		}
+		if (string.Equals(key, "contact", StringComparison.OrdinalIgnoreCase))
+		{
+			State.Content.Sections.Contact.Enabled = false;
+		}
+		if (key.Contains("banner", StringComparison.OrdinalIgnoreCase))
+		{
+			State.Content.Sections.Banners.Enabled = false;
+		}
+		if (key.Contains("conditions-contact-banners", StringComparison.OrdinalIgnoreCase))
+		{
+			State.Content.Sections.Conditions.Enabled = false;
+			State.Content.Sections.Contact.Enabled = false;
+			State.Content.Sections.Banners.Enabled = false;
+		}
+		if (string.Equals(key, "countdown", StringComparison.OrdinalIgnoreCase))
+		{
+			State.Content.Campaign.ShowCountdown = false;
 		}
 		if (key.StartsWith("custom-section", StringComparison.OrdinalIgnoreCase))
 		{
@@ -3135,15 +4143,19 @@
 	}
 
 	private DotNetObjectReference<Home>? SectionSortRef;
+	private DotNetObjectReference<Home>? SectionNavRef;
 	private DotNetObjectReference<Home>? PreviewResizeRef;
 
 	protected override async Task OnAfterRenderAsync(bool firstRender)
 	{
 		await SetupSortableAsync();
+		await SetupSectionObserverAsync();
 		if (firstRender)
 		{
 			await SetupPreviewDebugListenerAsync();
 			await SetupPreviewResizeAsync();
+			await EnsureDefaultPreviewWidthAsync();
+			await LoadRecentCardColorsAsync();
 		}
 	}
 
@@ -3156,6 +4168,15 @@
 	{
 		PreviewResizeRef ??= DotNetObjectReference.Create(this);
 		await JS.InvokeVoidAsync("lpSplit.init", "lpEditorRoot", "previewPane", "previewSplitter", PreviewResizeRef);
+	}
+
+	private async Task EnsureDefaultPreviewWidthAsync()
+	{
+		State.PreviewIsMobile = false;
+		IsResponsivePreview = false;
+		UseViewportSizing = false;
+		await JS.InvokeVoidAsync("lpSplit.setPreviewWidth", "lpEditorRoot", "previewPane", PcPreviewWidth);
+		await InvokeAsync(StateHasChanged);
 	}
 
 
@@ -3171,6 +4192,19 @@
 			}
 
 			await Task.Delay(100);
+		}
+	}
+
+	private async Task SetupSectionObserverAsync()
+	{
+		try
+		{
+			SectionNavRef ??= DotNetObjectReference.Create(this);
+			await JS.InvokeVoidAsync("sectionNav.setup", "previewFrame", SectionNavRef);
+		}
+		catch
+		{
+			// no-op
 		}
 	}
 
@@ -3214,9 +4248,30 @@
 	}
 
 	[JSInvokable]
+	public Task OnPreviewSectionChanged(string sectionId)
+	{
+		var normalized = NormalizeSectionKey(sectionId);
+		if (string.Equals(CurrentPreviewSectionId, normalized, StringComparison.OrdinalIgnoreCase))
+		{
+			return Task.CompletedTask;
+		}
+		CurrentPreviewSectionId = normalized;
+		if (FollowActiveSection)
+		{
+			_ = JS.InvokeVoidAsync("sectionNav.scrollRow", "sectionList", GetSectionRowId(normalized));
+		}
+		return InvokeAsync(StateHasChanged);
+	}
+
+	[JSInvokable]
 	public Task OnPreviewWidthChanged(int width)
 	{
 		if (UseViewportSizing)
+		{
+			return Task.CompletedTask;
+		}
+
+		if (!HasPreviewModeSelection)
 		{
 			return Task.CompletedTask;
 		}
@@ -3233,7 +4288,13 @@
 
 	public async ValueTask DisposeAsync()
 	{
+		if (_highlightHandler is not null)
+		{
+			HighlightService.OnRequested -= _highlightHandler;
+			_highlightHandler = null;
+		}
 		SectionSortRef?.Dispose();
+		SectionNavRef?.Dispose();
 		PreviewResizeRef?.Dispose();
 		await Task.CompletedTask;
 	}
@@ -3244,11 +4305,21 @@
 		var startedAt = DateTime.UtcNow;
 		IsPreviewLoading = true;
 		await InvokeAsync(StateHasChanged);
+		var scrollTop = 0;
+		try
+		{
+			scrollTop = await JS.InvokeAsync<int>("lpPreview.getScrollTop", "previewFrame");
+		}
+		catch
+		{
+			scrollTop = 0;
+		}
 		try
 		{
 			if (IsImportMode && ImportProject is not null)
 			{
 				State.PreviewHtml = await LpImportService.BuildPreviewHtmlAsync(ImportProject);
+				State.PreviewHtml = $"<!-- {DateTime.Now:HH:mm:ss.fff} -->" + State.PreviewHtml;
 			}
 			else if (State.Template is null)
 			{
@@ -3256,10 +4327,25 @@
 			}
 			else
 			{
-				State.PreviewHtml = await PreviewService.GenerateHtmlAsync(State.Template, State.Content, State.ImageOverrides, embedImages: true);
+				var spViewportWidth = (State.PreviewIsMobile || IsResponsivePreview)
+					? EffectiveResponsiveWidth
+					: (int?)null;
+				var applySpResetCss = State.PreviewIsMobile || IsResponsivePreview;
+				State.PreviewHtml = await PreviewService.GenerateHtmlAsync(
+					State.Template,
+					State.Content,
+					State.ImageOverrides,
+					embedImages: true,
+					includeDebugStamp: true,
+					editingSectionKey: SelectedSectionId,
+					fixedViewportWidth: spViewportWidth,
+					applySpResetCss: applySpResetCss);
 			}
 
-			await JS.InvokeVoidAsync("lpPreview.setHtml", "previewFrame", State.PreviewHtml);
+			PreviewVersion++;
+
+			await JS.InvokeVoidAsync("lpPreview.setHtmlWithScroll", "previewFrame", State.PreviewHtml, scrollTop);
+			await SetupSectionObserverAsync();
 			if (UseViewportSizing)
 			{
 				await ApplyResponsiveViewportAsync();
@@ -3270,7 +4356,9 @@
 		{
 			State.Error.SetError("プレビュー生成に失敗", ex.Message);
 			State.PreviewHtml = "<html><body><div style='padding:20px;font-family:sans-serif;'>プレビュー生成に失敗しました。</div></body></html>";
-			await JS.InvokeVoidAsync("lpPreview.setHtml", "previewFrame", State.PreviewHtml);
+			PreviewVersion++;
+			await JS.InvokeVoidAsync("lpPreview.setHtmlWithScroll", "previewFrame", State.PreviewHtml, scrollTop);
+			await SetupSectionObserverAsync();
 		}
 		var elapsed = DateTime.UtcNow - startedAt;
 		if (elapsed < TimeSpan.FromMilliseconds(250))
@@ -3438,19 +4526,6 @@
 		await InvokeAsync(StateHasChanged);
 	}
 
-	private void EnsureBackgroundSectionSelection()
-	{
-		if (!string.IsNullOrWhiteSpace(SelectedBackgroundSectionKey))
-		{
-			return;
-		}
-
-		SelectedBackgroundSectionKey = GetBackgroundSectionOptions().FirstOrDefault()?.Key
-			?? "campaign-content";
-	}
-
-	private SectionBackgroundSettings CurrentSectionBackground => GetSectionBackgroundSettings(SelectedBackgroundSectionKey);
-
 	private SectionStyleModel GetSectionStyleSettings(string key)
 	{
 		State.Content.SectionStyles ??= new Dictionary<string, SectionStyleModel>(StringComparer.OrdinalIgnoreCase);
@@ -3479,6 +4554,8 @@
 
 	private void EnsureSectionStyleDefaults(SectionStyleModel style, string key)
 	{
+		style.Design ??= new SectionDesignModel();
+		EnsureSectionDesignDefaults(style.Design);
 		style.BorderColor ??= string.Empty;
 		style.BorderStyle = string.IsNullOrWhiteSpace(style.BorderStyle) ? "solid" : style.BorderStyle;
 		style.Shadow ??= string.Empty;
@@ -3508,25 +4585,57 @@
 		animation.Easing = string.IsNullOrWhiteSpace(animation.Easing) ? "ease" : animation.Easing;
 	}
 
-	private IEnumerable<BackgroundSectionOption> GetBackgroundSectionOptions()
+	private static void EnsureSectionDesignDefaults(SectionDesignModel design)
 	{
-		var options = new List<BackgroundSectionOption>();
+		design.Type = string.IsNullOrWhiteSpace(design.Type) ? "simple" : design.Type;
+		design.BackgroundColor ??= "#ffffff";
+		design.BackgroundOpacity ??= 1;
+		design.GradientDirection ??= 135;
+		design.OverlayColor ??= "#111827";
+		design.OverlayOpacity ??= 0.35;
+		design.BorderRadius ??= 16;
+		design.PaddingPreset = string.IsNullOrWhiteSpace(design.PaddingPreset) ? "md" : design.PaddingPreset;
+		design.PaddingX ??= 24;
+		design.PaddingY ??= 24;
+		design.MarginBottom ??= 16;
+		design.BorderColor ??= "#e5e7eb";
+		design.BorderWidth ??= 1;
+		design.ShadowLevel = string.IsNullOrWhiteSpace(design.ShadowLevel) ? "md" : design.ShadowLevel;
+		design.AccentColor ??= "#4f46e5";
+		design.AccentHeight ??= 4;
+		design.PatternType = string.IsNullOrWhiteSpace(design.PatternType) ? "off" : design.PatternType;
+		design.Animation = string.IsNullOrWhiteSpace(design.Animation) ? "off" : design.Animation;
 
-		var keys = State.Content.SectionGroups
-			.Where(group => !string.IsNullOrWhiteSpace(group.Key))
-			.Select(group => group.Key)
-			.Distinct(StringComparer.OrdinalIgnoreCase)
-			.ToList();
-
-		foreach (var key in keys)
+		if (design.BackgroundOpacity is < 0 or > 1)
 		{
-			if (!IsEditorManagedSectionKey(key))
+			design.BackgroundOpacity = 1;
+		}
+		if (design.OverlayOpacity is < 0 or > 1)
+		{
+			design.OverlayOpacity = 0.35;
+		}
+	}
+
+
+	private IReadOnlyList<KeyValuePair<string, string>> GetDesignSectionOptions()
+	{
+		var options = new List<KeyValuePair<string, string>>();
+		foreach (var group in State.Content.SectionGroups)
+		{
+			if (string.IsNullOrWhiteSpace(group.Key))
 			{
 				continue;
 			}
-			options.Add(new BackgroundSectionOption(key, GetSectionDisplayName(key)));
+			if (!IsEditorManagedSectionKey(group.Key))
+			{
+				continue;
+			}
+			if (options.Any(option => string.Equals(option.Key, group.Key, StringComparison.OrdinalIgnoreCase)))
+			{
+				continue;
+			}
+			options.Add(new KeyValuePair<string, string>(group.Key, GetSectionDisplayName(group.Key, group.DisplayName)));
 		}
-
 		foreach (var custom in State.Content.CustomSections)
 		{
 			if (string.IsNullOrWhiteSpace(custom.Key))
@@ -3537,22 +4646,406 @@
 			{
 				continue;
 			}
-			options.Add(new BackgroundSectionOption(custom.Key, GetSectionDisplayName(custom.Key)));
+			options.Add(new KeyValuePair<string, string>(custom.Key, GetSectionDisplayName(custom.Key)));
 		}
-
 		return options;
 	}
 
-	private async Task OnBackgroundSectionChanged()
+	private void ScheduleDesignPreview(HighlightRequest? highlightRequest = null)
 	{
-		if (!string.IsNullOrWhiteSpace(SelectedBackgroundSectionKey))
+		_designPreviewCts?.Cancel();
+		_designPreviewCts = new CancellationTokenSource();
+		var token = _designPreviewCts.Token;
+		_ = Task.Run(async () =>
 		{
-			_ = GetSectionBackgroundSettings(SelectedBackgroundSectionKey);
+			try
+			{
+				await Task.Delay(150, token);
+				if (token.IsCancellationRequested)
+				{
+					return;
+				}
+				await InvokeAsync(UpdatePreviewAsync);
+				if (token.IsCancellationRequested)
+				{
+					return;
+				}
+				if (highlightRequest is not null)
+				{
+					HighlightService.Trigger(highlightRequest);
+				}
+			}
+			catch (TaskCanceledException)
+			{
+			}
+		});
+	}
+
+	private FrameStyle GetCardThemeStyle()
+	{
+		EnsureFrameDefaultStyle();
+		var style = State.Content.FrameDefaultStyle ?? new FrameStyle();
+		EnsureCardThemeDefaults(style);
+		State.Content.FrameDefaultStyle = style;
+		State.Content.CardThemeStyle = style;
+		return style;
+	}
+
+	private FrameStyle GetFrameThemeEditorStyle()
+	{
+		if (FrameThemeTab == "per")
+		{
+			return GetFrameThemeOverrideStyle();
 		}
 
-		SyncSectionBackgroundSetting();
+		return GetCardThemeStyle();
+	}
 
-		await InvokeAsync(StateHasChanged);
+	private FrameStyle GetFrameThemeOverrideStyle()
+	{
+		var key = EnsureFrameThemeSectionKey();
+		if (string.IsNullOrWhiteSpace(key))
+		{
+			return GetCardThemeStyle();
+		}
+
+		var settings = GetSectionStyleSettings(key);
+		if (settings.FrameStyleOverride is null)
+		{
+			settings.FrameStyleOverride = new FrameStyle();
+		}
+
+		EnsureCardThemeDefaults(settings.FrameStyleOverride);
+		return settings.FrameStyleOverride;
+	}
+
+	private FrameStyle GetFrameAnimationStyle()
+	{
+		if (FrameThemeTab != "per")
+		{
+			return GetCardThemeStyle();
+		}
+
+		return FrameAnimationScope == "all" ? GetCardThemeStyle() : GetFrameThemeOverrideStyle();
+	}
+
+	private void OnAnimationScopeChanged(string scope)
+	{
+		FrameAnimationScope = scope;
+	}
+
+	private void OnAnimationPreviewToggled(bool enabled)
+	{
+		State.Content.AnimationPreviewEnabled = enabled;
+		ScheduleDesignPreview();
+	}
+
+	private void SetFrameThemeTab(string tab)
+	{
+		FrameThemeTab = tab;
+		if (FrameThemeTab == "per")
+		{
+			EnsureFrameThemeSectionKey();
+		}
+	}
+
+	private void OnFrameThemeSectionChanged()
+	{
+		if (FrameThemeTab == "per")
+		{
+			EnsureFrameThemeSectionKey();
+			TriggerSectionHighlight(FrameThemeSectionKey, "glow");
+		}
+	}
+
+	private void ResetFrameThemeEditor()
+	{
+		if (FrameThemeTab == "per")
+		{
+			ResetFrameThemeOverride();
+			return;
+		}
+
+		ResetCardTheme();
+	}
+
+	private void ResetFrameThemeOverride()
+	{
+		var key = EnsureFrameThemeSectionKey();
+		if (string.IsNullOrWhiteSpace(key))
+		{
+			return;
+		}
+
+		var settings = GetSectionStyleSettings(key);
+		settings.FrameStyleOverride = null;
+		ScheduleDesignPreview();
+	}
+
+	private void RefreshDesignSectionOptions()
+	{
+		DesignSectionOptions = GetDesignSectionOptions();
+	}
+
+	private string EnsureFrameThemeSectionKey()
+	{
+		if (!string.IsNullOrWhiteSpace(FrameThemeSectionKey))
+		{
+			return FrameThemeSectionKey;
+		}
+
+		if (DesignSectionOptions.Count == 0)
+		{
+			DesignSectionOptions = GetDesignSectionOptions();
+		}
+
+		FrameThemeSectionKey = DesignSectionOptions.FirstOrDefault().Key ?? string.Empty;
+		return FrameThemeSectionKey;
+	}
+
+	private void OnCardThemeChanged()
+	{
+		if (_pendingBandHighlight)
+		{
+			_pendingBandHighlight = false;
+			ScheduleDesignPreview(BuildBandHighlightRequest());
+			return;
+		}
+		ScheduleDesignPreview(BuildFrameHighlightRequest());
+	}
+
+	private void OnBandThemeChanged()
+	{
+		_pendingBandHighlight = true;
+	}
+
+	private HighlightRequest BuildFrameHighlightRequest()
+	{
+		var target = FrameThemeTab == "per" ? FrameThemeSectionKey : SelectedSectionId;
+		if (string.IsNullOrWhiteSpace(target))
+		{
+			target = DesignSectionOptions.FirstOrDefault().Key ?? string.Empty;
+		}
+		var normalized = NormalizeHighlightId(target);
+
+		if (string.IsNullOrWhiteSpace(normalized))
+		{
+			return new HighlightRequest
+			{
+				ScopeType = "page",
+				Style = "wash",
+				DurationMs = 320
+			};
+		}
+
+		return new HighlightRequest
+		{
+			ScopeType = "section",
+			Id = normalized,
+			Style = "glow",
+			DurationMs = 320
+		};
+	}
+
+	private HighlightRequest BuildBandHighlightRequest()
+	{
+		var target = FrameThemeTab == "per" ? FrameThemeSectionKey : SelectedSectionId;
+		if (string.IsNullOrWhiteSpace(target))
+		{
+			target = DesignSectionOptions.FirstOrDefault().Key ?? string.Empty;
+		}
+		var normalized = NormalizeHighlightId(target);
+		var id = string.IsNullOrWhiteSpace(normalized) ? "band" : $"band-{normalized}";
+		return new HighlightRequest
+		{
+			ScopeType = "slot",
+			Id = id,
+			Style = "outline",
+			DurationMs = 320
+		};
+	}
+
+
+	private async Task OnCardColorUsed(string color)
+	{
+		if (string.IsNullOrWhiteSpace(color))
+		{
+			return;
+		}
+
+		if (RecentCardColors.Contains(color, StringComparer.OrdinalIgnoreCase))
+		{
+			RecentCardColors.RemoveAll(c => string.Equals(c, color, StringComparison.OrdinalIgnoreCase));
+		}
+
+		RecentCardColors.Insert(0, color);
+		if (RecentCardColors.Count > 8)
+		{
+			RecentCardColors.RemoveRange(8, RecentCardColors.Count - 8);
+		}
+
+		await SaveRecentCardColorsAsync();
+	}
+
+	private async Task LoadRecentCardColorsAsync()
+	{
+		try
+		{
+			var colors = await JS.InvokeAsync<string[]>("lpCardColors.load");
+			RecentCardColors.Clear();
+			if (colors is not null)
+			{
+				foreach (var color in colors.Where(c => !string.IsNullOrWhiteSpace(c)))
+				{
+					RecentCardColors.Add(color);
+				}
+			}
+			await InvokeAsync(StateHasChanged);
+		}
+		catch
+		{
+			return;
+		}
+	}
+
+	private async Task SaveRecentCardColorsAsync()
+	{
+		try
+		{
+			await JS.InvokeVoidAsync("lpCardColors.save", RecentCardColors.ToArray());
+		}
+		catch
+		{
+			return;
+		}
+	}
+
+	private void ResetCardTheme()
+	{
+		State.Content.FrameDefaultStyle = new FrameStyle();
+		EnsureCardThemeDefaults(State.Content.FrameDefaultStyle);
+		State.Content.CardThemeStyle = State.Content.FrameDefaultStyle;
+		ScheduleDesignPreview();
+	}
+
+	private void EnsureFrameDefaultStyle()
+	{
+		if (State.Content.FrameDefaultStyle is null)
+		{
+			State.Content.FrameDefaultStyle = State.Content.CardThemeStyle ?? new FrameStyle();
+		}
+		EnsureCardThemeDefaults(State.Content.FrameDefaultStyle);
+		State.Content.CardThemeStyle = State.Content.FrameDefaultStyle;
+	}
+
+	private void CleanFrameOverrideData()
+	{
+		if (State.Content.SectionStyles is null || State.Content.SectionStyles.Count == 0)
+		{
+			return;
+		}
+
+		foreach (var entry in State.Content.SectionStyles.Values)
+		{
+			if (entry?.FrameStyleOverride is not null)
+			{
+				entry.FrameStyleOverride = null;
+			}
+		}
+	}
+
+	private static void EnsureCardThemeDefaults(FrameStyle style)
+	{
+		style.Type = string.IsNullOrWhiteSpace(style.Type) ? "simple" : style.Type;
+		style.BackgroundColor ??= "#ffffff";
+		style.BackgroundOpacity ??= 100;
+		style.BorderColor ??= "#dc2626";
+		style.BorderWidth ??= 6;
+		style.BorderStyle = string.IsNullOrWhiteSpace(style.BorderStyle) ? "solid" : style.BorderStyle;
+		style.BorderRadius ??= 0;
+		style.ShadowLevel = string.IsNullOrWhiteSpace(style.ShadowLevel) ? "off" : style.ShadowLevel;
+		style.PaddingPreset = string.IsNullOrWhiteSpace(style.PaddingPreset) ? "normal" : style.PaddingPreset;
+		style.PaddingX ??= 24;
+		style.PaddingY ??= 20;
+		style.MaxWidthPx ??= 900;
+		style.HeaderBackgroundColor ??= "#dc2626";
+		style.HeaderTextColor ??= "#ffffff";
+		style.HeaderFontSizePx ??= 30;
+		style.HeaderHeightPx ??= 80;
+		style.BodyFontSizePx ??= 18;
+	}
+
+	private string EditingSectionGroupKey = string.Empty;
+	private string EditingSectionGroupName = string.Empty;
+
+	private bool IsEditingSectionGroupName(string? key)
+	{
+		if (string.IsNullOrWhiteSpace(key))
+		{
+			return false;
+		}
+
+		return string.Equals(EditingSectionGroupKey, key, StringComparison.OrdinalIgnoreCase);
+	}
+
+	private void BeginEditSectionGroupName(SectionGroupModel group)
+	{
+		if (group is null || string.IsNullOrWhiteSpace(group.Key))
+		{
+			return;
+		}
+
+		EditingSectionGroupKey = group.Key;
+		EditingSectionGroupName = string.IsNullOrWhiteSpace(group.DisplayName)
+			? GetSectionDisplayName(group.Key)
+			: group.DisplayName;
+	}
+
+	private void CommitEditSectionGroupName(SectionGroupModel group)
+	{
+		if (group is null || string.IsNullOrWhiteSpace(group.Key))
+		{
+			return;
+		}
+
+		if (!string.Equals(EditingSectionGroupKey, group.Key, StringComparison.OrdinalIgnoreCase))
+		{
+			return;
+		}
+
+		var draft = EditingSectionGroupName?.Trim() ?? string.Empty;
+		group.DisplayName = string.IsNullOrWhiteSpace(draft) ? null : draft;
+		EditingSectionGroupKey = string.Empty;
+		EditingSectionGroupName = string.Empty;
+		OnAnyInputAfter();
+	}
+
+	private void CancelEditSectionGroupName(SectionGroupModel group)
+	{
+		if (group is null || string.IsNullOrWhiteSpace(group.Key))
+		{
+			return;
+		}
+
+		if (!string.Equals(EditingSectionGroupKey, group.Key, StringComparison.OrdinalIgnoreCase))
+		{
+			return;
+		}
+
+		EditingSectionGroupKey = string.Empty;
+		EditingSectionGroupName = string.Empty;
+	}
+
+	private void OnSectionGroupNameKeydown(KeyboardEventArgs e, SectionGroupModel group)
+	{
+		if (e.Key == "Enter")
+		{
+			CommitEditSectionGroupName(group);
+		}
+		else if (e.Key == "Escape")
+		{
+			CancelEditSectionGroupName(group);
+		}
 	}
 
 	private void SyncPageBackgroundSetting()
@@ -3560,239 +5053,32 @@
 		PageBackgroundSetting = BackgroundSettingMapper.FromPage(State.Content.LpBackground);
 	}
 
-	private void SyncSectionBackgroundSetting()
-	{
-		SectionBackgroundSetting = BackgroundSettingMapper.FromSection(CurrentSectionBackground);
-	}
-
 	private async Task OnPageBackgroundChanged()
 	{
-		BackgroundSettingMapper.ApplyToPage(PageBackgroundSetting, State.Content.LpBackground);
+		if (!string.IsNullOrWhiteSpace(PageBackgroundSetting?.Preset?.PresetKey))
+		{
+			PageBackgroundSetting.SourceType = "preset";
+			PageBackgroundSetting.Mode = "preset";
+		}
+		BackgroundSettingMapper.ApplyToPage(PageBackgroundSetting!, State.Content.LpBackground);
 		await NotifyChanged();
 		await TriggerHighlightAsync(string.Empty, "background");
 	}
 
-	private async Task OnSectionBackgroundChanged()
-	{
-		BackgroundSettingMapper.ApplyToSection(SectionBackgroundSetting, CurrentSectionBackground);
-		await NotifyChanged();
-		await TriggerHighlightAsync(SelectedBackgroundSectionKey, "background");
-	}
-
-	private async Task ApplySectionBackground()
-	{
-		await OnSectionBackgroundChanged();
-	}
-
-	private async Task ApplySectionBackgroundToAll()
-	{
-		State.Content.SectionBackgrounds ??= new Dictionary<string, SectionBackgroundSettings>(StringComparer.OrdinalIgnoreCase);
-		foreach (var group in State.Content.SectionGroups)
-		{
-			if (string.IsNullOrWhiteSpace(group.Key) || IsFixedWhiteBackgroundSection(group.Key))
-			{
-				continue;
-			}
-
-			if (!State.Content.SectionBackgrounds.TryGetValue(group.Key, out var settings) || settings is null)
-			{
-				settings = new SectionBackgroundSettings();
-				State.Content.SectionBackgrounds[group.Key] = settings;
-			}
-			EnsureSectionBackgroundDefaults(settings);
-			BackgroundSettingMapper.ApplyToSection(SectionBackgroundSetting, settings);
-		}
-
-		foreach (var custom in State.Content.CustomSections)
-		{
-			if (string.IsNullOrWhiteSpace(custom.Key) || IsFixedWhiteBackgroundSection(custom.Key))
-			{
-				continue;
-			}
-
-			if (!State.Content.SectionBackgrounds.TryGetValue(custom.Key, out var settings) || settings is null)
-			{
-				settings = new SectionBackgroundSettings();
-				State.Content.SectionBackgrounds[custom.Key] = settings;
-			}
-			EnsureSectionBackgroundDefaults(settings);
-			BackgroundSettingMapper.ApplyToSection(SectionBackgroundSetting, settings);
-		}
-
-		await NotifyChanged();
-	}
-
-	private static bool IsFixedWhiteBackgroundSection(string? key)
-	{
-		if (string.IsNullOrWhiteSpace(key))
-		{
-			return false;
-		}
-
-		return key.Contains("conditions-contact-banners", StringComparison.OrdinalIgnoreCase)
-			|| string.Equals(key, "header", StringComparison.OrdinalIgnoreCase);
-	}
-
-	private SectionBackgroundSettings GetSectionBackgroundSettings(string key)
-	{
-		State.Content.SectionBackgrounds ??= new Dictionary<string, SectionBackgroundSettings>(StringComparer.OrdinalIgnoreCase);
-		if (!State.Content.SectionBackgrounds.TryGetValue(key, out var settings) || settings is null)
-		{
-			settings = new SectionBackgroundSettings();
-			EnsureSectionBackgroundDefaults(settings);
-			State.Content.SectionBackgrounds[key] = settings;
-		}
-
-		EnsureSectionBackgroundDefaults(settings);
-		return settings;
-	}
-
-	private static void EnsureSectionBackgroundDefaults(SectionBackgroundSettings settings)
-	{
-		settings.Mode = string.IsNullOrWhiteSpace(settings.Mode) ? "inherit" : settings.Mode;
-		settings.SourceType = string.IsNullOrWhiteSpace(settings.SourceType)
-			? (settings.Mode == "color" ? "solid" : settings.Mode)
-			: settings.SourceType;
-		settings.Color ??= string.Empty;
-		settings.ColorOpacity ??= 1;
-		settings.GradientType = string.IsNullOrWhiteSpace(settings.GradientType) ? "linear" : settings.GradientType;
-		settings.GradientAngle ??= 135;
-		settings.GradientColorA ??= string.Empty;
-		settings.GradientColorB ??= string.Empty;
-		settings.GradientOpacity ??= 1;
-		settings.ImageUrl ??= string.Empty;
-		settings.VideoUrl ??= string.Empty;
-		settings.VideoPoster ??= string.Empty;
-		settings.Repeat = string.IsNullOrWhiteSpace(settings.Repeat) ? "repeat" : settings.Repeat;
-		settings.Position = string.IsNullOrWhiteSpace(settings.Position) ? "center top" : settings.Position;
-		settings.PositionCustom ??= string.Empty;
-		settings.Size = string.IsNullOrWhiteSpace(settings.Size) ? "cover" : settings.Size;
-		settings.SizeCustom ??= string.Empty;
-		settings.Attachment = string.IsNullOrWhiteSpace(settings.Attachment) ? "scroll" : settings.Attachment;
-		settings.Preset ??= new BackgroundPresetSelection();
-		settings.Effects ??= new BackgroundEffects();
-	}
 
 	private async Task ApplyBackgroundPreset(BackgroundPresetModel preset)
 	{
 		var target = State.Content.LpBackground;
-		ApplyBackgroundModel(target, preset.PageBackground);
-
-		if (preset.SectionBackgrounds is not null)
-		{
-			State.Content.SectionBackgrounds ??= new Dictionary<string, SectionBackgroundSettings>(StringComparer.OrdinalIgnoreCase);
-			State.Content.SectionStyles ??= new Dictionary<string, SectionStyleModel>(StringComparer.OrdinalIgnoreCase);
-			foreach (var pair in preset.SectionBackgrounds)
-			{
-				if (IsFixedWhiteBackgroundSection(pair.Key))
-				{
-					continue;
-				}
-				var background = CloneSectionBackground(pair.Value);
-				var targetKeys = ResolveSectionKeysForPreset(pair.Key).ToList();
-				if (targetKeys.Count == 0)
-				{
-					targetKeys.Add(pair.Key);
-				}
-				foreach (var targetKey in targetKeys)
-				{
-					State.Content.SectionBackgrounds[targetKey] = CloneSectionBackground(background);
-					if (!State.Content.SectionStyles.TryGetValue(targetKey, out var style) || style is null)
-					{
-						style = new SectionStyleModel();
-						State.Content.SectionStyles[targetKey] = style;
-					}
-					style.Background = CloneSectionBackground(background);
-				}
-			}
-		}
+		target.Preset ??= new BackgroundPresetSelection();
+		target.Preset.PresetKey = preset.Id;
+		target.Preset.CssClass = preset.CssClass;
+		target.Preset.ColorA = preset.Defaults.BaseColor;
+		target.Preset.ColorB = preset.Defaults.AccentColor;
+		target.Preset.Opacity = preset.Defaults.Opacity ?? 1;
+		target.Preset.Scale = preset.Defaults.Scale ?? 1;
 
 		await NotifyChanged();
-	}
-
-	private static void ApplyBackgroundModel(LpBackgroundModel target, LpBackgroundModel source)
-	{
-		target.SourceType = source.SourceType;
-		target.Mode = source.Mode;
-		target.Color = source.Color;
-		target.ColorOpacity = source.ColorOpacity;
-		target.GradientType = source.GradientType;
-		target.GradientAngle = source.GradientAngle;
-		target.GradientColorA = source.GradientColorA;
-		target.GradientColorB = source.GradientColorB;
-		target.GradientOpacity = source.GradientOpacity;
-		target.ImageUrl = source.ImageUrl;
-		target.VideoUrl = source.VideoUrl;
-		target.VideoPoster = source.VideoPoster;
-		target.Repeat = source.Repeat;
-		target.Position = source.Position;
-		target.PositionCustom = source.PositionCustom;
-		target.Size = source.Size;
-		target.SizeCustom = source.SizeCustom;
-		target.Attachment = source.Attachment;
-		target.TransparentSections = source.TransparentSections;
-		target.Preset = source.Preset ?? new BackgroundPresetSelection();
-		target.Effects = source.Effects ?? new BackgroundEffects();
-	}
-
-	private IEnumerable<string> ResolveSectionKeysForPreset(string presetKey)
-	{
-		var normalized = NormalizeSectionKey(presetKey);
-		if (string.IsNullOrWhiteSpace(normalized))
-		{
-			yield break;
-		}
-
-		foreach (var group in State.Content.SectionGroups)
-		{
-			if (string.IsNullOrWhiteSpace(group.Key))
-			{
-				continue;
-			}
-			if (NormalizeSectionKey(group.Key) == normalized)
-			{
-				yield return group.Key;
-			}
-		}
-
-		foreach (var custom in State.Content.CustomSections)
-		{
-			if (string.IsNullOrWhiteSpace(custom.Key))
-			{
-				continue;
-			}
-			if (NormalizeSectionKey(custom.Key) == normalized)
-			{
-				yield return custom.Key;
-			}
-		}
-	}
-
-	private static SectionBackgroundSettings CloneSectionBackground(SectionBackgroundSettings source)
-	{
-		return new SectionBackgroundSettings
-		{
-			SourceType = source.SourceType,
-			Mode = source.Mode,
-			Color = source.Color,
-			ColorOpacity = source.ColorOpacity,
-			GradientType = source.GradientType,
-			GradientAngle = source.GradientAngle,
-			GradientColorA = source.GradientColorA,
-			GradientColorB = source.GradientColorB,
-			GradientOpacity = source.GradientOpacity,
-			ImageUrl = source.ImageUrl,
-			VideoUrl = source.VideoUrl,
-			VideoPoster = source.VideoPoster,
-			Repeat = source.Repeat,
-			Position = source.Position,
-			PositionCustom = source.PositionCustom,
-			Size = source.Size,
-			SizeCustom = source.SizeCustom,
-			Attachment = source.Attachment,
-			Preset = source.Preset ?? new BackgroundPresetSelection(),
-			Effects = source.Effects ?? new BackgroundEffects()
-		};
+		TriggerPageHighlight();
 	}
 
 	private void ApplyBulkStyle(IEnumerable<TextItemModel> items, BulkTextStyle style)
@@ -3845,18 +5131,6 @@
 		public int? FontSize { get; set; }
 	}
 
-	private sealed class BackgroundSectionOption
-	{
-		public BackgroundSectionOption(string key, string label)
-		{
-			Key = key;
-			Label = label;
-		}
-
-		public string Key { get; }
-		public string Label { get; }
-	}
-
 	private sealed class ResponsiveDeviceOption
 	{
 		public ResponsiveDeviceOption(string key, string label, int width, int height, double dpr)
@@ -3877,6 +5151,7 @@
 
 	private async Task SetPreviewMode(bool isMobile)
 	{
+		HasPreviewModeSelection = true;
 		IsResponsivePreview = false;
 		SelectedResponsiveDevice = string.Empty;
 		State.PreviewIsMobile = isMobile;
@@ -3915,6 +5190,7 @@
 		ResponsiveWidth = device.Width;
 		ResponsiveHeight = device.Height;
 		ResponsiveDpr = device.Dpr;
+		HasPreviewModeSelection = true;
 		IsResponsivePreview = true;
 		UseViewportSizing = true;
 		State.PreviewIsMobile = ResponsiveWidth < 600;
@@ -4019,5 +5295,46 @@
 
 		return Uri.TryCreate(url, UriKind.Absolute, out var uri)
 			   && (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps);
+	}
+
+	private async Task OnRankingLeftImageSelected(InputFileChangeEventArgs e)
+	{
+		await OnRankingDecorImageSelected(e, State.Content.Sections.Ranking.LeftTopImage);
+	}
+
+	private async Task OnRankingRightImageSelected(InputFileChangeEventArgs e)
+	{
+		await OnRankingDecorImageSelected(e, State.Content.Sections.Ranking.RightTopImage);
+	}
+
+	private async Task OnRankingDecorImageSelected(InputFileChangeEventArgs e, RankingDecorImageModel target)
+	{
+		State.Error.Clear();
+		try
+		{
+			var file = e.File;
+			if (file is null)
+			{
+				return;
+			}
+
+			var fileName = Path.GetFileName(file.Name);
+			if (string.IsNullOrWhiteSpace(fileName))
+			{
+				return;
+			}
+
+			using var ms = new MemoryStream();
+			await file.OpenReadStream(long.MaxValue).CopyToAsync(ms);
+			var bytes = ms.ToArray();
+			var path = $"images/{fileName}";
+			await SaveCustomSectionImageAsync(path, bytes);
+			target.Src = path;
+			await UpdatePreviewAsync();
+		}
+		catch (Exception ex)
+		{
+			State.Error.SetError("画像アップロードに失敗", ex.Message);
+		}
 	}
 }

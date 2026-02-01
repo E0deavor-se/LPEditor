@@ -17,6 +17,9 @@ builder.Services.AddScoped<ContentPersistService>();
 builder.Services.AddScoped<ZipExportService>();
 builder.Services.AddScoped<EditorState>();
 builder.Services.AddScoped<BackgroundPresetService>();
+builder.Services.AddScoped<IHighlightService, HighlightService>();
+builder.Services.AddScoped<FramePresetService>();
+builder.Services.AddScoped<AnimationPresetService>();
 builder.Services.AddScoped<LpImportService>();
 
 var app = builder.Build();

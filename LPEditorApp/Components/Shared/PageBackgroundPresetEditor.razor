@@ -1,0 +1,379 @@
+@using LPEditorApp.Models
+@inject IJSRuntime JS
+
+<div class="bg-preset-panel">
+    <div class="bg-preset-header">
+        <div>
+            <div class="bg-preset-title">背景プリセット</div>
+            <div class="bg-preset-sub">ワンクリックでLP全体に適用</div>
+        </div>
+        <div class="bg-preset-actions">
+            <button type="button" class="btn" @onclick="ResetPreset" disabled="@(SelectedPreset is null)">リセット</button>
+            <button type="button" class="btn" @onclick="Undo" disabled="@(_undoSnapshot is null)">1つ前に戻す</button>
+        </div>
+    </div>
+
+    <div class="bg-preset-toolbar">
+        <div class="bg-preset-chips">
+            @foreach (var chip in CategoryChips)
+            {
+                <button type="button" class="chip @(IsCategory(chip.Key) ? "is-active" : "")" @onclick="() => SetCategory(chip.Key)">@chip.Label</button>
+            }
+        </div>
+        <div class="bg-preset-search">
+            <input class="text" placeholder="検索（例: ドット / シンプル）" @bind="SearchTerm" @bind:event="oninput" />
+        </div>
+    </div>
+
+    <div class="bg-preset-grid">
+        <button type="button" class="bg-preset-card @(string.IsNullOrWhiteSpace(Selection.PresetKey) ? "is-selected" : "")" @onclick="ClearPreset">
+            <div class="bg-preset-preview bg-preset-preview--none">なし</div>
+            <div class="bg-preset-name">プリセット未選択</div>
+            <div class="bg-preset-desc">現在の背景設定を維持</div>
+        </button>
+        @foreach (var preset in FilteredPresets)
+        {
+            <button type="button" class="bg-preset-card @(IsSelected(preset) ? "is-selected" : "")" @onclick="() => ApplyPreset(preset)">
+                <div class="bg-preset-preview lp-bg @preset.CssClass" style="@BuildPresetStyle(preset)"></div>
+                <div class="bg-preset-name">@preset.Name</div>
+                <div class="bg-preset-desc">@preset.Description</div>
+                <div class="bg-preset-meta">
+                    <span class="badge">@ResolveCategoryLabel(preset.Category)</span>
+                    @if (!string.IsNullOrWhiteSpace(preset.RecommendedUse))
+                    {
+                        <span class="bg-preset-use">@preset.RecommendedUse</span>
+                    }
+                </div>
+                <button type="button" class="bg-preset-fav @(IsFavorite(preset.Id) ? "is-on" : "")" @onclick="() => ToggleFavorite(preset.Id)" @onclick:stopPropagation="true" aria-label="お気に入り">
+                    @(IsFavorite(preset.Id) ? "★" : "☆")
+                </button>
+            </button>
+        }
+    </div>
+
+    @if (SelectedPreset is not null)
+    {
+        <div class="bg-preset-detail">
+            <div class="bg-preset-detail-header">
+                <div>
+                    <div class="bg-preset-detail-title">@SelectedPreset.Name</div>
+                    <div class="bg-preset-detail-desc">@SelectedPreset.Description</div>
+                </div>
+                @if (IsCustom)
+                {
+                    <span class="bg-custom-badge">Custom</span>
+                }
+            </div>
+            <div class="bg-preset-detail-grid">
+                <div class="field">
+                    <label>Base</label>
+                    <div class="color-input">
+                        <input type="color" value="@ResolveBaseColor()" @oninput="OnBaseColorChanged" />
+                        <input class="text" value="@ResolveBaseColor()" @oninput="OnBaseColorTextChanged" />
+                    </div>
+                </div>
+                <div class="field">
+                    <label>Accent</label>
+                    <div class="color-input">
+                        <input type="color" value="@ResolveAccentColor()" @oninput="OnAccentColorChanged" />
+                        <input class="text" value="@ResolveAccentColor()" @oninput="OnAccentColorTextChanged" />
+                    </div>
+                </div>
+                <div class="field">
+                    <label>Opacity</label>
+                    <div class="slider-row">
+                        <input type="range" min="0" max="100" step="1" value="@ResolveOpacityPercent()" @oninput="OnOpacityChanged" />
+                        <span class="slider-value">@ResolveOpacityPercent()%</span>
+                    </div>
+                </div>
+                <div class="field">
+                    <label>Scale</label>
+                    <div class="slider-row">
+                        <input type="range" min="50" max="200" step="1" value="@ResolveScalePercent()" @oninput="OnScaleChanged" />
+                        <span class="slider-value">@ResolveScalePercent()%</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public BackgroundPresetSelection Selection { get; set; } = new();
+    [Parameter] public IReadOnlyList<BackgroundPresetModel> Presets { get; set; } = Array.Empty<BackgroundPresetModel>();
+    [Parameter] public EventCallback OnChanged { get; set; }
+
+    private string ActiveCategory = "all";
+    private string SearchTerm = string.Empty;
+    private readonly HashSet<string> FavoriteIds = new(StringComparer.OrdinalIgnoreCase);
+    private BackgroundPresetSelection? _undoSnapshot;
+
+    private static readonly (string Key, string Label)[] CategoryChips =
+    {
+        ("all", "すべて"),
+        ("paper", "Paper"),
+        ("dot", "Dot"),
+        ("stripe", "Stripe"),
+        ("geometric", "Geometric"),
+        ("fancy", "Fancy"),
+        ("minimal", "Minimal")
+    };
+
+    private BackgroundPresetModel? SelectedPreset
+        => Presets.FirstOrDefault(p => string.Equals(p.Id, Selection.PresetKey, StringComparison.OrdinalIgnoreCase));
+
+    private IEnumerable<BackgroundPresetModel> FilteredPresets
+        => Presets
+            .Where(preset => IsCategory("all") || string.Equals(preset.Category, ActiveCategory, StringComparison.OrdinalIgnoreCase))
+            .Where(preset => string.IsNullOrWhiteSpace(SearchTerm)
+                || preset.Name.Contains(SearchTerm, StringComparison.OrdinalIgnoreCase)
+                || preset.Description.Contains(SearchTerm, StringComparison.OrdinalIgnoreCase)
+                || preset.RecommendedUse.Contains(SearchTerm, StringComparison.OrdinalIgnoreCase));
+
+    private bool IsCustom
+    {
+        get
+        {
+            if (SelectedPreset is null)
+            {
+                return true;
+            }
+
+            return !MatchesDefaults(SelectedPreset, Selection);
+        }
+    }
+
+    protected override void OnParametersSet()
+    {
+        Selection ??= new BackgroundPresetSelection();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+        {
+            return;
+        }
+
+        try
+        {
+            var favorites = await JS.InvokeAsync<string[]>("lpBackgroundPresets.loadFavorites");
+            FavoriteIds.Clear();
+            foreach (var id in favorites ?? Array.Empty<string>())
+            {
+                if (!string.IsNullOrWhiteSpace(id))
+                {
+                    FavoriteIds.Add(id);
+                }
+            }
+            await InvokeAsync(StateHasChanged);
+        }
+        catch
+        {
+        }
+    }
+
+    private bool IsCategory(string key) => string.Equals(ActiveCategory, key, StringComparison.OrdinalIgnoreCase);
+
+    private void SetCategory(string key)
+    {
+        ActiveCategory = key;
+    }
+
+    private bool IsSelected(BackgroundPresetModel preset)
+        => string.Equals(Selection.PresetKey, preset.Id, StringComparison.OrdinalIgnoreCase);
+
+    private bool IsFavorite(string id) => FavoriteIds.Contains(id);
+
+    private async Task ToggleFavorite(string id)
+    {
+        if (string.IsNullOrWhiteSpace(id))
+        {
+            return;
+        }
+
+        if (!FavoriteIds.Add(id))
+        {
+            FavoriteIds.Remove(id);
+        }
+
+        await SaveFavoritesAsync();
+    }
+
+    private async Task SaveFavoritesAsync()
+    {
+        try
+        {
+            await JS.InvokeVoidAsync("lpBackgroundPresets.saveFavorites", FavoriteIds.ToArray());
+        }
+        catch
+        {
+        }
+    }
+
+    private async Task ApplyPreset(BackgroundPresetModel preset)
+    {
+        CaptureUndoSnapshot();
+
+        Selection.PresetKey = preset.Id;
+        Selection.CssClass = preset.CssClass;
+        Selection.ColorA = preset.Defaults.BaseColor;
+        Selection.ColorB = preset.Defaults.AccentColor;
+        Selection.Opacity = preset.Defaults.Opacity ?? 1;
+        Selection.Scale = preset.Defaults.Scale ?? 1;
+
+        await OnChanged.InvokeAsync();
+    }
+
+    private async Task ClearPreset()
+    {
+        CaptureUndoSnapshot();
+
+        Selection.PresetKey = string.Empty;
+        Selection.CssClass = string.Empty;
+
+        await OnChanged.InvokeAsync();
+    }
+
+    private async Task ResetPreset()
+    {
+        if (SelectedPreset is null)
+        {
+            return;
+        }
+
+        CaptureUndoSnapshot();
+        Selection.ColorA = SelectedPreset.Defaults.BaseColor;
+        Selection.ColorB = SelectedPreset.Defaults.AccentColor;
+        Selection.Opacity = SelectedPreset.Defaults.Opacity ?? 1;
+        Selection.Scale = SelectedPreset.Defaults.Scale ?? 1;
+
+        await OnChanged.InvokeAsync();
+    }
+
+    private async Task Undo()
+    {
+        if (_undoSnapshot is null)
+        {
+            return;
+        }
+
+        Selection.PresetKey = _undoSnapshot.PresetKey;
+        Selection.CssClass = _undoSnapshot.CssClass;
+        Selection.ColorA = _undoSnapshot.ColorA;
+        Selection.ColorB = _undoSnapshot.ColorB;
+        Selection.Opacity = _undoSnapshot.Opacity;
+        Selection.Scale = _undoSnapshot.Scale;
+
+        _undoSnapshot = null;
+        await OnChanged.InvokeAsync();
+    }
+
+    private void CaptureUndoSnapshot()
+    {
+        _undoSnapshot ??= new BackgroundPresetSelection
+        {
+            PresetKey = Selection.PresetKey,
+            CssClass = Selection.CssClass,
+            ColorA = Selection.ColorA,
+            ColorB = Selection.ColorB,
+            Opacity = Selection.Opacity,
+            Scale = Selection.Scale
+        };
+    }
+
+    private string BuildPresetStyle(BackgroundPresetModel preset)
+    {
+        var opacity = preset.Defaults.Opacity ?? 1;
+        var scale = preset.Defaults.Scale ?? 1;
+        return $"--bg-base: {preset.Defaults.BaseColor}; --bg-accent: {preset.Defaults.AccentColor}; --bg-opacity: {opacity:0.###}; --bg-scale: {scale:0.###};";
+    }
+
+    private string ResolveBaseColor()
+        => string.IsNullOrWhiteSpace(Selection.ColorA) ? SelectedPreset?.Defaults.BaseColor ?? "#f8fafc" : Selection.ColorA;
+
+    private string ResolveAccentColor()
+        => string.IsNullOrWhiteSpace(Selection.ColorB) ? SelectedPreset?.Defaults.AccentColor ?? "#cbd5f5" : Selection.ColorB;
+
+    private int ResolveOpacityPercent()
+        => (int)Math.Round(Math.Clamp(Selection.Opacity ?? SelectedPreset?.Defaults.Opacity ?? 1, 0, 1) * 100);
+
+    private int ResolveScalePercent()
+        => (int)Math.Round(Math.Clamp(Selection.Scale ?? SelectedPreset?.Defaults.Scale ?? 1, 0.5, 2) * 100);
+
+    private async Task OnBaseColorChanged(ChangeEventArgs args)
+    {
+        CaptureUndoSnapshot();
+        Selection.ColorA = args.Value?.ToString() ?? string.Empty;
+        await OnChanged.InvokeAsync();
+    }
+
+    private async Task OnBaseColorTextChanged(ChangeEventArgs args)
+    {
+        CaptureUndoSnapshot();
+        Selection.ColorA = args.Value?.ToString() ?? string.Empty;
+        await OnChanged.InvokeAsync();
+    }
+
+    private async Task OnAccentColorChanged(ChangeEventArgs args)
+    {
+        CaptureUndoSnapshot();
+        Selection.ColorB = args.Value?.ToString() ?? string.Empty;
+        await OnChanged.InvokeAsync();
+    }
+
+    private async Task OnAccentColorTextChanged(ChangeEventArgs args)
+    {
+        CaptureUndoSnapshot();
+        Selection.ColorB = args.Value?.ToString() ?? string.Empty;
+        await OnChanged.InvokeAsync();
+    }
+
+    private async Task OnOpacityChanged(ChangeEventArgs args)
+    {
+        CaptureUndoSnapshot();
+        var percent = ParseDouble(args.Value?.ToString(), ResolveOpacityPercent());
+        Selection.Opacity = Math.Clamp(percent / 100d, 0, 1);
+        await OnChanged.InvokeAsync();
+    }
+
+    private async Task OnScaleChanged(ChangeEventArgs args)
+    {
+        CaptureUndoSnapshot();
+        var percent = ParseDouble(args.Value?.ToString(), ResolveScalePercent());
+        Selection.Scale = Math.Clamp(percent / 100d, 0.5, 2);
+        await OnChanged.InvokeAsync();
+    }
+
+    private static double ParseDouble(string? value, double fallback)
+    {
+        return double.TryParse(value, out var parsed) ? parsed : fallback;
+    }
+
+    private static string ResolveCategoryLabel(string? category)
+    {
+        return category?.ToLowerInvariant() switch
+        {
+            "paper" => "Paper",
+            "dot" => "Dot",
+            "stripe" => "Stripe",
+            "geometric" => "Geometric",
+            "fancy" => "Fancy",
+            "minimal" => "Minimal",
+            _ => "Other"
+        };
+    }
+
+    private static bool MatchesDefaults(BackgroundPresetModel preset, BackgroundPresetSelection selection)
+    {
+        var baseColor = string.IsNullOrWhiteSpace(selection.ColorA) ? preset.Defaults.BaseColor : selection.ColorA;
+        var accentColor = string.IsNullOrWhiteSpace(selection.ColorB) ? preset.Defaults.AccentColor : selection.ColorB;
+        var opacity = selection.Opacity ?? preset.Defaults.Opacity ?? 1;
+        var scale = selection.Scale ?? preset.Defaults.Scale ?? 1;
+
+        return string.Equals(baseColor.Trim(), preset.Defaults.BaseColor.Trim(), StringComparison.OrdinalIgnoreCase)
+            && string.Equals(accentColor.Trim(), preset.Defaults.AccentColor.Trim(), StringComparison.OrdinalIgnoreCase)
+            && Math.Abs(opacity - (preset.Defaults.Opacity ?? 1)) < 0.001
+            && Math.Abs(scale - (preset.Defaults.Scale ?? 1)) < 0.001;
+    }
+}
