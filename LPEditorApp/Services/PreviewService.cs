@@ -10,6 +10,8 @@ namespace LPEditorApp.Services;
 
 public class PreviewService
 {
+    private const bool DisableDecoImages = false;
+
     public async Task<string> GenerateHtmlAsync(
         TemplateProject template,
         ContentModel content,
@@ -82,10 +84,11 @@ public class PreviewService
         EnsureBackgroundImageOnPage(document, content);
         ApplySectionBackgrounds(document, content);
         ApplySectionStyles(document, content, editingSectionKey);
-        ApplySectionDecorations(document, content);
+        ApplySectionDecorations(document, content, template, imageOverrides, embedImages);
         ApplySectionAnimations(document, content);
         EnsureSectionBodyOnly(document, content);
         RenderCommonFrame(document, content);
+        ApplyGlobalDecoImages(document, content);
         ApplyFrameAnimations(document, content);
         EnsureFrameAnimationStyle(document);
         EnsureFrameAnimationScript(document);
@@ -1760,6 +1763,68 @@ img[class*='decoration'] { z-index: 50 !important; }
                 ApplyFrameStyleToElements(frame, header, body, ResolveFrameStyle(content, normalizedKey));
             }
 
+            private static void ApplyGlobalDecoImages(IDocument document, ContentModel content)
+            {
+                if (DisableDecoImages)
+                {
+                    return;
+                }
+
+                var sourceImages = document.QuerySelectorAll(".lp-decor.decor-image[data-apply-all='true']").OfType<IElement>()
+                    .Where(el => !string.Equals(el.GetAttribute("data-global-deco"), "true", StringComparison.OrdinalIgnoreCase))
+                    .ToList();
+                if (sourceImages.Count == 0)
+                {
+                    return;
+                }
+
+                foreach (var group in document.QuerySelectorAll(".section-group[data-section]").ToList())
+                {
+                    var key = group.GetAttribute("data-section") ?? string.Empty;
+                    if (string.IsNullOrWhiteSpace(key))
+                    {
+                        continue;
+                    }
+
+                    var target = group.QuerySelector(".lp-frame-body") as IElement ?? group;
+                    var decorContainer = group.QuerySelector(".lp-decorations") as IElement ?? document.CreateElement("div");
+                    decorContainer.ClassName = "lp-decorations";
+
+                    foreach (var existing in target.QuerySelectorAll(".deco-img[data-global-deco='true']").ToList())
+                    {
+                        existing.Remove();
+                    }
+                    foreach (var existing in decorContainer.QuerySelectorAll(".lp-decor.decor-image[data-global-deco='true']").ToList())
+                    {
+                        existing.Remove();
+                    }
+
+                    foreach (var source in sourceImages)
+                    {
+                        var clone = source.Clone(true) as IElement;
+                        if (clone is null)
+                        {
+                            continue;
+                        }
+                        clone.SetAttribute("data-global-deco", "true");
+
+                        if (clone.ClassList.Contains("lp-decor"))
+                        {
+                            decorContainer.AppendChild(clone);
+                        }
+                        else
+                        {
+                            target.AppendChild(clone);
+                        }
+                    }
+
+                    if (decorContainer.ParentElement != target)
+                    {
+                        target.AppendChild(decorContainer);
+                    }
+                }
+            }
+
             private static FrameStyle ResolveFrameStyle(ContentModel content, string normalizedKey)
             {
                 return content.FrameDefaultStyle ?? content.CardThemeStyle ?? new FrameStyle();
@@ -2770,6 +2835,8 @@ img[class*='decoration'] { z-index: 50 !important; }
 .lp-decorations { position:absolute; inset:0; pointer-events:none; }
 .lp-frame-body .lp-decorations { inset: 0; }
 .lp-decor { position:absolute; opacity: var(--decor-opacity, 1); background: var(--decor-color, #1e1b4b); color:#fff; display:grid; place-items:center; font-size:0.75rem; font-weight:700; border-radius:999px; }
+.lp-decor.decor-image { background: transparent; padding: 0; }
+.lp-decor.decor-image img { width: 100%; height: 100%; object-fit: contain; display: block; }
 .lp-decor.layer-back { z-index:1; }
 .lp-decor.layer-front { z-index:3; }
 .lp-decor.pos-top { top: calc(8px + var(--decor-offset-y, 0px)); left:50%; transform: translateX(-50%); width: calc(var(--decor-size, 40px) * 3); height: var(--decor-size, 40px); }
@@ -2790,7 +2857,12 @@ img[class*='decoration'] { z-index: 50 !important; }
                 head.AppendChild(style);
             }
 
-            private static void ApplySectionDecorations(IDocument document, ContentModel content)
+            private static void ApplySectionDecorations(
+                IDocument document,
+                ContentModel content,
+                TemplateProject template,
+                IDictionary<string, byte[]>? overrides,
+                bool embedImages)
             {
                 foreach (var group in document.QuerySelectorAll(".section-group[data-section]").ToList())
                 {
@@ -2822,9 +2894,32 @@ img[class*='decoration'] { z-index: 50 !important; }
                         var color = string.IsNullOrWhiteSpace(layer.Color) ? "#1e1b4b" : layer.Color;
                         var offsetX = layer.OffsetX ?? 0;
                         var offsetY = layer.OffsetY ?? 0;
-                        decor.ClassName = $"lp-decor decor-{layer.Type} layer-{layer.Layer} pos-{layer.Position}";
+                        var layerType = string.IsNullOrWhiteSpace(layer.Type) ? "ribbon" : layer.Type;
+                        decor.ClassName = $"lp-decor decor-{layerType} layer-{layer.Layer} pos-{layer.Position}";
                         decor.SetAttribute("style", $"--decor-size:{size}px;--decor-color:{color};--decor-opacity:{opacity};--decor-offset-x:{offsetX}px;--decor-offset-y:{offsetY}px;");
-                        if (!string.IsNullOrWhiteSpace(layer.Label))
+
+                        if (layer.ApplyToAll)
+                        {
+                            decor.SetAttribute("data-apply-all", "true");
+                        }
+
+                        if (string.Equals(layerType, "image", StringComparison.OrdinalIgnoreCase))
+                        {
+                            if (string.IsNullOrWhiteSpace(layer.ImagePath) || IsImageDeleted(content, layer.ImagePath))
+                            {
+                                continue;
+                            }
+
+                            var img = document.CreateElement("img");
+                            img.SetAttribute("src", ResolveImageUrl(layer.ImagePath, template, overrides, embedImages));
+                            img.SetAttribute("alt", WebUtility.HtmlEncode(layer.ImageAlt ?? string.Empty));
+                            if (layer.ImageAutoFit)
+                            {
+                                decor.SetAttribute("data-autofit", "true");
+                            }
+                            decor.AppendChild(img);
+                        }
+                        else if (!string.IsNullOrWhiteSpace(layer.Label))
                         {
                             decor.TextContent = layer.Label;
                         }
@@ -4685,13 +4780,13 @@ img, svg, video, canvas { max-width: 100% !important; height: auto !important; }
         .lp-section[data-section-type='ranking'] .ranking-inner { background-color: __RANK_BG__; padding: 30px 55px 50px; max-width: 100%; width: 100%; display: block; margin: 0 auto; position: relative; box-sizing: border-box; overflow-x: hidden; }
 .lp-section[data-section-type='ranking'] .campaign__rank-text { margin-top: 20px; font-family: ""M PLUS 1"", ""Noto Sans JP"", sans-serif; color: #fff; font-weight: 800; text-align: center; line-height: 1.2; }
 .lp-section[data-section-type='ranking'] .campaign__rank-text > .-heading { font-size: 32px; display: flex; align-items: flex-end; justify-content: center; gap: 2px; }
-.lp-section[data-section-type='ranking'] .campaign__rank-text > .-heading::before, .lp-section[data-section-type='ranking'] .campaign__rank-text > .-heading::after { display: inline-block; content: ""; height: 29px; width: 15px; background: url(images/deco-rank01.png) no-repeat center bottom/100% 100%; }
+.lp-section[data-section-type='ranking'] .campaign__rank-text > .-heading::before, .lp-section[data-section-type='ranking'] .campaign__rank-text > .-heading::after { display: inline-block; content: ""; height: 29px; width: 15px; background: none; }
 .lp-section[data-section-type='ranking'] .campaign__rank-text > .-heading::before { margin-right: 10px; }
 .lp-section[data-section-type='ranking'] .campaign__rank-text > .-heading::after { transform: scale(-1, 1); }
 .lp-section[data-section-type='ranking'] .campaign__rank-text > .-kikan { display: flex; align-items: center; justify-content: center; gap: 10px; font-size: 22px; margin-top: 12px; }
 .lp-section[data-section-type='ranking'] .campaign__rank-text > .-kikan > span { background: white; border-radius: 4px; color: #BF1D20; display: inline-block; padding: 0 7px 2px; }
 .lp-section[data-section-type='ranking'] .campaign__rank-text > .-date { display: flex; align-items: center; justify-content: center; gap: 12px; font-size: 30px; margin-top: 24px; }
-.lp-section[data-section-type='ranking'] .campaign__rank-text > .-date::before, .lp-section[data-section-type='ranking'] .campaign__rank-text > .-date::after { display: inline-block; content: ""; height: 10px; flex: 1; background: url(images/deco-rank02.png) no-repeat center center/100% 100%; }
+.lp-section[data-section-type='ranking'] .campaign__rank-text > .-date::before, .lp-section[data-section-type='ranking'] .campaign__rank-text > .-date::after { display: inline-block; content: ""; height: 10px; flex: 1; background: none; }
 .lp-section[data-section-type='ranking'] .campaign__rank-notes { margin-top: 25px; }
 .lp-section[data-section-type='ranking'] .campaign__rank-notes li { color: #fff; }
 .lp-section[data-section-type='ranking'] .campaign__rank-box { width: calc(100% + 16px); margin-left: -8px; margin-top: 12px; border-collapse: separate; border-spacing: 8px; font-family: ""M PLUS 1"", ""Noto Sans JP"", sans-serif; font-weight: 800; line-height: 1.4; }
@@ -4711,6 +4806,12 @@ img, svg, video, canvas { max-width: 100% !important; height: auto !important; }
 .lp-section[data-section-type='ranking'] .deco-img.-right { top: 12px; right: -16px; }
 .lp-section[data-section-type='ranking'] .deco-img.-deco04 { max-width: 183px; height: auto; }
 .lp-section[data-section-type='ranking'] .deco-img.-deco05 { max-width: 236px; height: auto; }
+.lp-section .deco-img { position: absolute; content: ""; z-index: 2; }
+.lp-section .deco-img img { height: 100%; width: auto; object-fit: contain; }
+.lp-section .deco-img.-left { top: 36px; left: 32px; }
+.lp-section .deco-img.-right { top: 12px; right: -16px; }
+.lp-section .deco-img.-deco04 { max-width: 183px; height: auto; }
+.lp-section .deco-img.-deco05 { max-width: 236px; height: auto; }
 @media (max-width: 767px) {
     .lp-section[data-section-type='ranking'] .ranking-inner { padding: 30px 15px 30px; }
     .lp-section[data-section-type='ranking'] .campaign__rank-text > .-heading { font-size: 18px; }
@@ -4725,6 +4826,8 @@ img, svg, video, canvas { max-width: 100% !important; height: auto !important; }
     .lp-section[data-section-type='ranking'] .campaign__rank-box .king::after { width: 56px; height: 40px; }
     .lp-section[data-section-type='ranking'] .deco-img.-deco04 { width: 80px; left: 0; top: -20px; height: 60px; }
     .lp-section[data-section-type='ranking'] .deco-img.-deco05 { width: 90px; right: 0; top: -28px; height: 65px; }
+    .lp-section .deco-img.-deco04 { width: 80px; left: 0; top: -20px; height: 60px; }
+    .lp-section .deco-img.-deco05 { width: 90px; right: 0; top: -28px; height: 65px; }
 }
 ";
     style.TextContent = css.Replace("__RANK_BG__", rankBackground, StringComparison.Ordinal);
@@ -5347,13 +5450,14 @@ img, svg, video, canvas { max-width: 100% !important; height: auto !important; }
                 ? string.Empty
                 : $"<img class=\"campaign__iphoneImg\" src=\"{ResolveImageUrl(model.Image, template, overrides, embedImages)}\" alt=\"{WebUtility.HtmlEncode(model.ImageAlt ?? string.Empty)}\" />");
 
-        var decoHtml = string.IsNullOrWhiteSpace(model.DecoImage)
+        var decoHtml = DisableDecoImages
             ? string.Empty
-            : (IsImageDeleted(content, model.DecoImage)
+            : (string.IsNullOrWhiteSpace(model.DecoImage)
                 ? string.Empty
-                : $"<div class=\"deco-img -right -deco06\" data-autofit=\"true\"><img src=\"{ResolveImageUrl(model.DecoImage, template, overrides, embedImages)}\" alt=\"{WebUtility.HtmlEncode(model.DecoAlt ?? string.Empty)}\" /></div>");
-
-                return $@"
+                : (IsImageDeleted(content, model.DecoImage)
+                    ? string.Empty
+                    : $"<div class=\"deco-img -right -deco06\" data-autofit=\"true\"><img src=\"{ResolveImageUrl(model.DecoImage, template, overrides, embedImages)}\" alt=\"{WebUtility.HtmlEncode(model.DecoAlt ?? string.Empty)}\" /></div>"));
+        return $@"
 <div class=""campaign__inner"">
     {textHtml}
     {importantHtml}
@@ -5643,17 +5747,7 @@ img, svg, video, canvas { max-width: 100% !important; height: auto !important; }
 
     private static RankingDecorImageModel ResolveRankingDecorImage(RankingDecorImageModel image, string fallbackPath)
     {
-        if (!string.IsNullOrWhiteSpace(image.Src))
-        {
-            return image;
-        }
-
-        return new RankingDecorImageModel
-        {
-            Src = fallbackPath,
-            Alt = string.Empty,
-            Visible = true
-        };
+        return image;
     }
 
     private static string BuildRankingDecorImageHtml(
@@ -5663,6 +5757,11 @@ img, svg, video, canvas { max-width: 100% !important; height: auto !important; }
         bool embedImages,
         string className)
     {
+        if (DisableDecoImages)
+        {
+            return string.Empty;
+        }
+
         if (image is null || !image.Visible || string.IsNullOrWhiteSpace(image.Src))
         {
             return string.Empty;

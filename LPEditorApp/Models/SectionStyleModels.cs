@@ -251,6 +251,18 @@ public class DecorationLayer
     [JsonPropertyName("label")]
     public string Label { get; set; } = string.Empty;
 
+    [JsonPropertyName("imagePath")]
+    public string ImagePath { get; set; } = string.Empty;
+
+    [JsonPropertyName("imageAlt")]
+    public string ImageAlt { get; set; } = string.Empty;
+
+    [JsonPropertyName("imageAutoFit")]
+    public bool ImageAutoFit { get; set; } = true;
+
+    [JsonPropertyName("applyToAll")]
+    public bool ApplyToAll { get; set; }
+
     [JsonPropertyName("animation")]
     public DecorationAnimationSetting Animation { get; set; } = new();
 }

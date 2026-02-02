@@ -50,6 +50,7 @@
                     <option value="divider">区切り線</option>
                     <option value="pattern">背景パターン</option>
                     <option value="shape">図形</option>
+                    <option value="image">画像</option>
                 </InputSelect>
             </div>
             <div class="field">
@@ -99,6 +100,34 @@
                 <label>ラベル</label>
                 <input class="text" @bind-value="SelectedLayer.Label" @bind-value:after="NotifyChanged" />
             </div>
+            @if (string.Equals(SelectedLayer.Type, "image", StringComparison.OrdinalIgnoreCase))
+            {
+                <div class="field">
+                    <label>画像</label>
+                    <div class="bulk-style">
+                        <InputSelect class="text-option-select" @bind-Value="SelectedLayer.ImagePath" @bind-Value:after="NotifyChanged">
+                            <option value="">なし</option>
+                            @foreach (var path in DecoImageOptions)
+                            {
+                                <option value="@path">@path</option>
+                            }
+                        </InputSelect>
+                        <input class="text" @bind-value="SelectedLayer.ImagePath" @bind-value:after="NotifyChanged" placeholder="images/deco-01.png" />
+                    </div>
+                </div>
+                <div class="field">
+                    <label>代替テキスト</label>
+                    <input class="text" @bind-value="SelectedLayer.ImageAlt" @bind-value:after="NotifyChanged" />
+                </div>
+                <div class="field">
+                    <label>自動フィット</label>
+                    <label class="check"><input type="checkbox" @bind="SelectedLayer.ImageAutoFit" @bind:after="NotifyChanged" /> 有効</label>
+                </div>
+                <div class="field">
+                    <label>全セクションに適用</label>
+                    <label class="check"><input type="checkbox" @bind="SelectedLayer.ApplyToAll" @bind:after="NotifyChanged" /> 有効</label>
+                </div>
+            }
             <div class="field">
                 <label>装飾アニメ</label>
                 <InputSelect class="text-option-select" @bind-Value="SelectedLayer.Animation.Preset" @bind-Value:after="NotifyChanged">
@@ -126,6 +155,7 @@
 @code {
     [Parameter] public SectionStyleModel Style { get; set; } = new();
     [Parameter] public EventCallback OnChanged { get; set; }
+    [Parameter] public IReadOnlyList<string> DecoImageOptions { get; set; } = Array.Empty<string>();
 
     private DecorationLayer? SelectedLayer;
 
@@ -212,6 +242,10 @@
             Color = layer.Color,
             OpacityPct = layer.OpacityPct,
             Label = layer.Label,
+            ImagePath = layer.ImagePath,
+            ImageAlt = layer.ImageAlt,
+            ImageAutoFit = layer.ImageAutoFit,
+            ApplyToAll = layer.ApplyToAll,
             Animation = new DecorationAnimationSetting
             {
                 Preset = layer.Animation.Preset,
@@ -241,6 +275,10 @@
             Color = layer.Color,
             OpacityPct = layer.OpacityPct,
             Label = layer.Label,
+            ImagePath = layer.ImagePath,
+            ImageAlt = layer.ImageAlt,
+            ImageAutoFit = layer.ImageAutoFit,
+            ApplyToAll = layer.ApplyToAll,
             Animation = new DecorationAnimationSetting
             {
                 Preset = layer.Animation.Preset,
