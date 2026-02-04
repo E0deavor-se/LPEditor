@@ -66,31 +66,38 @@
             </div>
             <div class="bg-preset-detail-grid">
                 <div class="field">
-                    <label>Base</label>
+                    <label>背景色</label>
                     <div class="color-input">
-                        <input type="color" value="@ResolveBaseColor()" @oninput="OnBaseColorChanged" />
-                        <input class="text" value="@ResolveBaseColor()" @oninput="OnBaseColorTextChanged" />
+                        <input type="color" value="@ResolveBackgroundColor()" @oninput="OnBackgroundColorChanged" />
+                        <input class="text" value="@ResolveBackgroundColor()" @oninput="OnBackgroundColorTextChanged" />
                     </div>
                 </div>
                 <div class="field">
-                    <label>Accent</label>
+                    <label>柄の色</label>
                     <div class="color-input">
-                        <input type="color" value="@ResolveAccentColor()" @oninput="OnAccentColorChanged" />
-                        <input class="text" value="@ResolveAccentColor()" @oninput="OnAccentColorTextChanged" />
+                        <input type="color" value="@ResolvePatternColor()" @oninput="OnPatternColorChanged" />
+                        <input class="text" value="@ResolvePatternColor()" @oninput="OnPatternColorTextChanged" />
                     </div>
                 </div>
                 <div class="field">
-                    <label>Opacity</label>
+                    <label>柄の透明度</label>
                     <div class="slider-row">
                         <input type="range" min="0" max="100" step="1" value="@ResolveOpacityPercent()" @oninput="OnOpacityChanged" />
                         <span class="slider-value">@ResolveOpacityPercent()%</span>
                     </div>
                 </div>
                 <div class="field">
-                    <label>Scale</label>
+                    <label>柄サイズ</label>
                     <div class="slider-row">
                         <input type="range" min="50" max="200" step="1" value="@ResolveScalePercent()" @oninput="OnScaleChanged" />
                         <span class="slider-value">@ResolveScalePercent()%</span>
+                    </div>
+                </div>
+                <div class="field">
+                    <label>ぼかし</label>
+                    <div class="slider-row">
+                        <input type="range" min="0" max="12" step="0.5" value="@ResolveBlurPx()" @oninput="OnBlurChanged" />
+                        <span class="slider-value">@ResolveBlurPx()px</span>
                     </div>
                 </div>
             </div>
@@ -221,6 +228,7 @@
         Selection.ColorB = preset.Defaults.AccentColor;
         Selection.Opacity = preset.Defaults.Opacity ?? 1;
         Selection.Scale = preset.Defaults.Scale ?? 1;
+        Selection.Blur = 0;
 
         await OnChanged.InvokeAsync();
     }
@@ -231,6 +239,7 @@
 
         Selection.PresetKey = string.Empty;
         Selection.CssClass = string.Empty;
+        Selection.Blur = 0;
 
         await OnChanged.InvokeAsync();
     }
@@ -247,6 +256,7 @@
         Selection.ColorB = SelectedPreset.Defaults.AccentColor;
         Selection.Opacity = SelectedPreset.Defaults.Opacity ?? 1;
         Selection.Scale = SelectedPreset.Defaults.Scale ?? 1;
+        Selection.Blur = 0;
 
         await OnChanged.InvokeAsync();
     }
@@ -264,6 +274,7 @@
         Selection.ColorB = _undoSnapshot.ColorB;
         Selection.Opacity = _undoSnapshot.Opacity;
         Selection.Scale = _undoSnapshot.Scale;
+        Selection.Blur = _undoSnapshot.Blur;
 
         _undoSnapshot = null;
         await OnChanged.InvokeAsync();
@@ -278,7 +289,8 @@
             ColorA = Selection.ColorA,
             ColorB = Selection.ColorB,
             Opacity = Selection.Opacity,
-            Scale = Selection.Scale
+            Scale = Selection.Scale,
+            Blur = Selection.Blur
         };
     }
 
@@ -286,13 +298,13 @@
     {
         var opacity = preset.Defaults.Opacity ?? 1;
         var scale = preset.Defaults.Scale ?? 1;
-        return $"--bg-base: {preset.Defaults.BaseColor}; --bg-accent: {preset.Defaults.AccentColor}; --bg-opacity: {opacity:0.###}; --bg-scale: {scale:0.###};";
+        return $"--bg-base: {preset.Defaults.BaseColor}; --bg-accent: {preset.Defaults.AccentColor}; --bg-opacity: {opacity:0.###}; --bg-scale: {scale:0.###}; --bg-blur: 0px;";
     }
 
-    private string ResolveBaseColor()
+    private string ResolveBackgroundColor()
         => string.IsNullOrWhiteSpace(Selection.ColorA) ? SelectedPreset?.Defaults.BaseColor ?? "#f8fafc" : Selection.ColorA;
 
-    private string ResolveAccentColor()
+    private string ResolvePatternColor()
         => string.IsNullOrWhiteSpace(Selection.ColorB) ? SelectedPreset?.Defaults.AccentColor ?? "#cbd5f5" : Selection.ColorB;
 
     private int ResolveOpacityPercent()
@@ -301,28 +313,31 @@
     private int ResolveScalePercent()
         => (int)Math.Round(Math.Clamp(Selection.Scale ?? SelectedPreset?.Defaults.Scale ?? 1, 0.5, 2) * 100);
 
-    private async Task OnBaseColorChanged(ChangeEventArgs args)
+    private double ResolveBlurPx()
+        => Math.Round(Math.Clamp(Selection.Blur ?? 0, 0, 12), 1);
+
+    private async Task OnBackgroundColorChanged(ChangeEventArgs args)
     {
         CaptureUndoSnapshot();
         Selection.ColorA = args.Value?.ToString() ?? string.Empty;
         await OnChanged.InvokeAsync();
     }
 
-    private async Task OnBaseColorTextChanged(ChangeEventArgs args)
+    private async Task OnBackgroundColorTextChanged(ChangeEventArgs args)
     {
         CaptureUndoSnapshot();
         Selection.ColorA = args.Value?.ToString() ?? string.Empty;
         await OnChanged.InvokeAsync();
     }
 
-    private async Task OnAccentColorChanged(ChangeEventArgs args)
+    private async Task OnPatternColorChanged(ChangeEventArgs args)
     {
         CaptureUndoSnapshot();
         Selection.ColorB = args.Value?.ToString() ?? string.Empty;
         await OnChanged.InvokeAsync();
     }
 
-    private async Task OnAccentColorTextChanged(ChangeEventArgs args)
+    private async Task OnPatternColorTextChanged(ChangeEventArgs args)
     {
         CaptureUndoSnapshot();
         Selection.ColorB = args.Value?.ToString() ?? string.Empty;
@@ -342,6 +357,14 @@
         CaptureUndoSnapshot();
         var percent = ParseDouble(args.Value?.ToString(), ResolveScalePercent());
         Selection.Scale = Math.Clamp(percent / 100d, 0.5, 2);
+        await OnChanged.InvokeAsync();
+    }
+
+    private async Task OnBlurChanged(ChangeEventArgs args)
+    {
+        CaptureUndoSnapshot();
+        var blur = ParseDouble(args.Value?.ToString(), ResolveBlurPx());
+        Selection.Blur = Math.Clamp(blur, 0, 12);
         await OnChanged.InvokeAsync();
     }
 
@@ -370,10 +393,12 @@
         var accentColor = string.IsNullOrWhiteSpace(selection.ColorB) ? preset.Defaults.AccentColor : selection.ColorB;
         var opacity = selection.Opacity ?? preset.Defaults.Opacity ?? 1;
         var scale = selection.Scale ?? preset.Defaults.Scale ?? 1;
+        var blur = selection.Blur ?? 0;
 
         return string.Equals(baseColor.Trim(), preset.Defaults.BaseColor.Trim(), StringComparison.OrdinalIgnoreCase)
             && string.Equals(accentColor.Trim(), preset.Defaults.AccentColor.Trim(), StringComparison.OrdinalIgnoreCase)
             && Math.Abs(opacity - (preset.Defaults.Opacity ?? 1)) < 0.001
-            && Math.Abs(scale - (preset.Defaults.Scale ?? 1)) < 0.001;
+            && Math.Abs(scale - (preset.Defaults.Scale ?? 1)) < 0.001
+            && Math.Abs(blur) < 0.001;
     }
 }

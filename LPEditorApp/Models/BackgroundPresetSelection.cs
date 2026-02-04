@@ -27,4 +27,7 @@ public class BackgroundPresetSelection
 
     [JsonPropertyName("scale")]
     public double? Scale { get; set; }
+
+    [JsonPropertyName("blur")]
+    public double? Blur { get; set; }
 }

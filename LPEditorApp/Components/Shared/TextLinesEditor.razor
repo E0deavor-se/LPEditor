@@ -9,6 +9,17 @@
         <div class="list-block" @key="item.Id">
             <div class="list-row">
                 <input class="text" placeholder="テキスト" @bind-value="item.Text" @bind-value:event="oninput" @bind-value:after="NotifyChanged" />
+                @if (FontSizeOptions.Length > 0)
+                {
+                    <select class="text" @onchange="e => OnFontSizeChanged(item, e)">
+                        <option value="">サイズ</option>
+                        @foreach (var size in FontSizeOptions)
+                        {
+                            <option value="@size" selected="@(item.FontSize == size)">@size px</option>
+                        }
+                    </select>
+                }
+                <input type="color" class="text" value="@GetColorValue(item.Color)" @onchange="e => OnColorChanged(item, e)" title="文字色" />
                 @if (AllowDelete)
                 {
                     <button type="button" class="btn small" @onclick="() => RemoveLineById(item.Id)" disabled="@(Items.Count <= 1)">削除</button>
@@ -83,6 +94,28 @@
 
     private void NotifyChanged()
     {
+        _ = OnChanged.InvokeAsync();
+    }
+
+    private void OnFontSizeChanged(StyledTextItem item, ChangeEventArgs e)
+    {
+        var value = e?.Value?.ToString();
+        if (int.TryParse(value, out var size))
+        {
+            item.FontSize = size;
+        }
+        else
+        {
+            item.FontSize = null;
+        }
+
+        _ = OnChanged.InvokeAsync();
+    }
+
+    private void OnColorChanged(StyledTextItem item, ChangeEventArgs e)
+    {
+        var value = e?.Value?.ToString();
+        item.Color = string.IsNullOrWhiteSpace(value) ? null : value;
         _ = OnChanged.InvokeAsync();
     }
 }

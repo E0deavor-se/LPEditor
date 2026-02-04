@@ -207,9 +207,10 @@
   height: 100vh;
   z-index: -1;
   pointer-events: none;
-  background-color: var(--bg-base, #f8fafc);
+  background-color: var(--bg-base, transparent);
   background-repeat: repeat;
   opacity: var(--bg-opacity, 1);
+  filter: blur(var(--bg-blur, 0px));
 }
 
 .lp-bg.bg--paper-grid-1 {

@@ -544,7 +544,7 @@
 								{
 									var openKey = $"group-{group.Key}";
 									var keyLower = group.Key?.ToLowerInvariant() ?? string.Empty;
-									var customSection = State.Content.CustomSections.FirstOrDefault(x => string.Equals(x.Key, group.Key, StringComparison.OrdinalIgnoreCase));
+									var customSection = CustomSectionsSafe.FirstOrDefault(x => string.Equals(x.Key, group.Key, StringComparison.OrdinalIgnoreCase));
 									var normalizedKey = NormalizeSectionKey(group.Key);
 									var isCurrent = string.Equals(CurrentPreviewSectionId, normalizedKey, StringComparison.OrdinalIgnoreCase);
 									var isSelected = string.Equals(SelectedSectionId, group.Key, StringComparison.OrdinalIgnoreCase);
@@ -684,11 +684,11 @@
 																<div class="sticky-tabs-editor__tabs">
 																	@for (var tabIndex = 0; tabIndex < stickyTabs.Tabs.Count; tabIndex++)
 																	{
-																		var currentIndex = tabIndex;
-																		var tab = stickyTabs.Tabs[currentIndex];
-																		var isActive = currentIndex == SelectedStickyTabIndex;
-																		var tabBg = string.IsNullOrWhiteSpace(tab.Color) ? "#e5e7eb" : tab.Color;
-																		var tabTextColor = ResolveStickyTabEditorTextColor(tabBg, tab.TextColor);
+																	var currentIndex = tabIndex;
+																	var tab = stickyTabs.Tabs[currentIndex];
+																	var isActive = currentIndex == SelectedStickyTabIndex;
+																	var tabBg = string.IsNullOrWhiteSpace(tab.Color) ? "#e5e7eb" : tab.Color;
+																	var tabTextColor = ResolveStickyTabEditorTextColor(tabBg, tab.TextColor);
 																		<button type="button" class="sticky-tabs-editor__tab@(isActive ? " is-active" : string.Empty)" style="--tab-bg:@tabBg; --tab-color:@tabTextColor;" title="@tab.Title" @onclick="() => SelectStickyTab(currentIndex)">
 																			<span class="sticky-tabs-editor__tabTitle">@tab.Title</span>
 																			@if (isActive)
@@ -951,6 +951,16 @@
 													<label>カウントダウン表示</label>
 													<label class="check"><input type="checkbox" @bind="State.Content.Campaign.ShowCountdown" @bind:after="OnAnyInputAfter" /> 表示する</label>
 												</div>
+													<div class="field">
+														<label>フッターテキストサイズ</label>
+														<select class="text" @onchange="OnCountdownTextSizeChanged">
+															<option value="">自動</option>
+															@foreach (var size in FontSizeOptions)
+															{
+																<option value="@size" selected="@(State.Content.Campaign.CountdownTextSize == size)">@size px</option>
+															}
+														</select>
+													</div>
 												@if (State.Content.Campaign.ShowCountdown)
 												{
 													<div class="field">
@@ -1275,6 +1285,7 @@
 
 	protected override async Task OnInitializedAsync()
 	{
+		EnsureContentCollections();
 		SetupEditContext();
 		InitializeAccordionDefaults();
 		EnsureSectionTextLines();
@@ -1555,7 +1566,7 @@
 
 	private IReadOnlyList<MiniMap.MiniMapSection> GetMiniMapSections()
 	{
-		return State.Content.SectionGroups
+		return SectionGroupsSafe
 			.Where(group => IsEditorManagedSectionKey(group.Key))
 			.Select(group => new MiniMap.MiniMapSection
 			{
@@ -1615,7 +1626,7 @@
 		{
 			return string.Empty;
 		}
-		var isCustom = State.Content.CustomSections.Any(section => string.Equals(section.Key, group.Key, StringComparison.OrdinalIgnoreCase));
+		var isCustom = CustomSectionsSafe.Any(section => string.Equals(section.Key, group.Key, StringComparison.OrdinalIgnoreCase));
 		var typeLabel = GetSectionTypeLabel(group.Key, isCustom);
 		var visibility = group.Enabled ? "表示中" : "非表示";
 		return $"{typeLabel} · {visibility}";
@@ -1623,7 +1634,7 @@
 
 	private IEnumerable<SectionGroupModel> GetFilteredSectionGroups()
 	{
-		IEnumerable<SectionGroupModel> query = State.Content.SectionGroups
+		IEnumerable<SectionGroupModel> query = SectionGroupsSafe
 			.Where(group => IsEditorManagedSectionKey(group.Key));
 
 		if (!string.IsNullOrWhiteSpace(SectionSearch))
@@ -1648,7 +1659,7 @@
 		{
 			query = query.Where(group =>
 			{
-				var isCustom = State.Content.CustomSections.Any(section => string.Equals(section.Key, group.Key, StringComparison.OrdinalIgnoreCase));
+				var isCustom = CustomSectionsSafe.Any(section => string.Equals(section.Key, group.Key, StringComparison.OrdinalIgnoreCase));
 				return string.Equals(GetSectionTypeKey(group.Key, isCustom), SectionTypeFilter, StringComparison.OrdinalIgnoreCase);
 			});
 		}
@@ -1659,13 +1670,19 @@
 	private IReadOnlyList<SectionGroupModel> FilteredSectionGroups
 		=> GetFilteredSectionGroups().ToList();
 
+	private IReadOnlyList<SectionGroupModel> SectionGroupsSafe
+		=> State.Content.SectionGroups ?? new List<SectionGroupModel>();
+
+	private IReadOnlyList<CustomSectionModel> CustomSectionsSafe
+		=> State.Content.CustomSections ?? new List<CustomSectionModel>();
+
 	private IReadOnlyList<KeyValuePair<string, string>> GetSectionTypeOptions()
 	{
 		var order = new[] { "campaign", "coupon", "tabs", "ranking", "payment", "countdown", "store", "custom", "other" };
 		var map = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-		foreach (var group in State.Content.SectionGroups.Where(group => IsEditorManagedSectionKey(group.Key)))
+		foreach (var group in SectionGroupsSafe.Where(group => IsEditorManagedSectionKey(group.Key)))
 		{
-			var isCustom = State.Content.CustomSections.Any(section => string.Equals(section.Key, group.Key, StringComparison.OrdinalIgnoreCase));
+			var isCustom = CustomSectionsSafe.Any(section => string.Equals(section.Key, group.Key, StringComparison.OrdinalIgnoreCase));
 			var key = GetSectionTypeKey(group.Key, isCustom);
 			if (!map.ContainsKey(key))
 			{
@@ -1980,7 +1997,7 @@
 			return null;
 		}
 
-		return State.Content.SectionGroups
+		return SectionGroupsSafe
 			.FirstOrDefault(group => string.Equals(group.Key, key, StringComparison.OrdinalIgnoreCase))
 			?.DisplayName;
 	}
@@ -1992,7 +2009,7 @@
 			return false;
 		}
 
-		if (State.Content.CustomSections.Any(section => string.Equals(section.Key, key, StringComparison.OrdinalIgnoreCase)))
+		if (CustomSectionsSafe.Any(section => string.Equals(section.Key, key, StringComparison.OrdinalIgnoreCase)))
 		{
 			return true;
 		}
@@ -2409,6 +2426,7 @@
 			using var reader = new StreamReader(file.OpenReadStream(long.MaxValue));
 			var json = await reader.ReadToEndAsync();
 			State.Content = JsonSerializer.Deserialize<ContentModel>(json) ?? new ContentModel();
+			EnsureContentCollections();
 			if (State.Template is not null && State.Template.SectionGroupKeys.Count > 0)
 			{
 				TemplateService.EnsureSectionGroups(State.Content, State.Template.SectionGroupKeys);
@@ -2426,6 +2444,13 @@
 		{
 			State.Error.SetError("content.json読み込みに失敗", ex.Message);
 		}
+	}
+
+	private void EnsureContentCollections()
+	{
+		State.Content.SectionGroups ??= new List<SectionGroupModel>();
+		State.Content.CustomSections ??= new List<CustomSectionModel>();
+		State.Content.Sections ??= new SectionsModel();
 	}
 
 	private async Task OnSaveContent()
@@ -2610,6 +2635,21 @@
 	private async Task OnCountdownEndInputChanged(ChangeEventArgs e)
 	{
 		State.Content.Campaign.CountdownEnd = NormalizeDateTimeLocal(e?.Value?.ToString());
+		await UpdatePreviewAsync();
+	}
+
+	private async Task OnCountdownTextSizeChanged(ChangeEventArgs e)
+	{
+		var value = e?.Value?.ToString();
+		if (int.TryParse(value, out var size))
+		{
+			State.Content.Campaign.CountdownTextSize = size;
+		}
+		else
+		{
+			State.Content.Campaign.CountdownTextSize = null;
+		}
+
 		await UpdatePreviewAsync();
 	}
 

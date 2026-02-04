@@ -1,0 +1,586 @@
+@using System.Net.Http.Json
+@using System.Text.Json
+@using System.Linq
+@using LPEditorApp.Models.Ai
+@inject IHttpClientFactory ClientFactory
+@inject NavigationManager Navigation
+@inject IJSRuntime JS
+
+<section class="ai-panel">
+    <h3>AIデザイン</h3>
+
+    <div class="field">
+        <label>業種</label>
+        <input class="text" @bind-value="Input.Industry" @bind-value:event="oninput" />
+    </div>
+    <div class="field">
+        <label>キャンペーン種別</label>
+        <input class="text" @bind-value="Input.CampaignType" @bind-value:event="oninput" />
+    </div>
+    <div class="field">
+        <label>トーン</label>
+        <select class="text" @bind="Input.Tone">
+            <option value="casual">カジュアル</option>
+            <option value="formal">フォーマル</option>
+        </select>
+    </div>
+    <div class="field">
+        <label>ブランドカラー希望</label>
+        <input class="text" placeholder="#RRGGBB" @bind-value="Input.BrandColorHint" @bind-value:event="oninput" />
+    </div>
+    <div class="field">
+        <label>参考URL（任意）</label>
+        <input class="text" @bind-value="Input.ReferenceUrl" @bind-value:event="oninput" />
+    </div>
+    <div class="field">
+        <label>禁止事項（任意）</label>
+        <textarea class="text" rows="2" @bind-value="Input.Prohibited" @bind-value:event="oninput"></textarea>
+    </div>
+
+    <div class="ai-actions">
+        <button type="button" class="btn" disabled="@IsLoading" @onclick="GenerateAsync">AIでデザイン生成（推奨）</button>
+        <button type="button" class="btn" disabled="@(IsLoading || Result is null)" @onclick="ApplyAsync">このデザインを適用</button>
+    </div>
+
+    <hr />
+
+    <h3>参考URLからデザイン生成</h3>
+    <div class="field">
+        <label>参考URL</label>
+        <input class="text" @bind-value="ReferenceInput.ReferenceUrl" @bind-value:event="oninput" />
+    </div>
+    <div class="field">
+        <label>キャンペーン種別</label>
+        <select class="text" @bind="ReferenceInput.CampaignType">
+            <option value="ranking">ranking</option>
+            <option value="lottery">lottery</option>
+            <option value="coupon">coupon</option>
+            <option value="municipality">municipality</option>
+        </select>
+    </div>
+    <div class="field">
+        <label>ブランドカラー希望（任意）</label>
+        <input class="text" placeholder="#RRGGBB" @bind-value="ReferenceInput.BrandColorHint" @bind-value:event="oninput" />
+    </div>
+    <div class="field">
+        <label>トーン</label>
+        <select class="text" @bind="ReferenceInput.Tone">
+            <option value="casual">casual</option>
+            <option value="impact">impact</option>
+            <option value="clean">clean</option>
+        </select>
+    </div>
+
+    <div class="ai-actions">
+        <button type="button" class="btn" disabled="@IsLoading" @onclick="GenerateReferenceAsync">生成</button>
+        <button type="button" class="btn" disabled="@(IsLoading || ReferenceResult is null)" @onclick="ApplyReferenceAsync">適用（Native表示）</button>
+    </div>
+
+    <div class="ai-actions">
+        <button type="button" class="btn" disabled="@IsLoading" @onclick="GenerateReferenceZipAsync">Experimental: HTML/CSSテンプレ生成</button>
+        <button type="button" class="btn" disabled="@(IsLoading || ReferenceZip is null)" @onclick="ApplyReferenceZipAsync">テンプレとして読み込み</button>
+    </div>
+
+    <div class="ai-actions">
+        <button type="button" class="btn" disabled="@IsLoading" @onclick="GenerateDecorationAsync">AIで装飾生成</button>
+        <button type="button" class="btn" disabled="@(IsLoading || DecorationResult is null)" @onclick="ApplyDecorationAsync">この装飾を適用</button>
+    </div>
+
+    <div class="field">
+        <label>AIデザインを強制適用</label>
+        <input type="checkbox" checked="@ForceApply" @onchange="OnForceToggle" />
+    </div>
+
+    <div class="ai-actions">
+        <button type="button" class="btn" disabled="@IsLoading" @onclick="GenerateExperimentalAsync">Experimental：HTML/CSSをAI生成</button>
+    </div>
+    <div class="ai-note">※Experimentalは崩れる可能性があります。社内検証用途のみ。</div>
+
+    @if (IsLoading)
+    {
+        <div class="ai-status">生成中...</div>
+    }
+    else if (!string.IsNullOrWhiteSpace(ErrorMessage))
+    {
+        <div class="ai-error">@ErrorMessage</div>
+    }
+    else if (!string.IsNullOrWhiteSpace(SuccessMessage))
+    {
+        <div class="ai-success">@SuccessMessage</div>
+    }
+
+    @if (Result is not null)
+    {
+        <div class="ai-result">
+            <h4>デザイン結果</h4>
+            <div class="ai-result-meta">
+                <div>designType: @Result.DesignType</div>
+                <div>radius: @Result.Theme?.Radius</div>
+                <div>layout: @Result.Layout?.Container / @Result.Layout?.Hero</div>
+            </div>
+            <div class="ai-color-chips">
+                <span style="background:@Result.Theme?.Primary"></span>
+                <span style="background:@Result.Theme?.Secondary"></span>
+                <span style="background:@Result.Theme?.Accent"></span>
+                <span style="background:@Result.Theme?.Bg"></span>
+                <span style="background:@Result.Theme?.Text"></span>
+            </div>
+            <textarea class="text ai-json" rows="8" readonly>@RawJson</textarea>
+        </div>
+    }
+
+    @if (DecorationResult is not null)
+    {
+        <div class="ai-result">
+            <h4>装飾結果</h4>
+            <div class="ai-result-meta">
+                <div>background: @DecorationResult.Background?.Type / @DecorationResult.Background?.Pattern</div>
+                <div>frame: @DecorationResult.SectionFrame?.Style / @DecorationResult.SectionFrame?.Shadow</div>
+                <div>heading: @DecorationResult.HeadingDecoration?.Type</div>
+                <div>cta: @DecorationResult.CtaEmphasis?.Style</div>
+                <div>divider: @DecorationResult.SectionDivider?.Type</div>
+            </div>
+            <div class="ai-color-chips">
+                <span style="background:@DecorationResult.Background?.Colors?.FirstOrDefault()"></span>
+                <span style="background:@DecorationResult.Background?.Colors?.Skip(1).FirstOrDefault()"></span>
+                <span style="background:@DecorationResult.HeadingDecoration?.Color"></span>
+                <span style="background:@DecorationResult.CtaEmphasis?.Color"></span>
+                <span style="background:@DecorationResult.SectionDivider?.Color"></span>
+            </div>
+            <textarea class="text ai-json" rows="8" readonly>@DecorationRawJson</textarea>
+        </div>
+    }
+
+    @if (!string.IsNullOrWhiteSpace(ExperimentalPreviewHtml))
+    {
+        <div class="ai-result">
+            <h4>Experimentalプレビュー</h4>
+            <iframe class="ai-experimental-frame" srcdoc="@ExperimentalPreviewHtml"></iframe>
+            <div class="ai-actions">
+                <button type="button" class="btn" @onclick="DownloadZipAsync">ZIPダウンロード</button>
+            </div>
+        </div>
+    }
+
+    @if (ReferenceResult is not null)
+    {
+        <div class="ai-result">
+            <h4>参考URLデザイン結果</h4>
+            <div class="ai-result-meta">
+                <div>hero: @ReferenceResult.LayoutRecipe?.Hero</div>
+                <div>section: @ReferenceResult.LayoutRecipe?.Section</div>
+                <div>decor: @ReferenceResult.DecorSpec?.Background / @ReferenceResult.DecorSpec?.Divider</div>
+            </div>
+            <div class="ai-color-chips">
+                <span style="background:@ReferenceResult.StyleTokens?.Colors?.Primary"></span>
+                <span style="background:@ReferenceResult.StyleTokens?.Colors?.Accent"></span>
+                <span style="background:@ReferenceResult.StyleTokens?.Colors?.Bg"></span>
+                <span style="background:@ReferenceResult.StyleTokens?.Colors?.Text"></span>
+                <span style="background:@ReferenceResult.StyleTokens?.Colors?.Border"></span>
+            </div>
+            <textarea class="text ai-json" rows="8" readonly>@ReferenceRawJson</textarea>
+        </div>
+    }
+
+    @if (!string.IsNullOrWhiteSpace(ReferenceExperimentalHtml))
+    {
+        <div class="ai-result">
+            <h4>参考URL Experimentalプレビュー</h4>
+            <iframe class="ai-experimental-frame" srcdoc="@ReferenceExperimentalHtml"></iframe>
+            <div class="ai-actions">
+                <button type="button" class="btn" @onclick="DownloadReferenceZipAsync">ZIPダウンロード</button>
+            </div>
+        </div>
+    }
+</section>
+
+@code {
+    [Parameter]
+    public LpDesignSpec? CurrentSpec { get; set; }
+
+    [Parameter]
+    public LpDecorationSpec? CurrentDecorationSpec { get; set; }
+
+    [Parameter]
+    public LpReferenceStyleSpec? CurrentReferenceSpec { get; set; }
+
+    [Parameter]
+    public bool ForceApply { get; set; }
+
+    [Parameter]
+    public EventCallback<LpDesignSpec> OnApply { get; set; }
+
+    [Parameter]
+    public EventCallback<LpDecorationSpec> OnApplyDecoration { get; set; }
+
+    [Parameter]
+    public EventCallback<LpReferenceStyleSpec> OnApplyReference { get; set; }
+
+    [Parameter]
+    public EventCallback<byte[]> OnApplyReferenceZip { get; set; }
+
+    [Parameter]
+    public EventCallback<bool> OnForceApplyChanged { get; set; }
+
+    [Parameter]
+    public LpBlueprint? Blueprint { get; set; }
+
+    private AiDesignRequest Input { get; set; } = new();
+    private bool IsLoading { get; set; }
+    private string? ErrorMessage { get; set; }
+    private string? SuccessMessage { get; set; }
+    private LpDesignSpec? Result { get; set; }
+    private string RawJson { get; set; } = string.Empty;
+    private LpDecorationSpec? DecorationResult { get; set; }
+    private string DecorationRawJson { get; set; } = string.Empty;
+    private string ExperimentalPreviewHtml { get; set; } = string.Empty;
+    private byte[]? ExperimentalZip { get; set; }
+    private AiReferenceDesignRequest ReferenceInput { get; set; } = new();
+    private LpReferenceStyleSpec? ReferenceResult { get; set; }
+    private string ReferenceRawJson { get; set; } = string.Empty;
+    private string ReferenceExperimentalHtml { get; set; } = string.Empty;
+    private byte[]? ReferenceZip { get; set; }
+
+    protected override void OnParametersSet()
+    {
+        if (Result is null && CurrentSpec is not null)
+        {
+            Result = CurrentSpec;
+        }
+
+        if (DecorationResult is null && CurrentDecorationSpec is not null)
+        {
+            DecorationResult = CurrentDecorationSpec;
+        }
+
+        if (ReferenceResult is null && CurrentReferenceSpec is not null)
+        {
+            ReferenceResult = CurrentReferenceSpec;
+        }
+    }
+
+    private async Task GenerateAsync()
+    {
+        ErrorMessage = null;
+        SuccessMessage = null;
+        IsLoading = true;
+        Result = null;
+        RawJson = string.Empty;
+
+        try
+        {
+            var client = ClientFactory.CreateClient();
+            client.BaseAddress = new Uri(Navigation.BaseUri);
+            var response = await client.PostAsJsonAsync("api/ai/generate-design", Input);
+            var raw = await response.Content.ReadAsStringAsync();
+
+            if (!response.IsSuccessStatusCode)
+            {
+                ErrorMessage = "AI生成に失敗しました。入力内容を見直して再度お試しください。";
+                return;
+            }
+
+            RawJson = raw;
+            Result = JsonSerializer.Deserialize<LpDesignSpec>(raw, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+            if (Result is null)
+            {
+                ErrorMessage = "生成結果の解析に失敗しました。";
+                return;
+            }
+
+            SuccessMessage = "デザイン結果を取得しました。";
+        }
+        catch
+        {
+            ErrorMessage = "AI生成に失敗しました。時間をおいて再度お試しください。";
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+    private async Task ApplyAsync()
+    {
+        if (Result is null)
+        {
+            return;
+        }
+
+        await OnApply.InvokeAsync(Result);
+        SuccessMessage = "デザインを適用しました。";
+    }
+
+    private async Task GenerateDecorationAsync()
+    {
+        ErrorMessage = null;
+        SuccessMessage = null;
+        IsLoading = true;
+        DecorationResult = null;
+        DecorationRawJson = string.Empty;
+
+        try
+        {
+            var client = ClientFactory.CreateClient();
+            client.BaseAddress = new Uri(Navigation.BaseUri);
+            var response = await client.PostAsJsonAsync("api/ai/generate-decor", Input);
+            var raw = await response.Content.ReadAsStringAsync();
+
+            if (!response.IsSuccessStatusCode)
+            {
+                ErrorMessage = "AI生成に失敗しました。入力内容を見直して再度お試しください。";
+                return;
+            }
+
+            DecorationRawJson = raw;
+            DecorationResult = JsonSerializer.Deserialize<LpDecorationSpec>(raw, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+            if (DecorationResult is null)
+            {
+                ErrorMessage = "生成結果の解析に失敗しました。";
+                return;
+            }
+
+            SuccessMessage = "装飾結果を取得しました。";
+        }
+        catch
+        {
+            ErrorMessage = "AI生成に失敗しました。時間をおいて再度お試しください。";
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+    private async Task ApplyDecorationAsync()
+    {
+        if (DecorationResult is null)
+        {
+            return;
+        }
+
+        await OnApplyDecoration.InvokeAsync(DecorationResult);
+        SuccessMessage = "装飾を適用しました。";
+    }
+
+    private async Task GenerateReferenceAsync()
+    {
+        ErrorMessage = null;
+        SuccessMessage = null;
+        IsLoading = true;
+        ReferenceResult = null;
+        ReferenceRawJson = string.Empty;
+
+        try
+        {
+            var client = ClientFactory.CreateClient();
+            client.BaseAddress = new Uri(Navigation.BaseUri);
+            var response = await client.PostAsJsonAsync("api/ai/generate-reference-design", ReferenceInput);
+            var raw = await response.Content.ReadAsStringAsync();
+
+            if (!response.IsSuccessStatusCode)
+            {
+                ErrorMessage = "AI生成に失敗しました。入力内容を見直して再度お試しください。";
+                return;
+            }
+
+            ReferenceRawJson = raw;
+            ReferenceResult = JsonSerializer.Deserialize<LpReferenceStyleSpec>(raw, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+            if (ReferenceResult is null)
+            {
+                ErrorMessage = "生成結果の解析に失敗しました。";
+                return;
+            }
+
+            SuccessMessage = "参考URLデザイン結果を取得しました。";
+        }
+        catch
+        {
+            ErrorMessage = "AI生成に失敗しました。時間をおいて再度お試しください。";
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+    private async Task ApplyReferenceAsync()
+    {
+        if (ReferenceResult is null)
+        {
+            return;
+        }
+
+        await OnApplyReference.InvokeAsync(ReferenceResult);
+        SuccessMessage = "参考URLデザインを適用しました。";
+    }
+
+    private async Task GenerateReferenceZipAsync()
+    {
+        ErrorMessage = null;
+        SuccessMessage = null;
+        IsLoading = true;
+        ReferenceExperimentalHtml = string.Empty;
+        ReferenceZip = null;
+
+        try
+        {
+            var client = ClientFactory.CreateClient();
+            client.BaseAddress = new Uri(Navigation.BaseUri);
+            var response = await client.PostAsJsonAsync("api/ai/generate-reference-zip", ReferenceInput);
+            if (!response.IsSuccessStatusCode)
+            {
+                ErrorMessage = "AI生成に失敗しました。";
+                return;
+            }
+
+            var payload = await response.Content.ReadFromJsonAsync<ReferenceZipPayload>();
+            if (payload is null || string.IsNullOrWhiteSpace(payload.ZipBase64))
+            {
+                ErrorMessage = "ZIP生成に失敗しました。";
+                return;
+            }
+
+            ReferenceZip = Convert.FromBase64String(payload.ZipBase64);
+            if (ReferenceZip.Length == 0)
+            {
+                ErrorMessage = "ZIP生成に失敗しました。";
+                return;
+            }
+
+            var css = payload.Css ?? string.Empty;
+            var html = payload.Html ?? string.Empty;
+            ReferenceExperimentalHtml = string.IsNullOrWhiteSpace(html)
+                ? "<html><body style='font-family:sans-serif;padding:16px;'>ZIPを生成しました。ダウンロードしてください。</body></html>"
+                : $"<!DOCTYPE html><html><head><style>{css}</style></head><body>{html}</body></html>";
+
+            SuccessMessage = "参考URLテンプレを生成しました。";
+        }
+        catch
+        {
+            ErrorMessage = "AI生成に失敗しました。時間をおいて再度お試しください。";
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+    private async Task ApplyReferenceZipAsync()
+    {
+        if (ReferenceZip is null)
+        {
+            return;
+        }
+
+        await OnApplyReferenceZip.InvokeAsync(ReferenceZip);
+        SuccessMessage = "テンプレを読み込みました。";
+    }
+
+    private async Task DownloadReferenceZipAsync()
+    {
+        if (ReferenceZip is null)
+        {
+            return;
+        }
+
+        await JS.InvokeVoidAsync("lpExport.saveZip", "ai-reference-template.zip", ReferenceZip);
+    }
+
+    private Task OnForceToggle(ChangeEventArgs e)
+    {
+        if (e?.Value is bool value)
+        {
+            return OnForceApplyChanged.InvokeAsync(value);
+        }
+        if (bool.TryParse(e?.Value?.ToString(), out var parsed))
+        {
+            return OnForceApplyChanged.InvokeAsync(parsed);
+        }
+        return Task.CompletedTask;
+    }
+
+    private async Task GenerateExperimentalAsync()
+    {
+        ErrorMessage = null;
+        SuccessMessage = null;
+        IsLoading = true;
+        ExperimentalPreviewHtml = string.Empty;
+        ExperimentalZip = null;
+
+        try
+        {
+            if (Blueprint is null)
+            {
+                ErrorMessage = "Blueprintが未生成です。先にLP生成を実行してください。";
+                return;
+            }
+
+            var client = ClientFactory.CreateClient();
+            client.BaseAddress = new Uri(Navigation.BaseUri);
+            var response = await client.PostAsJsonAsync("api/ai/generate-zip", new AiGenerateZipRequest { Blueprint = Blueprint });
+            if (!response.IsSuccessStatusCode)
+            {
+                ErrorMessage = "AI生成に失敗しました。";
+                return;
+            }
+
+            var payload = await response.Content.ReadFromJsonAsync<ExperimentalZipPayload>();
+            if (payload is null || string.IsNullOrWhiteSpace(payload.ZipBase64))
+            {
+                ErrorMessage = "ZIP生成に失敗しました。";
+                return;
+            }
+
+            ExperimentalZip = Convert.FromBase64String(payload.ZipBase64);
+            if (ExperimentalZip.Length == 0)
+            {
+                ErrorMessage = "ZIP生成に失敗しました。";
+                return;
+            }
+
+            if (string.IsNullOrWhiteSpace(payload.Html))
+            {
+                ExperimentalPreviewHtml = "<html><body style='font-family:sans-serif;padding:16px;'>ZIPを生成しました。ダウンロードしてください。</body></html>";
+            }
+            else
+            {
+                var css = payload.Css ?? string.Empty;
+                ExperimentalPreviewHtml = $"<!DOCTYPE html><html><head><style>{css}</style></head><body>{payload.Html}</body></html>";
+            }
+            SuccessMessage = "Experimental ZIPを生成しました。";
+        }
+        catch
+        {
+            ErrorMessage = "AI生成に失敗しました。時間をおいて再度お試しください。";
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+    private async Task DownloadZipAsync()
+    {
+        if (ExperimentalZip is null)
+        {
+            return;
+        }
+
+        await JS.InvokeVoidAsync("lpExport.saveZip", "ai-template.zip", ExperimentalZip);
+    }
+
+    private sealed class ExperimentalZipPayload
+    {
+        public string ZipBase64 { get; set; } = string.Empty;
+        public string? Html { get; set; }
+        public string? Css { get; set; }
+    }
+
+    private sealed class ReferenceZipPayload
+    {
+        public string ZipBase64 { get; set; } = string.Empty;
+        public string? Html { get; set; }
+        public string? Css { get; set; }
+    }
+}

@@ -1,9 +1,5 @@
 <div class="sectionNav">
     <div class="sectionNav__controls">
-        <div class="sectionNav__search">
-            <span class="sectionNav__icon" aria-hidden="true">🔍</span>
-            <input class="text sectionNav__input" placeholder="セクションを検索" value="@Search" @oninput="OnSearchInput" />
-        </div>
         <div class="sectionNav__filters">
             <div class="sectionNav__segmented">
                 <button type="button" class="sectionNav__segBtn @(VisibilityFilter == "all" ? "is-active" : "")" @onclick='() => SetVisibilityFilter("all")'>すべて</button>
@@ -46,9 +42,6 @@
     [Parameter] public bool FollowActive { get; set; }
     [Parameter] public EventCallback<bool> FollowActiveChanged { get; set; }
     [Parameter] public RenderFragment? ChildContent { get; set; }
-
-    private Task OnSearchInput(ChangeEventArgs e)
-        => SearchChanged.InvokeAsync(e.Value?.ToString() ?? string.Empty);
 
     private Task OnTypeChanged(ChangeEventArgs e)
         => TypeFilterChanged.InvokeAsync(e.Value?.ToString() ?? "all");

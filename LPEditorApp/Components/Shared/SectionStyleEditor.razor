@@ -32,18 +32,64 @@
     [Parameter] public SectionStyleModel Style { get; set; } = new();
     [Parameter] public EventCallback OnChanged { get; set; }
 
+    protected override void OnParametersSet()
+    {
+        SyncStyleFromDesign();
+    }
+
     private Task Notify()
     {
         Style.PaddingTop = Style.Layout.PaddingTop;
         Style.PaddingRight = Style.Layout.PaddingRight;
         Style.PaddingBottom = Style.Layout.PaddingBottom;
         Style.PaddingLeft = Style.Layout.PaddingLeft;
+        SyncDesignFromStyle();
         return OnChanged.InvokeAsync();
     }
 
     private async Task OnBorderColorChanged(string? value)
     {
         Style.BorderColor = value ?? string.Empty;
+        SyncDesignFromStyle();
         await Notify();
+    }
+
+    private void SyncStyleFromDesign()
+    {
+        if (Style.Design is null)
+        {
+            return;
+        }
+
+        if (!string.IsNullOrWhiteSpace(Style.Design.BorderColor))
+        {
+            Style.BorderColor = Style.Design.BorderColor!;
+        }
+
+        if (Style.Design.BorderWidth.HasValue)
+        {
+            Style.BorderWidth = Style.Design.BorderWidth;
+        }
+
+        if (Style.Design.BorderRadius.HasValue)
+        {
+            Style.Radius = Style.Design.BorderRadius;
+        }
+
+        if (!string.IsNullOrWhiteSpace(Style.Design.ShadowLevel))
+        {
+            Style.Shadow = string.Equals(Style.Design.ShadowLevel, "off", StringComparison.OrdinalIgnoreCase)
+                ? string.Empty
+                : Style.Design.ShadowLevel!;
+        }
+    }
+
+    private void SyncDesignFromStyle()
+    {
+        Style.Design ??= new SectionDesignModel();
+        Style.Design.BorderColor = string.IsNullOrWhiteSpace(Style.BorderColor) ? Style.Design.BorderColor : Style.BorderColor;
+        Style.Design.BorderWidth = Style.BorderWidth;
+        Style.Design.BorderRadius = Style.Radius;
+        Style.Design.ShadowLevel = string.IsNullOrWhiteSpace(Style.Shadow) ? "off" : Style.Shadow;
     }
 }

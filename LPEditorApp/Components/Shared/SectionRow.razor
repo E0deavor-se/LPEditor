@@ -12,22 +12,22 @@
             </div>
         </div>
         <div class="sectionNav-actions" @onclick:stopPropagation="true">
-            <button type="button" class="sectionNav-btn sectionNav-expand @(IsOpen ? "is-open" : "")" title="@(IsOpen ? "詳細を閉じる" : "詳細を開く")" @onclick="OnToggleOpen" aria-expanded="@IsOpen">▾</button>
             <label class="toggle-switch sectionNav-toggle">
                 <input type="checkbox" checked="@IsVisible" @onchange="OnToggleChanged" />
                 <span class="toggle-label">表示</span>
             </label>
-            <button type="button" class="sectionNav-btn is-primary" title="編集" @onclick="OnEdit">📝</button>
-            <button type="button" class="sectionNav-btn" title="装飾" @onclick='() => OnQuickAction.InvokeAsync("decor")'>🎨</button>
-            <button type="button" class="sectionNav-btn" title="背景" @onclick='() => OnQuickAction.InvokeAsync("background")'>🖼</button>
-            <button type="button" class="sectionNav-btn" title="ジャンプ" @onclick='() => OnQuickAction.InvokeAsync("scroll")'>⤵</button>
-            <details class="sectionNav-menu">
-                <summary class="sectionNav-btn" title="メニュー">⋯</summary>
+            <details class="sectionNav-menu" @onclick:stopPropagation="true">
+                <summary class="sectionNav-btn" title="クイック操作">⋯</summary>
                 <div class="sectionNav-menuList">
-                    <button type="button" class="sectionNav-menuItem" @onclick="OnToggleOpen">@(IsOpen ? "詳細を閉じる" : "詳細を開く")</button>
-                    <button type="button" class="sectionNav-menuItem" @onclick='() => OnMenuAction.InvokeAsync("delete")'>削除</button>
+                    <button type="button" class="sectionNav-menuItem" @onclick='() => TriggerQuickAction("scroll")'>プレビューへスクロール</button>
+                    <button type="button" class="sectionNav-menuItem" @onclick='() => TriggerQuickAction("text")'>本文編集へ移動</button>
+                    <button type="button" class="sectionNav-menuItem" @onclick='() => TriggerQuickAction("decor")'>装飾編集へ移動</button>
+                    <button type="button" class="sectionNav-menuItem" @onclick='() => TriggerQuickAction("background")'>背景編集へ移動</button>
+                    <button type="button" class="sectionNav-menuItem" @onclick='() => TriggerQuickAction("toggle")'>表示/非表示を切替</button>
                 </div>
             </details>
+            <button type="button" class="sectionNav-btn is-primary" title="編集" @onclick="OnEdit">編集</button>
+            <button type="button" class="sectionNav-btn is-danger" title="削除" @onclick='() => OnMenuAction.InvokeAsync("delete")'>削除</button>
         </div>
     </div>
     @if (IsOpen && ChildContent is not null)
@@ -58,4 +58,7 @@
     [Parameter] public EventCallback OnToggleOpen { get; set; }
     [Parameter] public EventCallback<string> OnQuickAction { get; set; }
     [Parameter] public EventCallback<string> OnMenuAction { get; set; }
+
+    private Task TriggerQuickAction(string action)
+        => OnQuickAction.HasDelegate ? OnQuickAction.InvokeAsync(action) : Task.CompletedTask;
 }

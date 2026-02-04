@@ -1,0 +1,27 @@
+@using LPEditorApp.Models
+
+@if (!string.IsNullOrWhiteSpace(SectionKey))
+{
+    var style = GetStyle?.Invoke(SectionKey!) ?? new SectionStyleModel();
+    <AdvancedSettings Title="デザイン設定">
+        <SectionQuickPresetPicker Style="style" OnChanged="() => OnChanged.InvokeAsync(SectionKey!)" />
+        <SectionBackgroundEditor Background="style.Background" OnChanged="() => OnChanged.InvokeAsync(SectionKey!)" />
+        <SectionLayoutEditor Layout="style.Layout" OnChanged="() => OnChanged.InvokeAsync(SectionKey!)" />
+        <SectionStyleEditor Style="style" OnChanged="() => OnChanged.InvokeAsync(SectionKey!)" />
+        <TypographyEditor Typography="style.Typography"
+                          FontSizeOptions="FontSizeOptions"
+                          FontFamilyOptions="FontFamilyOptions"
+                          OnChanged="() => OnChanged.InvokeAsync(SectionKey!)" />
+        <SectionAnimationEditor Animation="style.SectionAnimation" OnChanged="() => OnChanged.InvokeAsync(SectionKey!)" />
+        <DecorationsPanel Style="style" OnChanged="() => OnDecorChanged.InvokeAsync(SectionKey!)" />
+    </AdvancedSettings>
+}
+
+@code {
+    [Parameter] public string? SectionKey { get; set; }
+    [Parameter] public Func<string, SectionStyleModel>? GetStyle { get; set; }
+    [Parameter] public EventCallback<string> OnChanged { get; set; }
+    [Parameter] public EventCallback<string> OnDecorChanged { get; set; }
+    [Parameter] public int[] FontSizeOptions { get; set; } = Array.Empty<int>();
+    [Parameter] public FontFamilyOption[] FontFamilyOptions { get; set; } = Array.Empty<FontFamilyOption>();
+}

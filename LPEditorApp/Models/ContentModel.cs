@@ -33,6 +33,9 @@ public class CampaignModel
 
     [JsonPropertyName("footerLines")]
     public List<StyledTextItem> FooterLines { get; set; } = new();
+
+    [JsonPropertyName("countdownTextSize")]
+    public int? CountdownTextSize { get; set; }
 }
 
 public class HeaderModel

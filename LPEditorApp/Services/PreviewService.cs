@@ -5,6 +5,8 @@ using System.Text.RegularExpressions;
 using AngleSharp;
 using AngleSharp.Dom;
 using LPEditorApp.Models;
+using LPEditorApp.Models.Ai;
+using LPEditorApp.Services.Ai;
 
 namespace LPEditorApp.Services;
 
@@ -59,6 +61,7 @@ public class PreviewService
         EnsureRankingStyle(document, content);
         EnsurePaymentHistoryStyle(document, content);
         EnsureStoreSearchStyle(document, content);
+        RemoveLegacyStoreSearchScripts(document);
         EnsureStoreSearchScript(document, content);
         EnsureCouponFlowStyle(document, content);
         EnsureCouponFlowScript(document, content);
@@ -76,9 +79,11 @@ public class PreviewService
         {
             InlineStyles(document, template, content, imageOverrides, embedImages);
             InlineScripts(document, template, content);
+            RemoveLegacyStoreSearchScripts(document);
         }
 
         ApplyCampaignStyle(document, content);
+        EnsureCountdownTextSizeStyle(document, content);
         EnsureBackgroundImageOnPage(document, content);
         ApplySectionBackgrounds(document, content);
         ApplySectionStyles(document, content, editingSectionKey);
@@ -691,8 +696,7 @@ img[class*='decoration'] { z-index: 50 !important; }
 
         private static bool IsPresetBackground(BackgroundSetting setting)
         {
-                var mode = BackgroundRenderService.ResolveSourceType(setting);
-                return mode == "preset" && !string.IsNullOrWhiteSpace(setting.Preset?.CssClass);
+            return !string.IsNullOrWhiteSpace(setting.Preset?.CssClass);
         }
 
         private static void EnsurePresetBackgroundLayer(IDocument document, BackgroundPresetSelection? preset)
@@ -730,11 +734,13 @@ img[class*='decoration'] { z-index: 50 !important; }
                 var accentColor = string.IsNullOrWhiteSpace(preset.ColorB) ? "#cbd5f5" : preset.ColorB;
                 var opacity = Math.Clamp(preset.Opacity ?? 1, 0, 1).ToString("0.###", System.Globalization.CultureInfo.InvariantCulture);
                 var scale = Math.Clamp(preset.Scale ?? 1, 0.5, 2).ToString("0.###", System.Globalization.CultureInfo.InvariantCulture);
+                var blur = Math.Clamp(preset.Blur ?? 0, 0, 12).ToString("0.###", System.Globalization.CultureInfo.InvariantCulture) + "px";
 
                 SetCssCustomProperty(layer, "--bg-base", baseColor);
                 SetCssCustomProperty(layer, "--bg-accent", accentColor);
                 SetCssCustomProperty(layer, "--bg-opacity", opacity);
                 SetCssCustomProperty(layer, "--bg-scale", scale);
+                SetCssCustomProperty(layer, "--bg-blur", blur);
         }
 
         private static void RemovePresetBackgroundLayer(IDocument document)
@@ -762,9 +768,10 @@ img[class*='decoration'] { z-index: 50 !important; }
     height: 100%;
     z-index: 0;
     pointer-events: none;
-    background-color: var(--bg-base, #f8fafc);
+    background-color: var(--bg-base, transparent);
     background-repeat: repeat;
     opacity: var(--bg-opacity, 1);
+    filter: blur(var(--bg-blur, 0px));
 }
 
 .lp-bg.bg--paper-grid-1 {
@@ -1341,6 +1348,18 @@ img[class*='decoration'] { z-index: 50 !important; }
                         rules.AppendLine(BuildSectionDesignContentRule(selector));
                     }
 
+                    var layoutRule = BuildSectionLayoutRule(style.Layout, selector);
+                    if (!string.IsNullOrWhiteSpace(layoutRule))
+                    {
+                        rules.AppendLine(layoutRule);
+                    }
+
+                    var typographyRule = BuildSectionTypographyRule(style.Typography, selector);
+                    if (!string.IsNullOrWhiteSpace(typographyRule))
+                    {
+                        rules.AppendLine(typographyRule);
+                    }
+
                     if (style.Design is not null
                         && string.Equals(style.Design.Animation, "fadein", StringComparison.OrdinalIgnoreCase))
                     {
@@ -1390,9 +1409,10 @@ img[class*='decoration'] { z-index: 50 !important; }
                         rules.Add("background-repeat: no-repeat");
                         rules.Add("background-position: center");
                     }
-                    if (design.BorderRadius is > 0)
+                    var borderRadius = style.Radius is > 0 ? style.Radius : design.BorderRadius;
+                    if (borderRadius is > 0)
                     {
-                        rules.Add($"border-radius: {design.BorderRadius}px");
+                        rules.Add($"border-radius: {borderRadius}px");
                     }
                     var (paddingX, paddingY) = ResolveDesignPadding(design);
                     if (paddingY is > 0)
@@ -1409,13 +1429,16 @@ img[class*='decoration'] { z-index: 50 !important; }
                     {
                         rules.Add($"margin-bottom: {design.MarginBottom}px");
                     }
-                    if (design.BorderWidth is > 0)
+                    var borderWidth = style.BorderWidth is > 0 ? style.BorderWidth : design.BorderWidth;
+                    if (borderWidth is > 0)
                     {
-                        var borderColor = SanitizeCssColor(design.BorderColor) ?? "#e5e7eb";
-                        var borderWidth = design.BorderWidth.Value;
+                        var borderColor = SanitizeCssColor(style.BorderColor)
+                            ?? SanitizeCssColor(design.BorderColor)
+                            ?? "#e5e7eb";
                         rules.Add($"border: {borderWidth}px solid {borderColor}");
                     }
-                    var shadow = ResolveSectionShadow(design.ShadowLevel ?? "off");
+                    var shadowLevel = string.IsNullOrWhiteSpace(style.Shadow) ? design.ShadowLevel : style.Shadow;
+                    var shadow = ResolveSectionShadow(shadowLevel ?? "off");
                     if (design.AccentLineEnabled)
                     {
                         var accentColor = SanitizeCssColor(design.AccentColor) ?? "#4f46e5";
@@ -1536,9 +1559,10 @@ img[class*='decoration'] { z-index: 50 !important; }
                         rules.Add("background-position: center !important;");
                     }
 
-                    if (design.BorderRadius is > 0)
+                    var borderRadius = style.Radius is > 0 ? style.Radius : design.BorderRadius;
+                    if (borderRadius is > 0)
                     {
-                        rules.Add($"border-radius: {design.BorderRadius}px !important;");
+                        rules.Add($"border-radius: {borderRadius}px !important;");
                     }
 
                     var (paddingX, paddingY) = ResolveDesignPadding(design);
@@ -1558,14 +1582,17 @@ img[class*='decoration'] { z-index: 50 !important; }
                         rules.Add($"margin-bottom: {design.MarginBottom}px !important;");
                     }
 
-                    if (design.BorderWidth is > 0)
+                    var borderWidth = style.BorderWidth is > 0 ? style.BorderWidth : design.BorderWidth;
+                    if (borderWidth is > 0)
                     {
-                        var borderColor = SanitizeCssColor(design.BorderColor) ?? "#e5e7eb";
-                        var borderWidth = design.BorderWidth.Value;
+                        var borderColor = SanitizeCssColor(style.BorderColor)
+                            ?? SanitizeCssColor(design.BorderColor)
+                            ?? "#e5e7eb";
                         rules.Add($"border: {borderWidth}px solid {borderColor} !important;");
                     }
 
-                    var shadow = ResolveSectionShadow(design.ShadowLevel ?? "off");
+                    var shadowLevel = string.IsNullOrWhiteSpace(style.Shadow) ? design.ShadowLevel : style.Shadow;
+                    var shadow = ResolveSectionShadow(shadowLevel ?? "off");
                     if (design.AccentLineEnabled)
                     {
                         var accentColor = SanitizeCssColor(design.AccentColor) ?? "#4f46e5";
@@ -1634,6 +1661,79 @@ img[class*='decoration'] { z-index: 50 !important; }
                 }
 
                 return $"{selector} {{ {string.Join(" ", rules)} }}";
+            }
+
+            private static string BuildSectionLayoutRule(SectionLayoutSettings? layout, string selector)
+            {
+                if (layout is null)
+                {
+                    return string.Empty;
+                }
+
+                var rules = new List<string>();
+                if (layout.PaddingTop is > 0)
+                {
+                    rules.Add($"padding-top: {layout.PaddingTop}px !important;");
+                }
+                if (layout.PaddingRight is > 0)
+                {
+                    rules.Add($"padding-right: {layout.PaddingRight}px !important;");
+                }
+                if (layout.PaddingBottom is > 0)
+                {
+                    rules.Add($"padding-bottom: {layout.PaddingBottom}px !important;");
+                }
+                if (layout.PaddingLeft is > 0)
+                {
+                    rules.Add($"padding-left: {layout.PaddingLeft}px !important;");
+                }
+                if (layout.Gap is > 0)
+                {
+                    rules.Add($"gap: {layout.Gap}px !important;");
+                }
+                if (layout.MaxWidth is > 0)
+                {
+                    rules.Add($"max-width: {layout.MaxWidth}px !important;");
+                    rules.Add("margin-left: auto !important;");
+                    rules.Add("margin-right: auto !important;");
+                }
+
+                return rules.Count == 0 ? string.Empty : $"{selector} {{ {string.Join(" ", rules)} }}";
+            }
+
+            private static string BuildSectionTypographyRule(SectionTypographySettings? typography, string selector)
+            {
+                if (typography is null)
+                {
+                    return string.Empty;
+                }
+
+                var rules = new List<string>();
+                var fontFamily = SanitizeFontFamily(typography.FontFamily);
+                if (!string.IsNullOrWhiteSpace(fontFamily))
+                {
+                    rules.Add($"font-family: {fontFamily} !important;");
+                }
+                if (typography.FontSize is > 0)
+                {
+                    rules.Add($"font-size: {typography.FontSize}px !important;");
+                }
+                if (typography.FontWeight is > 0)
+                {
+                    rules.Add($"font-weight: {typography.FontWeight} !important;");
+                }
+                var color = SanitizeCssColor(typography.Color);
+                if (!string.IsNullOrWhiteSpace(color))
+                {
+                    rules.Add($"color: {color} !important;");
+                }
+                var align = SanitizeTextAlign(typography.Align);
+                if (!string.IsNullOrWhiteSpace(align))
+                {
+                    rules.Add($"text-align: {align} !important;");
+                }
+
+                return rules.Count == 0 ? string.Empty : $"{selector} {{ {string.Join(" ", rules)} }}";
             }
 
             private static (int? PaddingX, int? PaddingY) ResolveDesignPadding(SectionDesignModel design)
@@ -4882,6 +4982,39 @@ img, svg, video, canvas { max-width: 100% !important; height: auto !important; }
                 head.AppendChild(script);
         }
 
+    private static void RemoveLegacyStoreSearchScripts(IDocument document)
+    {
+        if (document is null)
+        {
+            return;
+        }
+
+        var scripts = document.QuerySelectorAll("script").ToList();
+        foreach (var script in scripts)
+        {
+            if (script.HasAttribute("data-store-search-script"))
+            {
+                continue;
+            }
+
+            var src = script.GetAttribute("src") ?? string.Empty;
+            var text = script.TextContent ?? string.Empty;
+            if (src.Contains("store", StringComparison.OrdinalIgnoreCase)
+                && src.Contains("search", StringComparison.OrdinalIgnoreCase))
+            {
+                script.Remove();
+                continue;
+            }
+
+            if (text.Contains("displayResults", StringComparison.OrdinalIgnoreCase)
+                || text.Contains("initStoreData", StringComparison.OrdinalIgnoreCase)
+                || text.Contains("store-search", StringComparison.OrdinalIgnoreCase))
+            {
+                script.Remove();
+            }
+        }
+    }
+
     private static void EnsureCouponFlowScript(IDocument document, ContentModel content)
     {
         if (!content.Sections.CouponFlow.Enabled)
@@ -5684,9 +5817,10 @@ img, svg, video, canvas { max-width: 100% !important; height: auto !important; }
         }
 
         var styleBuilder = new StringBuilder();
-        if (item.FontSize is > 0)
+        var safeSize = SanitizeFontSize(item.FontSize);
+        if (safeSize is not null)
         {
-            styleBuilder.Append($"font-size:{item.FontSize}px;");
+            styleBuilder.Append($"font-size:{safeSize}px;");
         }
         if (item.Bold)
         {
@@ -6418,6 +6552,16 @@ img, svg, video, canvas { max-width: 100% !important; height: auto !important; }
         return value is >= 10 and <= 32 ? value : null;
     }
 
+    private static int? SanitizeCountdownTextSize(int? fontSize)
+    {
+        if (!fontSize.HasValue)
+        {
+            return null;
+        }
+
+        return Math.Clamp(fontSize.Value, 10, 120);
+    }
+
     private static IElement? FindFirst(IParentNode root, params string[] selectors)
     {
         foreach (var selector in selectors)
@@ -6568,6 +6712,44 @@ img, svg, video, canvas { max-width: 100% !important; height: auto !important; }
 [data-countdown-hidden='true'] { display: none !important; }
 ";
         head.AppendChild(style);
+    }
+
+    private static void EnsureCountdownTextSizeStyle(IDocument document, ContentModel content)
+    {
+        var head = document.Head;
+        if (head is null)
+        {
+            return;
+        }
+
+        var size = SanitizeCountdownTextSize(content.Campaign.CountdownTextSize);
+        var style = document.QuerySelector("style[data-countdown-text-size='true']") as IElement;
+        if (!size.HasValue)
+        {
+            style?.Remove();
+            return;
+        }
+
+        if (style is null)
+        {
+            style = document.CreateElement("style");
+            style.SetAttribute("data-countdown-text-size", "true");
+            head.AppendChild(style);
+        }
+
+        var px = size.Value;
+        style.TextContent = $@"
+.section-group[data-section='countdown'],
+.section-group[data-section='countdown'] .countdown-period,
+.section-group[data-section='countdown'] .countdown-period__text,
+.section-group[data-section='countdown'] .campaign-period,
+.section-group[data-section='countdown'] .campaign__period,
+.section-group[data-section='countdown'] .countdown,
+.section-group[data-section='countdown'] .countdown *,
+.section-group[data-section='countdown'] .countdown-timer,
+.section-group[data-section='countdown'] .countdown-timer * {{
+  font-size: {px}px !important;
+}}";
     }
 
     private static void EnsurePaymentHistoryStyle(IDocument document, ContentModel content)
@@ -7083,5 +7265,211 @@ img, svg, video, canvas { max-width: 100% !important; height: auto !important; }
 
         var resolved = ResolveTemplatePath(template, filename) ?? filename;
         return ResolveImageUrl(resolved, template, overrides, embedImages);
+    }
+
+    public async Task<string> ApplyAiDesignOverridesAsync(string html, LpDesignSpec spec)
+    {
+        var context = BrowsingContext.New(Configuration.Default);
+        var document = await context.OpenAsync(req => req.Content(html));
+        var head = document.Head ?? document.DocumentElement;
+        var body = document.Body ?? document.DocumentElement;
+
+        var mapper = new AiDesignMapper();
+        var mapping = mapper.Map(spec);
+        var styleTag = document.CreateElement("style");
+        styleTag.TextContent = BuildAiDesignCss(mapping);
+        head.AppendChild(styleTag);
+
+        foreach (var className in mapping.Classes)
+        {
+            body.ClassList.Add(className);
+        }
+
+        return document.DocumentElement?.OuterHtml ?? html;
+    }
+
+    public async Task<string> ApplyAiDecorationOverridesAsync(string html, LpDecorationSpec spec)
+    {
+        var context = BrowsingContext.New(Configuration.Default);
+        var document = await context.OpenAsync(req => req.Content(html));
+        var head = document.Head ?? document.DocumentElement;
+        var body = document.Body ?? document.DocumentElement;
+        var canvas = document.QuerySelector(".lp-canvas") as IElement;
+
+        var mapper = new AiDecorationMapper();
+        var mapping = mapper.Map(spec);
+        var styleTag = document.CreateElement("style");
+        styleTag.TextContent = BuildAiDecorationCss(mapping);
+        head.AppendChild(styleTag);
+
+        foreach (var className in mapping.Classes)
+        {
+            body.ClassList.Add(className);
+            canvas?.ClassList.Add(className);
+        }
+
+        return document.DocumentElement?.OuterHtml ?? html;
+    }
+
+    public Task<string> GenerateAiDesignHtmlAsync(ContentModel content, LpDesignSpec spec, LpDecorationSpec? decorationSpec, string? editingSectionKey = null)
+    {
+        var mapper = new AiDesignMapper();
+        var mapping = mapper.Map(spec);
+        var resolvedDecoration = decorationSpec ?? new LpDecorationSpec();
+        var decorMapper = new AiDecorationMapper();
+        var decorMapping = decorMapper.Map(resolvedDecoration);
+
+        var hero = content.Sections.CampaignContent;
+        var offer = content.Sections.CouponPeriod;
+        var howto = content.Sections.CouponFlow;
+        var notes = content.Sections.CouponNotes;
+
+        var heroNotes = hero.Notes.Select(item => item.Text).Where(text => !string.IsNullOrWhiteSpace(text)).ToList();
+        var howtoItems = howto.Items.Select(item => item.Text).Where(text => !string.IsNullOrWhiteSpace(text)).ToList();
+        var notesLines = notes.TextLines.Select(item => item.Text).Where(text => !string.IsNullOrWhiteSpace(text)).ToList();
+        var footerLines = content.Campaign.FooterLines.Select(line => line.Text).Where(text => !string.IsNullOrWhiteSpace(text)).ToList();
+
+        var heroHtml = BuildSectionHtml("hero", hero.Title, hero.Body, heroNotes, mapping, editingSectionKey);
+        var offerHtml = BuildSectionHtml("offer", offer.Title, offer.Text, new List<string>(), mapping, editingSectionKey, isHtmlBody: true);
+        var howtoHtml = BuildSectionHtml("howto", howto.Title, howto.Lead, howtoItems, mapping, editingSectionKey);
+        var notesHtml = BuildSectionHtml("notes", notes.Title, null, notesLines, mapping, editingSectionKey, notesAsDetails: string.Equals(spec.Layout.NotesStyle, "accordion", StringComparison.OrdinalIgnoreCase));
+        var footerHtml = BuildSectionHtml("footer", "お問い合わせ", string.Join("\n", footerLines), new List<string>(), mapping, editingSectionKey);
+
+                var containerClass = mapping.Classes.FirstOrDefault(name => name.StartsWith("ai-container-", StringComparison.OrdinalIgnoreCase));
+                var bodyClasses = string.Join(" ", mapping.Classes.Concat(decorMapping.Classes));
+        var html = $@"<!DOCTYPE html>
+    <html>
+    <head>
+    <meta charset=""utf-8"" />
+    <meta name=""viewport"" content=""width=device-width, initial-scale=1"" />
+        <style>{BuildAiDesignCss(mapping)}{BuildAiDecorationCss(decorMapping)}</style>
+    </head>
+        <body class=""ai-preview {bodyClasses}"">
+      <div class=""ai-container {(string.IsNullOrWhiteSpace(containerClass) ? string.Empty : containerClass)}"">
+    {heroHtml}
+    {offerHtml}
+    {howtoHtml}
+    {notesHtml}
+    {footerHtml}
+  </div>
+</body>
+</html>";
+
+        return Task.FromResult(html);
+    }
+
+    private static string BuildAiDesignCss(AiDesignMapping mapping)
+    {
+        var vars = string.Join(";", mapping.Variables.Select(pair => $"{pair.Key}:{pair.Value}"));
+        return $@"
+:root{{{vars};}}
+body.ai-preview{{background:var(--ai-bg);color:var(--ai-text);font-family:var(--ai-font,system);margin:0;padding:24px;}}
+.ai-container{{max-width:1100px;margin:0 auto;display:flex;flex-direction:column;gap:24px;}}
+.ai-container.ai-container-wide{{max-width:1280px;}}
+.ai-section{{background:#fff;border-radius:var(--ai-radius);padding:20px;box-shadow:0 8px 20px rgba(15,23,42,0.08);}}
+.ai-section.ai-section-band{{background:var(--ai-primary);color:#fff;}}
+.ai-section.ai-section-flat{{box-shadow:none;border:1px solid rgba(15,23,42,0.08);}}
+.ai-heading{{font-size:1.4rem;font-weight:700;margin-bottom:8px;}}
+.ai-heading.ai-heading-pill{{display:inline-block;background:var(--ai-primary);color:#fff;padding:4px 12px;border-radius:999px;}}
+.ai-heading.ai-heading-underline{{border-bottom:2px solid var(--ai-primary);padding-bottom:6px;}}
+.ai-bullets{{margin:12px 0 0 18px;}}
+.ai-offer-body{{font-weight:600;}}
+.ai-notes-details{{margin-top:8px;}}
+.ai-cta{{display:inline-block;margin-top:12px;padding:10px 16px;border-radius:999px;background:var(--ai-primary);color:#fff;text-decoration:none;}}
+@media (max-width:768px){{body.ai-preview{{padding:16px;}}.ai-section{{padding:16px;}}}}
+";
+    }
+
+    private static string BuildAiDecorationCss(AiDecorationMapping mapping)
+    {
+        var vars = string.Join(";", mapping.Variables.Select(pair => $"{pair.Key}:{pair.Value}"));
+        return $@"
+:root{{{vars};}}
+body.ai-preview{{position:relative;}}
+body.ai-preview::before{{content:"";position:fixed;inset:0;opacity:var(--ai-decor-bg-opacity,0);pointer-events:none;z-index:-1;}}
+body.ai-preview.ai-decor-bg-solid::before{{background:var(--ai-decor-bg-1);}}
+body.ai-preview.ai-decor-bg-gradient::before{{background:linear-gradient(135deg,var(--ai-decor-bg-1),var(--ai-decor-bg-2));}}
+body.ai-preview.ai-decor-bg-pattern::before{{background:var(--ai-decor-bg-1);}}
+body.ai-preview.ai-decor-pattern-dots::before{{background-image:radial-gradient(rgba(15,23,42,0.12) 1px, transparent 1px);background-size:14px 14px;}}
+body.ai-preview.ai-decor-pattern-waves::before{{background-image:linear-gradient(135deg, rgba(15,23,42,0.08) 25%, transparent 25%, transparent 50%, rgba(15,23,42,0.08) 50%, rgba(15,23,42,0.08) 75%, transparent 75%, transparent);background-size:32px 32px;}}
+
+body.ai-preview.ai-decor-frame-flat .ai-section{{background:#fff;box-shadow:none;border:1px solid rgba(15,23,42,0.08);}}
+body.ai-preview.ai-decor-frame-band .ai-section{{background:var(--ai-primary);color:#fff;box-shadow:none;}}
+body.ai-preview.ai-decor-shadow-none .ai-section{{box-shadow:none;}}
+body.ai-preview.ai-decor-shadow-medium .ai-section{{box-shadow:0 10px 26px rgba(15,23,42,0.16);}}
+body.ai-preview.ai-decor-border-light .ai-section{{border:1px solid rgba(15,23,42,0.12);}}
+body.ai-preview.ai-decor-border-none .ai-section{{border:none;}}
+body.ai-preview.ai-decor-frame-card .ai-section{{border-radius:var(--ai-decor-frame-radius,16px);}}
+
+body.ai-preview.ai-decor-heading-accent-line .ai-heading{{border-left:var(--ai-decor-heading-thickness,3px) solid var(--ai-decor-heading-color);padding-left:10px;}}
+body.ai-preview.ai-decor-heading-pill .ai-heading{{background:var(--ai-decor-heading-color);color:#fff;border-radius:999px;padding:4px 14px;display:inline-block;}}
+body.ai-preview.ai-decor-heading-label .ai-heading{{display:inline-block;border:1px solid var(--ai-decor-heading-color);color:var(--ai-decor-heading-color);border-radius:6px;padding:2px 10px;font-weight:600;}}
+
+body.ai-preview.ai-decor-cta-badge .ai-cta{{background:var(--ai-decor-cta-color);box-shadow:0 6px 16px rgba(0,0,0,0.12);}}
+body.ai-preview.ai-decor-cta-glow .ai-cta{{background:var(--ai-decor-cta-color);box-shadow:0 0 0 6px rgba(0,0,0,0.08), 0 10px 24px rgba(0,0,0,0.18);}}
+
+body.ai-preview.ai-decor-divider-wave .ai-section::after{{content:"";display:block;height:var(--ai-decor-divider-height,0);margin-top:14px;background:radial-gradient(circle at 10px -6px, var(--ai-decor-divider-color) 12px, transparent 13px) repeat-x;background-size:24px 18px;opacity:0.7;}}
+body.ai-preview.ai-decor-divider-zigzag .ai-section::after{{content:"";display:block;height:var(--ai-decor-divider-height,0);margin-top:14px;background:repeating-linear-gradient(135deg, var(--ai-decor-divider-color) 0 6px, transparent 6px 12px);opacity:0.7;}}
+
+.lp-canvas.ai-decor-frame-card .section-group > section,
+.lp-canvas.ai-decor-frame-card section{{border-radius:var(--ai-decor-frame-radius,16px);}}
+.lp-canvas.ai-decor-frame-flat .section-group > section,
+.lp-canvas.ai-decor-frame-flat section{{background:#fff;box-shadow:none;border:1px solid rgba(15,23,42,0.08);}}
+.lp-canvas.ai-decor-frame-band .section-group > section,
+.lp-canvas.ai-decor-frame-band section{{background:var(--ai-primary);color:#fff;}}
+.lp-canvas.ai-decor-shadow-none .section-group > section,
+.lp-canvas.ai-decor-shadow-none section{{box-shadow:none;}}
+.lp-canvas.ai-decor-shadow-medium .section-group > section,
+.lp-canvas.ai-decor-shadow-medium section{{box-shadow:0 10px 26px rgba(15,23,42,0.16);}}
+.lp-canvas.ai-decor-border-light .section-group > section,
+.lp-canvas.ai-decor-border-light section{{border:1px solid rgba(15,23,42,0.12);}}
+.lp-canvas.ai-decor-border-none .section-group > section,
+.lp-canvas.ai-decor-border-none section{{border:none;}}
+
+.lp-canvas.ai-decor-heading-accent-line h2,
+.lp-canvas.ai-decor-heading-accent-line h3{{border-left:var(--ai-decor-heading-thickness,3px) solid var(--ai-decor-heading-color);padding-left:10px;}}
+.lp-canvas.ai-decor-heading-pill h2,
+.lp-canvas.ai-decor-heading-pill h3{{background:var(--ai-decor-heading-color);color:#fff;border-radius:999px;padding:4px 14px;display:inline-block;}}
+.lp-canvas.ai-decor-heading-label h2,
+.lp-canvas.ai-decor-heading-label h3{{display:inline-block;border:1px solid var(--ai-decor-heading-color);color:var(--ai-decor-heading-color);border-radius:6px;padding:2px 10px;font-weight:600;}}
+
+.lp-canvas.ai-decor-cta-badge .btn,
+.lp-canvas.ai-decor-cta-badge .button,
+.lp-canvas.ai-decor-cta-badge .campaign__btn{{background:var(--ai-decor-cta-color) !important;box-shadow:0 6px 16px rgba(0,0,0,0.12);}}
+.lp-canvas.ai-decor-cta-glow .btn,
+.lp-canvas.ai-decor-cta-glow .button,
+.lp-canvas.ai-decor-cta-glow .campaign__btn{{background:var(--ai-decor-cta-color) !important;box-shadow:0 0 0 6px rgba(0,0,0,0.08), 0 10px 24px rgba(0,0,0,0.18);}}
+
+.lp-canvas.ai-decor-divider-wave .section-group > section::after,
+.lp-canvas.ai-decor-divider-wave section::after{{content:"";display:block;height:var(--ai-decor-divider-height,0);margin-top:14px;background:radial-gradient(circle at 10px -6px, var(--ai-decor-divider-color) 12px, transparent 13px) repeat-x;background-size:24px 18px;opacity:0.7;}}
+.lp-canvas.ai-decor-divider-zigzag .section-group > section::after,
+.lp-canvas.ai-decor-divider-zigzag section::after{{content:"";display:block;height:var(--ai-decor-divider-height,0);margin-top:14px;background:repeating-linear-gradient(135deg, var(--ai-decor-divider-color) 0 6px, transparent 6px 12px);opacity:0.7;}}
+";
+    }
+
+    private static string BuildSectionHtml(string key, string? heading, string? body, List<string> bullets, AiDesignMapping mapping, string? editingSectionKey, bool isHtmlBody = false, bool notesAsDetails = false)
+    {
+        var sectionClass = "ai-section";
+        var headingClass = "ai-heading";
+        var sectionStyle = mapping.Classes.FirstOrDefault(name => name.StartsWith("ai-section-", StringComparison.OrdinalIgnoreCase));
+        var headingStyle = mapping.Classes.FirstOrDefault(name => name.StartsWith("ai-heading-", StringComparison.OrdinalIgnoreCase));
+        if (!string.IsNullOrWhiteSpace(sectionStyle))
+        {
+            sectionClass += " " + sectionStyle;
+        }
+        if (!string.IsNullOrWhiteSpace(headingStyle))
+        {
+            headingClass += " " + headingStyle;
+        }
+
+        var bodyHtml = string.IsNullOrWhiteSpace(body) ? string.Empty : (isHtmlBody ? body : System.Net.WebUtility.HtmlEncode(body).Replace("\n", "<br />"));
+        var bulletsHtml = bullets.Count == 0 ? string.Empty : $"<ul class=\"ai-bullets\">{string.Join(string.Empty, bullets.Select(item => $"<li>{System.Net.WebUtility.HtmlEncode(item)}</li>"))}</ul>";
+        var headingHtml = string.IsNullOrWhiteSpace(heading) ? string.Empty : $"<div class=\"{headingClass}\">{System.Net.WebUtility.HtmlEncode(heading)}</div>";
+
+        var notesHtml = notesAsDetails && bullets.Count > 0
+            ? $"<details class=\"ai-notes-details\"><summary>注意事項を見る</summary>{bulletsHtml}</details>"
+            : bulletsHtml;
+
+        return $@"<section class=""{sectionClass}"" data-section-id=""{key}"">{headingHtml}<div class=""ai-body"">{bodyHtml}</div>{notesHtml}</section>";
     }
 }

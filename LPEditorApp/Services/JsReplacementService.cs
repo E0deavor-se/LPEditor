@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.RegularExpressions;
 
 namespace LPEditorApp.Services;
@@ -31,9 +32,9 @@ public class JsReplacementService
             return value;
         }
 
-        if (DateTime.TryParse(value, out var dateTime))
+        if (DateTime.TryParse(value, CultureInfo.InvariantCulture, DateTimeStyles.None, out var dateTime))
         {
-            return dateTime.ToString("yyyy/MM/dd HH:mm:ss");
+            return dateTime.ToString("yyyy-MM-dd'T'HH:mm:ss", CultureInfo.InvariantCulture);
         }
 
         return value;

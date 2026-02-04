@@ -283,16 +283,30 @@
 
     private async Task OnModeChanged(string mode)
     {
-        BackgroundSettingService.ApplyType(Setting, mode);
+        if (!ShowPreset)
+        {
+            var presetSnapshot = Setting.Preset;
+            BackgroundSettingService.ApplyType(Setting, mode);
+            Setting.Preset = presetSnapshot ?? new BackgroundPresetSelection();
+        }
+        else
+        {
+            BackgroundSettingService.ApplyType(Setting, mode);
+        }
         EnsureDefaultsForMode();
         await OnChanged.InvokeAsync();
     }
 
     protected override void OnParametersSet()
     {
-        if (!ShowPreset && string.Equals(Setting.Mode, "preset", StringComparison.OrdinalIgnoreCase))
+        if (!ShowPreset && string.Equals(BackgroundRenderService.ResolveSourceType(Setting), "preset", StringComparison.OrdinalIgnoreCase))
         {
-            BackgroundSettingService.ApplyType(Setting, "color");
+            Setting.SourceType = "solid";
+            Setting.Mode = "solid";
+            if (string.IsNullOrWhiteSpace(Setting.Color))
+            {
+                Setting.Color = "#ffffff";
+            }
         }
 
         _snapshot = CloneSetting(Setting);
