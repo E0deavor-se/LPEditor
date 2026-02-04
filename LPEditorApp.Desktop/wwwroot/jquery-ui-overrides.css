@@ -1,0 +1,10 @@
+.ui-icon {
+  background-image: none !important;
+}
+.ui-widget-overlay {
+  background-image: none !important;
+}
+.ui-widget-header,
+.ui-widget-content {
+  background-image: none !important;
+}

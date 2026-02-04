@@ -1032,6 +1032,16 @@
 											}
 											else
 											{
+											@if (!IsImportMode && IsEditorManagedSectionKey(group.Key))
+											{
+												var decorStyle = GetSectionStyleSettings(group.Key ?? string.Empty);
+												<div class="sub-header" style="margin-top:12px;">
+													<strong>装飾</strong>
+												</div>
+												<DecorationsPanel Style="decorStyle"
+												                 DecoImageOptions="State.DecoImagePaths"
+												                 OnChanged="OnAnyInputAfter" />
+											}
 												<div class="text text-readonly">このセクションは詳細設定がありません。</div>
 											}
 
@@ -3582,10 +3592,6 @@
 		{
 			history.ImageAlt = "スマートフォン画像";
 		}
-		if (string.IsNullOrWhiteSpace(history.DecoImage))
-		{
-			history.DecoImage = "images/deco-06.png";
-		}
 	}
 
 	private async Task OnStoreExcelSelected(InputFileChangeEventArgs e)
@@ -3833,14 +3839,6 @@
 		}
 		ranking.LeftTopImage ??= new RankingDecorImageModel();
 		ranking.RightTopImage ??= new RankingDecorImageModel();
-		if (string.IsNullOrWhiteSpace(ranking.LeftTopImage.Src))
-		{
-			ranking.LeftTopImage.Src = "images/deco-04.png";
-		}
-		if (string.IsNullOrWhiteSpace(ranking.RightTopImage.Src))
-		{
-			ranking.RightTopImage.Src = "images/deco-05.png";
-		}
 	}
 
 	private int GetRankingHeaderCount()

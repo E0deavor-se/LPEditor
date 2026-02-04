@@ -464,7 +464,7 @@ public class PaymentHistorySectionModel
     public string ImageAlt { get; set; } = "スマートフォン画像";
 
     [JsonPropertyName("decoImage")]
-    public string DecoImage { get; set; } = "images/deco-06.png";
+    public string DecoImage { get; set; } = string.Empty;
 
     [JsonPropertyName("decoAlt")]
     public string DecoAlt { get; set; } = string.Empty;
@@ -634,7 +634,7 @@ public class RankingDecorImageModel
     public string Alt { get; set; } = string.Empty;
 
     [JsonPropertyName("visible")]
-    public bool Visible { get; set; } = true;
+    public bool Visible { get; set; } = false;
 }
 
 public partial class RankingSectionModel
