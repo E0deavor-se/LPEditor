@@ -3,13 +3,22 @@
 
 <div class="bg-image-editor">
     <div class="field">
-        <label>画像URL</label>
-        <input class="text" placeholder="https://... または data:image/..." value="@Setting.ImageUrl" @oninput="OnUrlChanged" />
+        <label>PC画像URL</label>
+        <input class="text" placeholder="https://... または data:image/..." value="@Setting.ImageUrl" @oninput="OnPcUrlChanged" />
     </div>
     <div class="field">
-        <label>画像を選択</label>
-        <InputFile OnChange="OnFileSelected" accept="image/*" />
+        <label>PC画像を選択</label>
+        <InputFile OnChange="OnPcFileSelected" accept="image/*" />
         <div class="hint">選んだ画像は自動で埋め込みURLに変換されます。</div>
+    </div>
+    <div class="field">
+        <label>SP画像URL</label>
+        <input class="text" placeholder="https://... または data:image/..." value="@Setting.ImageUrlSp" @oninput="OnSpUrlChanged" />
+    </div>
+    <div class="field">
+        <label>SP画像を選択</label>
+        <InputFile OnChange="OnSpFileSelected" accept="image/*" />
+        <div class="hint">SP専用が不要な場合は空でOKです。</div>
     </div>
 </div>
 
@@ -17,13 +26,13 @@
     [Parameter] public BackgroundSetting Setting { get; set; } = new();
     [Parameter] public EventCallback OnChanged { get; set; }
 
-    private async Task OnUrlChanged(ChangeEventArgs args)
+    private async Task OnPcUrlChanged(ChangeEventArgs args)
     {
         Setting.ImageUrl = args.Value?.ToString() ?? string.Empty;
         await OnChanged.InvokeAsync();
     }
 
-    private async Task OnFileSelected(InputFileChangeEventArgs args)
+    private async Task OnPcFileSelected(InputFileChangeEventArgs args)
     {
         var file = args.File;
         if (file is null)
@@ -37,6 +46,29 @@
         var base64 = Convert.ToBase64String(ms.ToArray());
         var dataUrl = $"data:{file.ContentType};base64,{base64}";
         Setting.ImageUrl = dataUrl;
+        await OnChanged.InvokeAsync();
+    }
+
+    private async Task OnSpUrlChanged(ChangeEventArgs args)
+    {
+        Setting.ImageUrlSp = args.Value?.ToString() ?? string.Empty;
+        await OnChanged.InvokeAsync();
+    }
+
+    private async Task OnSpFileSelected(InputFileChangeEventArgs args)
+    {
+        var file = args.File;
+        if (file is null)
+        {
+            return;
+        }
+
+        await using var stream = file.OpenReadStream(8 * 1024 * 1024);
+        using var ms = new MemoryStream();
+        await stream.CopyToAsync(ms);
+        var base64 = Convert.ToBase64String(ms.ToArray());
+        var dataUrl = $"data:{file.ContentType};base64,{base64}";
+        Setting.ImageUrlSp = dataUrl;
         await OnChanged.InvokeAsync();
     }
 }

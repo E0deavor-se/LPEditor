@@ -28,7 +28,6 @@
 			<button class="btn @(ActiveTab == "content" ? "primary" : "")" type="button" @onclick='() => SetTab("content")'>入力</button>
 			<button class="btn @(ActiveTab == "images" ? "primary" : "")" type="button" @onclick='() => SetTab("images")'>画像</button>
 			<button class="btn @(ActiveTab == "design" ? "primary" : "")" type="button" @onclick='() => SetTab("design")'>デザイン/背景</button>
-			<button class="btn @(ActiveTab == "mv-background" ? "primary" : "")" type="button" @onclick='() => SetTab("mv-background")'>MV背景</button>
 		</div>
 		<StepNavigator Steps="GetStepItems()" OnStepSelected="OnStepSelected" />
 
@@ -293,6 +292,41 @@
 	@if (ActiveTab == "design")
 		{
 			<div class="tab-content">
+				<section class="panel mv-bg-panel">
+					<div class="sub-header">
+						<strong>MV背景</strong>
+						<button type="button" class="accordion-toggle @(IsSectionOpen("mv-background") ? "is-open" : "")" @onclick='() => ToggleSection("mv-background")'>@(IsSectionOpen("mv-background") ? "閉じる" : "開く")</button>
+					</div>
+					@if (IsSectionOpen("mv-background"))
+					{
+						<div class="mv-bg-hero">
+							<div class="mv-bg-title">Main Visual Background</div>
+							<div class="mv-bg-actions">
+								<label class="mv-bg-toggle">
+									<input type="checkbox" @bind="State.Content.MvBackgroundSync" @bind:after="OnMvBackgroundSyncChanged" />
+									<span>LP全体と背景を合わせる</span>
+								</label>
+								<div class="mv-bg-buttons">
+									<button class="btn" type="button" @onclick="CopyPageBackgroundToMv" disabled="@State.Content.MvBackgroundSync">LP背景をコピー</button>
+									<button class="btn" type="button" @onclick="ResetMvBackground" disabled="@State.Content.MvBackgroundSync">リセット</button>
+								</div>
+							</div>
+							<div class="mv-bg-hint">同期OFFで、動画・グラデ・画像・パターンなどをMVだけに適用できます。</div>
+						</div>
+
+						<div class="mv-bg-editor @(State.Content.MvBackgroundSync ? "is-disabled" : "")">
+							<BackgroundSettingEditor Setting="MvBackgroundSetting"
+							                       OnChanged="OnMvBackgroundChanged"
+							                       PreviewLabel="MV背景"
+							                       PreviewCaption="MV/ヒーローに反映されます"
+							                       ShowPreset="true" />
+							<PageBackgroundPresetEditor Selection="MvBackgroundSetting.Preset"
+							                           Presets="BackgroundPresets"
+							                           OnChanged="OnMvBackgroundChanged" />
+						</div>
+					}
+				</section>
+
 				<section class="panel">
 					<div class="sub-header">
 						<strong>ページ背景（LP全体）</strong>
@@ -363,45 +397,6 @@
 			</div>
 		}
 
-		@if (ActiveTab == "mv-background")
-		{
-			<div class="tab-content mv-background-tab">
-				<section class="panel mv-bg-panel">
-					<div class="sub-header">
-						<strong>MV背景</strong>
-						<button type="button" class="accordion-toggle @(IsSectionOpen("mv-background") ? "is-open" : "")" @onclick='() => ToggleSection("mv-background")'>@(IsSectionOpen("mv-background") ? "閉じる" : "開く")</button>
-					</div>
-					@if (IsSectionOpen("mv-background"))
-					{
-						<div class="mv-bg-hero">
-							<div class="mv-bg-title">Main Visual Background</div>
-							<div class="mv-bg-actions">
-								<label class="mv-bg-toggle">
-									<input type="checkbox" @bind="State.Content.MvBackgroundSync" @bind:after="OnMvBackgroundSyncChanged" />
-									<span>LP全体と背景を合わせる</span>
-								</label>
-								<div class="mv-bg-buttons">
-									<button class="btn" type="button" @onclick="CopyPageBackgroundToMv" disabled="@State.Content.MvBackgroundSync">LP背景をコピー</button>
-									<button class="btn" type="button" @onclick="ResetMvBackground" disabled="@State.Content.MvBackgroundSync">リセット</button>
-								</div>
-							</div>
-							<div class="mv-bg-hint">同期OFFで、動画・グラデ・画像・パターンなどをMVだけに適用できます。</div>
-						</div>
-
-						<div class="mv-bg-editor @(State.Content.MvBackgroundSync ? "is-disabled" : "")">
-							<BackgroundSettingEditor Setting="MvBackgroundSetting"
-							                       OnChanged="OnMvBackgroundChanged"
-							                       PreviewLabel="MV背景"
-							                       PreviewCaption="MV/ヒーローに反映されます"
-							                       ShowPreset="true" />
-							<PageBackgroundPresetEditor Selection="MvBackgroundSetting.Preset"
-							                           Presets="BackgroundPresets"
-							                           OnChanged="OnMvBackgroundChanged" />
-						</div>
-					}
-				</section>
-			</div>
-		}
 
 		@if (ActiveTab == "content")
 		{
@@ -1023,6 +1018,27 @@
 														</select>
 													</div>
 													<div class="field">
+														<label>日付テキストサイズ（SP）</label>
+														<select class="text" @onchange="OnCountdownDateTextSizeSpChanged">
+															<option value="">自動</option>
+															@foreach (var size in FontSizeOptions)
+															{
+																<option value="@size" selected="@(State.Content.Campaign.CountdownDateTextSizeSp == size)">@size px</option>
+															}
+														</select>
+													</div>
+													<div class="field">
+														<label>日付テキスト太さ</label>
+														<select class="text" @onchange="OnCountdownDateFontWeightChanged">
+															<option value="">自動</option>
+															<option value="300" selected="@(State.Content.Campaign.CountdownDateFontWeight == 300)">Light</option>
+															<option value="400" selected="@(State.Content.Campaign.CountdownDateFontWeight == 400)">Normal</option>
+															<option value="500" selected="@(State.Content.Campaign.CountdownDateFontWeight == 500)">Medium</option>
+															<option value="600" selected="@(State.Content.Campaign.CountdownDateFontWeight == 600)">SemiBold</option>
+															<option value="700" selected="@(State.Content.Campaign.CountdownDateFontWeight == 700)">Bold</option>
+														</select>
+													</div>
+													<div class="field">
 														<label>日付テキスト色</label>
 														<div class="input-row">
 															<input class="text" @bind-value="State.Content.Campaign.CountdownDateTextColor" @bind-value:event="oninput" @bind-value:after="OnAnyInputAfter" placeholder="#ffffff" />
@@ -1037,6 +1053,27 @@
 															{
 																<option value="@size" selected="@(State.Content.Campaign.CountdownTimerTextSize == size)">@size px</option>
 															}
+														</select>
+													</div>
+													<div class="field">
+														<label>カウントダウン文字サイズ（SP）</label>
+														<select class="text" @onchange="OnCountdownTimerTextSizeSpChanged">
+															<option value="">自動</option>
+															@foreach (var size in FontSizeOptions)
+															{
+																<option value="@size" selected="@(State.Content.Campaign.CountdownTimerTextSizeSp == size)">@size px</option>
+															}
+														</select>
+													</div>
+													<div class="field">
+														<label>カウントダウン文字太さ</label>
+														<select class="text" @onchange="OnCountdownTimerFontWeightChanged">
+															<option value="">自動</option>
+															<option value="300" selected="@(State.Content.Campaign.CountdownTimerFontWeight == 300)">Light</option>
+															<option value="400" selected="@(State.Content.Campaign.CountdownTimerFontWeight == 400)">Normal</option>
+															<option value="500" selected="@(State.Content.Campaign.CountdownTimerFontWeight == 500)">Medium</option>
+															<option value="600" selected="@(State.Content.Campaign.CountdownTimerFontWeight == 600)">SemiBold</option>
+															<option value="700" selected="@(State.Content.Campaign.CountdownTimerFontWeight == 700)">Bold</option>
 														</select>
 													</div>
 													<div class="field">
@@ -2789,6 +2826,36 @@
 		return Task.CompletedTask;
 	}
 
+	private Task OnCountdownDateTextSizeSpChanged(ChangeEventArgs e)
+	{
+		if (int.TryParse(e?.Value?.ToString(), out var size))
+		{
+			State.Content.Campaign.CountdownDateTextSizeSp = size;
+		}
+		else
+		{
+			State.Content.Campaign.CountdownDateTextSizeSp = null;
+		}
+
+		OnAnyInputAfter();
+		return Task.CompletedTask;
+	}
+
+	private Task OnCountdownDateFontWeightChanged(ChangeEventArgs e)
+	{
+		if (int.TryParse(e?.Value?.ToString(), out var weight))
+		{
+			State.Content.Campaign.CountdownDateFontWeight = weight;
+		}
+		else
+		{
+			State.Content.Campaign.CountdownDateFontWeight = null;
+		}
+
+		OnAnyInputAfter();
+		return Task.CompletedTask;
+	}
+
 	private Task OnCountdownTimerTextSizeChanged(ChangeEventArgs e)
 	{
 		if (int.TryParse(e?.Value?.ToString(), out var size))
@@ -2798,6 +2865,36 @@
 		else
 		{
 			State.Content.Campaign.CountdownTimerTextSize = null;
+		}
+
+		OnAnyInputAfter();
+		return Task.CompletedTask;
+	}
+
+	private Task OnCountdownTimerTextSizeSpChanged(ChangeEventArgs e)
+	{
+		if (int.TryParse(e?.Value?.ToString(), out var size))
+		{
+			State.Content.Campaign.CountdownTimerTextSizeSp = size;
+		}
+		else
+		{
+			State.Content.Campaign.CountdownTimerTextSizeSp = null;
+		}
+
+		OnAnyInputAfter();
+		return Task.CompletedTask;
+	}
+
+	private Task OnCountdownTimerFontWeightChanged(ChangeEventArgs e)
+	{
+		if (int.TryParse(e?.Value?.ToString(), out var weight))
+		{
+			State.Content.Campaign.CountdownTimerFontWeight = weight;
+		}
+		else
+		{
+			State.Content.Campaign.CountdownTimerFontWeight = null;
 		}
 
 		OnAnyInputAfter();

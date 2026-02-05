@@ -22,7 +22,10 @@ public static class BackgroundSettingService
     {
         setting.Mode = "image";
         setting.SourceType = "image";
-        setting.ImageUrl = imageUrl ?? string.Empty;
+        if (!string.IsNullOrWhiteSpace(imageUrl))
+        {
+            setting.ImageUrl = imageUrl;
+        }
         ClearOtherValues(setting, "image");
     }
 
@@ -30,21 +33,28 @@ public static class BackgroundSettingService
     {
         setting.Mode = "video";
         setting.SourceType = "video";
-        setting.VideoUrl = videoUrl ?? string.Empty;
+        if (!string.IsNullOrWhiteSpace(videoUrl))
+        {
+            setting.VideoUrl = videoUrl;
+        }
         ClearOtherValues(setting, "video");
     }
 
     private static void ClearOtherValues(BackgroundSetting setting, string mode)
     {
-        if (!string.Equals(mode, "image", StringComparison.OrdinalIgnoreCase))
+        if (!string.Equals(mode, "image", StringComparison.OrdinalIgnoreCase)
+            && !string.Equals(mode, "video", StringComparison.OrdinalIgnoreCase))
         {
             setting.ImageUrl = string.Empty;
+            setting.ImageUrlSp = string.Empty;
         }
 
         if (!string.Equals(mode, "video", StringComparison.OrdinalIgnoreCase))
         {
             setting.VideoUrl = string.Empty;
             setting.VideoPoster = string.Empty;
+            setting.VideoUrlSp = string.Empty;
+            setting.VideoPosterSp = string.Empty;
         }
 
         if (!string.Equals(mode, "preset", StringComparison.OrdinalIgnoreCase))

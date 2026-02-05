@@ -78,7 +78,8 @@ public static class BackgroundStyleService
             {
                 return rules;
             }
-            if (string.IsNullOrWhiteSpace(setting.ImageUrl))
+            var imageUrl = ResolveImageUrl(setting);
+            if (string.IsNullOrWhiteSpace(imageUrl))
             {
                 return rules;
             }
@@ -87,7 +88,7 @@ public static class BackgroundStyleService
             var position = ResolvePosition(setting);
             var size = ResolveSize(setting);
             var attachment = string.IsNullOrWhiteSpace(setting.Attachment) ? "scroll" : setting.Attachment;
-            var image = $"url(\"{EscapeCssUrl(setting.ImageUrl)}\")";
+            var image = $"url(\"{EscapeCssUrl(imageUrl)}\")";
             rules.Add($"background-image: {image}{important};");
             rules.Add($"background-repeat: {repeat}{important};");
             rules.Add($"background-position: {position}{important};");
@@ -101,6 +102,16 @@ public static class BackgroundStyleService
         }
 
         return rules;
+    }
+
+    private static string? ResolveImageUrl(BackgroundSetting setting)
+    {
+        if (!string.IsNullOrWhiteSpace(setting.ImageUrl))
+        {
+            return setting.ImageUrl;
+        }
+
+        return string.IsNullOrWhiteSpace(setting.ImageUrlSp) ? null : setting.ImageUrlSp;
     }
 
     public static string ResolvePosition(BackgroundSetting setting)

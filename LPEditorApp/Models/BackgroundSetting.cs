@@ -22,9 +22,15 @@ public sealed class BackgroundSetting
 
     public string ImageUrl { get; set; } = string.Empty;
 
+    public string ImageUrlSp { get; set; } = string.Empty;
+
     public string VideoUrl { get; set; } = string.Empty;
 
+    public string VideoUrlSp { get; set; } = string.Empty;
+
     public string VideoPoster { get; set; } = string.Empty;
+
+    public string VideoPosterSp { get; set; } = string.Empty;
 
     public string Repeat { get; set; } = "no-repeat";
 

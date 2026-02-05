@@ -3,22 +3,39 @@
 
 <div class="bg-video-editor">
     <div class="field">
-        <label>動画ファイルを選択</label>
-        <InputFile OnChange="OnVideoFileSelected" accept="video/*" />
+        <label>PC動画を選択</label>
+        <InputFile OnChange="OnPcVideoFileSelected" accept="video/*" />
         <div class="hint">ローカル動画は埋め込み(data URL)として保存されます。</div>
     </div>
     <div class="field">
-        <label>ポスター画像URL（任意）</label>
+        <label>SP動画を選択</label>
+        <InputFile OnChange="OnSpVideoFileSelected" accept="video/*" />
+        <div class="hint">SP専用が不要な場合は空でOKです。</div>
+    </div>
+    <div class="field">
+        <label>PCポスター画像URL（任意）</label>
         <input class="text" placeholder="https://..." value="@Setting.VideoPoster" @oninput="OnPosterChanged" />
     </div>
     <div class="field">
-        <label>画像フォールバック（任意）</label>
+        <label>SPポスター画像URL（任意）</label>
+        <input class="text" placeholder="https://..." value="@Setting.VideoPosterSp" @oninput="OnPosterSpChanged" />
+    </div>
+    <div class="field">
+        <label>PC画像フォールバック（任意）</label>
         <input class="text" placeholder="https://... または data:image/..." value="@Setting.ImageUrl" @oninput="OnFallbackChanged" />
         <div class="hint">動画が再生できない場合はこの画像が使われます。</div>
     </div>
     <div class="field">
-        <label>ポスター画像を選択</label>
+        <label>SP画像フォールバック（任意）</label>
+        <input class="text" placeholder="https://... または data:image/..." value="@Setting.ImageUrlSp" @oninput="OnFallbackSpChanged" />
+    </div>
+    <div class="field">
+        <label>PCポスター画像を選択</label>
         <InputFile OnChange="OnPosterFileSelected" accept="image/*" />
+    </div>
+    <div class="field">
+        <label>SPポスター画像を選択</label>
+        <InputFile OnChange="OnPosterSpFileSelected" accept="image/*" />
     </div>
 </div>
 
@@ -32,9 +49,21 @@
         await OnChanged.InvokeAsync();
     }
 
+    private async Task OnPosterSpChanged(ChangeEventArgs args)
+    {
+        Setting.VideoPosterSp = args.Value?.ToString() ?? string.Empty;
+        await OnChanged.InvokeAsync();
+    }
+
     private async Task OnFallbackChanged(ChangeEventArgs args)
     {
         Setting.ImageUrl = args.Value?.ToString() ?? string.Empty;
+        await OnChanged.InvokeAsync();
+    }
+
+    private async Task OnFallbackSpChanged(ChangeEventArgs args)
+    {
+        Setting.ImageUrlSp = args.Value?.ToString() ?? string.Empty;
         await OnChanged.InvokeAsync();
     }
 
@@ -55,7 +84,24 @@
         await OnChanged.InvokeAsync();
     }
 
-    private async Task OnVideoFileSelected(InputFileChangeEventArgs args)
+    private async Task OnPosterSpFileSelected(InputFileChangeEventArgs args)
+    {
+        var file = args.File;
+        if (file is null)
+        {
+            return;
+        }
+
+        await using var stream = file.OpenReadStream(8 * 1024 * 1024);
+        using var ms = new MemoryStream();
+        await stream.CopyToAsync(ms);
+        var base64 = Convert.ToBase64String(ms.ToArray());
+        var dataUrl = $"data:{file.ContentType};base64,{base64}";
+        Setting.VideoPosterSp = dataUrl;
+        await OnChanged.InvokeAsync();
+    }
+
+    private async Task OnPcVideoFileSelected(InputFileChangeEventArgs args)
     {
         var file = args.File;
         if (file is null)
@@ -70,6 +116,24 @@
         var base64 = Convert.ToBase64String(ms.ToArray());
         var dataUrl = $"data:{file.ContentType};base64,{base64}";
         Setting.VideoUrl = dataUrl;
+        await OnChanged.InvokeAsync();
+    }
+
+    private async Task OnSpVideoFileSelected(InputFileChangeEventArgs args)
+    {
+        var file = args.File;
+        if (file is null)
+        {
+            return;
+        }
+
+        var maxSize = 100 * 1024 * 1024;
+        await using var stream = file.OpenReadStream(maxSize);
+        using var ms = new MemoryStream();
+        await stream.CopyToAsync(ms);
+        var base64 = Convert.ToBase64String(ms.ToArray());
+        var dataUrl = $"data:{file.ContentType};base64,{base64}";
+        Setting.VideoUrlSp = dataUrl;
         await OnChanged.InvokeAsync();
     }
 }

@@ -29,7 +29,8 @@ public static class BackgroundRenderService
         var type = ResolveSourceType(setting);
         if (type == "image")
         {
-            if (string.IsNullOrWhiteSpace(setting.ImageUrl))
+            var imageUrl = ResolveImageUrl(setting);
+            if (string.IsNullOrWhiteSpace(imageUrl))
             {
                 return string.Empty;
             }
@@ -37,7 +38,7 @@ public static class BackgroundRenderService
             var position = BackgroundStyleService.ResolvePosition(setting);
             var size = BackgroundStyleService.ResolveSize(setting);
             var repeat = string.IsNullOrWhiteSpace(setting.Repeat) ? "no-repeat" : setting.Repeat;
-            return $"background-image:url(\"{EscapeCssUrl(setting.ImageUrl)}\");background-position:{position};background-size:{size};background-repeat:{repeat};";
+            return $"background-image:url(\"{EscapeCssUrl(imageUrl)}\");background-position:{position};background-size:{size};background-repeat:{repeat};";
         }
 
         return string.Empty;
@@ -79,17 +80,32 @@ public static class BackgroundRenderService
             return setting.VideoUrl;
         }
 
-        return string.Empty;
+        return string.IsNullOrWhiteSpace(setting.VideoUrlSp) ? string.Empty : setting.VideoUrlSp;
     }
 
     public static string ResolveImageFallback(BackgroundSetting setting)
     {
-        return string.IsNullOrWhiteSpace(setting.ImageUrl) ? string.Empty : setting.ImageUrl;
+        return ResolveImageUrl(setting) ?? string.Empty;
     }
 
     public static string ResolvePoster(BackgroundSetting setting)
     {
-        return string.IsNullOrWhiteSpace(setting.VideoPoster) ? string.Empty : setting.VideoPoster;
+        if (!string.IsNullOrWhiteSpace(setting.VideoPoster))
+        {
+            return setting.VideoPoster;
+        }
+
+        return string.IsNullOrWhiteSpace(setting.VideoPosterSp) ? string.Empty : setting.VideoPosterSp;
+    }
+
+    private static string? ResolveImageUrl(BackgroundSetting setting)
+    {
+        if (!string.IsNullOrWhiteSpace(setting.ImageUrl))
+        {
+            return setting.ImageUrl;
+        }
+
+        return string.IsNullOrWhiteSpace(setting.ImageUrlSp) ? null : setting.ImageUrlSp;
     }
 
     private static string? SanitizeCssColor(string? value)

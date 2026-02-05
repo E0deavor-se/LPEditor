@@ -21,8 +21,11 @@ public static class BackgroundSettingMapper
             GradientColorB = model.GradientColorB ?? string.Empty,
             GradientOpacity = model.GradientOpacity ?? 1,
             ImageUrl = model.ImageUrl ?? string.Empty,
+            ImageUrlSp = model.ImageUrlSp ?? string.Empty,
             VideoUrl = model.VideoUrl ?? string.Empty,
+            VideoUrlSp = model.VideoUrlSp ?? string.Empty,
             VideoPoster = model.VideoPoster ?? string.Empty,
+            VideoPosterSp = model.VideoPosterSp ?? string.Empty,
             Repeat = string.IsNullOrWhiteSpace(model.Repeat) ? "repeat" : model.Repeat,
             Position = string.IsNullOrWhiteSpace(model.Position) ? "center center" : model.Position,
             PositionCustom = model.PositionCustom ?? string.Empty,
@@ -47,8 +50,11 @@ public static class BackgroundSettingMapper
         model.GradientColorB = setting.GradientColorB ?? string.Empty;
         model.GradientOpacity = setting.GradientOpacity;
         model.ImageUrl = setting.ImageUrl ?? string.Empty;
+        model.ImageUrlSp = setting.ImageUrlSp ?? string.Empty;
         model.VideoUrl = setting.VideoUrl ?? string.Empty;
+        model.VideoUrlSp = setting.VideoUrlSp ?? string.Empty;
         model.VideoPoster = setting.VideoPoster ?? string.Empty;
+        model.VideoPosterSp = setting.VideoPosterSp ?? string.Empty;
         model.Repeat = string.IsNullOrWhiteSpace(setting.Repeat) ? "repeat" : setting.Repeat;
         model.Position = string.IsNullOrWhiteSpace(setting.Position) ? "center center" : setting.Position;
         model.PositionCustom = setting.PositionCustom ?? string.Empty;

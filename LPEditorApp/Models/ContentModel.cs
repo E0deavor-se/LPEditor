@@ -40,14 +40,26 @@ public class CampaignModel
     [JsonPropertyName("countdownDateTextSize")]
     public int? CountdownDateTextSize { get; set; }
 
+    [JsonPropertyName("countdownDateTextSizeSp")]
+    public int? CountdownDateTextSizeSp { get; set; }
+
     [JsonPropertyName("countdownTimerTextSize")]
     public int? CountdownTimerTextSize { get; set; }
+
+    [JsonPropertyName("countdownTimerTextSizeSp")]
+    public int? CountdownTimerTextSizeSp { get; set; }
 
     [JsonPropertyName("countdownDateTextColor")]
     public string? CountdownDateTextColor { get; set; }
 
     [JsonPropertyName("countdownTimerTextColor")]
     public string? CountdownTimerTextColor { get; set; }
+
+    [JsonPropertyName("countdownDateFontWeight")]
+    public int? CountdownDateFontWeight { get; set; }
+
+    [JsonPropertyName("countdownTimerFontWeight")]
+    public int? CountdownTimerFontWeight { get; set; }
 }
 
 public class HeaderModel
@@ -182,11 +194,20 @@ public class LpBackgroundModel
     [JsonPropertyName("imageUrl")]
     public string ImageUrl { get; set; } = string.Empty;
 
+    [JsonPropertyName("imageUrlSp")]
+    public string ImageUrlSp { get; set; } = string.Empty;
+
     [JsonPropertyName("videoUrl")]
     public string VideoUrl { get; set; } = string.Empty;
 
+    [JsonPropertyName("videoUrlSp")]
+    public string VideoUrlSp { get; set; } = string.Empty;
+
     [JsonPropertyName("videoPoster")]
     public string VideoPoster { get; set; } = string.Empty;
+
+    [JsonPropertyName("videoPosterSp")]
+    public string VideoPosterSp { get; set; } = string.Empty;
 
     [JsonPropertyName("repeat")]
     public string Repeat { get; set; } = "repeat";

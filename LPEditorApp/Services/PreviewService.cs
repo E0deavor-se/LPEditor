@@ -13,6 +13,7 @@ namespace LPEditorApp.Services;
 public class PreviewService
 {
     private static readonly bool DisableDecoImages = false;
+    private const int BackgroundMobileBreakpoint = 768;
 
     public async Task<string> GenerateHtmlAsync(
         TemplateProject template,
@@ -86,6 +87,7 @@ public class PreviewService
 
         ApplyCampaignStyle(document, content);
         EnsureCountdownTextSizeStyle(document, content);
+        EnsureCountdownLayoutStyle(document);
         EnsureCouponPeriodTextSizeStyle(document, content);
         EnsureBackgroundImageOnPage(document, content);
         EnsureHeroBackground(document, content);
@@ -952,6 +954,8 @@ img[class*='decoration'] { z-index: 50 !important; }
         if (!BackgroundRenderService.UseMediaLayer(setting))
         {
             existing?.Remove();
+            RemoveMobileMediaStyle(document, "data-bg-media-mobile");
+            RemoveMobileMediaStyle(document, "data-bg-video-swap");
             return;
         }
 
@@ -981,27 +985,30 @@ img[class*='decoration'] { z-index: 50 !important; }
         if (sourceType == "video" && !string.IsNullOrWhiteSpace(videoUrl))
         {
             media.SetAttribute("style", "position:absolute;inset:0;");
-            var video = media.QuerySelector("video") as IElement;
-            if (video is null)
+            RemoveMobileMediaStyle(document, "data-bg-media-mobile");
+            var pcUrl = string.IsNullOrWhiteSpace(setting.VideoUrl) ? videoUrl : setting.VideoUrl;
+            var spUrl = string.IsNullOrWhiteSpace(setting.VideoUrlSp) ? string.Empty : setting.VideoUrlSp;
+            var hasSp = !string.IsNullOrWhiteSpace(spUrl) && !string.Equals(spUrl, pcUrl, StringComparison.Ordinal);
+
+            foreach (var child in media.Children.ToList())
             {
-                foreach (var child in media.Children.ToList())
-                {
-                    child.Remove();
-                }
-                video = document.CreateElement("video");
-                video.SetAttribute("autoplay", string.Empty);
-                video.SetAttribute("muted", string.Empty);
-                video.SetAttribute("loop", string.Empty);
-                video.SetAttribute("playsinline", string.Empty);
-                video.SetAttribute("preload", "auto");
-                media.AppendChild(video);
+                child.Remove();
             }
 
-            video.SetAttribute("style", "width:100%;height:100%;object-fit:cover;" + BackgroundRenderService.BuildFilterStyle(setting.Effects));
-            video.SetAttribute("src", videoUrl);
-            if (!string.IsNullOrWhiteSpace(setting.VideoPoster))
+            if (hasSp)
             {
-                video.SetAttribute("poster", setting.VideoPoster);
+                var pcVideo = BuildBackgroundVideo(document, "lp-bg-video lp-bg-video-pc", pcUrl, setting.VideoPoster, setting.Effects);
+                var spPoster = string.IsNullOrWhiteSpace(setting.VideoPosterSp) ? setting.VideoPoster : setting.VideoPosterSp;
+                var spVideo = BuildBackgroundVideo(document, "lp-bg-video lp-bg-video-sp", spUrl, spPoster, setting.Effects);
+                media.AppendChild(pcVideo);
+                media.AppendChild(spVideo);
+                EnsureVideoSwapStyle(document, "data-bg-video-swap", ".lp-bg-video-pc", ".lp-bg-video-sp");
+            }
+            else
+            {
+                var pcVideo = BuildBackgroundVideo(document, "lp-bg-video", pcUrl, setting.VideoPoster, setting.Effects);
+                media.AppendChild(pcVideo);
+                RemoveMobileMediaStyle(document, "data-bg-video-swap");
             }
         }
         else
@@ -1011,6 +1018,7 @@ img[class*='decoration'] { z-index: 50 !important; }
                 child.Remove();
             }
             media.SetAttribute("style", "position:absolute;inset:0;" + BackgroundRenderService.BuildMediaStyle(setting) + BackgroundRenderService.BuildFilterStyle(setting.Effects));
+            EnsureMobileImageStyle(document, "data-bg-media-mobile", ".lp-bg-media", setting.ImageUrlSp, setting);
         }
 
         overlay.SetAttribute("style", "position:absolute;inset:0;" + BackgroundRenderService.BuildOverlayStyle(setting.Effects));
@@ -1082,6 +1090,8 @@ img[class*='decoration'] { z-index: 50 !important; }
         if (!BackgroundRenderService.UseMediaLayer(setting))
         {
             existing?.Remove();
+            RemoveMobileMediaStyle(document, "data-mv-bg-media-mobile");
+            RemoveMobileMediaStyle(document, "data-mv-bg-video-swap");
             return;
         }
 
@@ -1111,27 +1121,30 @@ img[class*='decoration'] { z-index: 50 !important; }
         if (sourceType == "video" && !string.IsNullOrWhiteSpace(videoUrl))
         {
             media.SetAttribute("style", "position:absolute;inset:0;");
-            var video = media.QuerySelector("video") as IElement;
-            if (video is null)
+            RemoveMobileMediaStyle(document, "data-mv-bg-media-mobile");
+            var pcUrl = string.IsNullOrWhiteSpace(setting.VideoUrl) ? videoUrl : setting.VideoUrl;
+            var spUrl = string.IsNullOrWhiteSpace(setting.VideoUrlSp) ? string.Empty : setting.VideoUrlSp;
+            var hasSp = !string.IsNullOrWhiteSpace(spUrl) && !string.Equals(spUrl, pcUrl, StringComparison.Ordinal);
+
+            foreach (var child in media.Children.ToList())
             {
-                foreach (var child in media.Children.ToList())
-                {
-                    child.Remove();
-                }
-                video = document.CreateElement("video");
-                video.SetAttribute("autoplay", string.Empty);
-                video.SetAttribute("muted", string.Empty);
-                video.SetAttribute("loop", string.Empty);
-                video.SetAttribute("playsinline", string.Empty);
-                video.SetAttribute("preload", "auto");
-                media.AppendChild(video);
+                child.Remove();
             }
 
-            video.SetAttribute("style", "width:100%;height:100%;object-fit:cover;" + BackgroundRenderService.BuildFilterStyle(setting.Effects));
-            video.SetAttribute("src", videoUrl);
-            if (!string.IsNullOrWhiteSpace(setting.VideoPoster))
+            if (hasSp)
             {
-                video.SetAttribute("poster", setting.VideoPoster);
+                var pcVideo = BuildBackgroundVideo(document, "mv-bg-video mv-bg-video-pc", pcUrl, setting.VideoPoster, setting.Effects);
+                var spPoster = string.IsNullOrWhiteSpace(setting.VideoPosterSp) ? setting.VideoPoster : setting.VideoPosterSp;
+                var spVideo = BuildBackgroundVideo(document, "mv-bg-video mv-bg-video-sp", spUrl, spPoster, setting.Effects);
+                media.AppendChild(pcVideo);
+                media.AppendChild(spVideo);
+                EnsureVideoSwapStyle(document, "data-mv-bg-video-swap", ".mv-bg-video-pc", ".mv-bg-video-sp");
+            }
+            else
+            {
+                var pcVideo = BuildBackgroundVideo(document, "mv-bg-video", pcUrl, setting.VideoPoster, setting.Effects);
+                media.AppendChild(pcVideo);
+                RemoveMobileMediaStyle(document, "data-mv-bg-video-swap");
             }
         }
         else
@@ -1141,6 +1154,7 @@ img[class*='decoration'] { z-index: 50 !important; }
                 child.Remove();
             }
             media.SetAttribute("style", "position:absolute;inset:0;" + BackgroundRenderService.BuildMediaStyle(setting) + BackgroundRenderService.BuildFilterStyle(setting.Effects));
+            EnsureMobileImageStyle(document, "data-mv-bg-media-mobile", ".mv-bg-media", setting.ImageUrlSp, setting);
         }
 
         overlay.SetAttribute("style", "position:absolute;inset:0;" + BackgroundRenderService.BuildOverlayStyle(setting.Effects));
@@ -1149,6 +1163,93 @@ img[class*='decoration'] { z-index: 50 !important; }
         {
             wrapper.Prepend(stage);
         }
+    }
+
+    private static IElement BuildBackgroundVideo(IDocument document, string className, string url, string? poster, BackgroundEffects effects)
+    {
+        var video = document.CreateElement("video");
+        video.SetAttribute("autoplay", string.Empty);
+        video.SetAttribute("muted", string.Empty);
+        video.SetAttribute("loop", string.Empty);
+        video.SetAttribute("playsinline", string.Empty);
+        video.SetAttribute("preload", "auto");
+        video.SetAttribute("class", className);
+        video.SetAttribute("style", "width:100%;height:100%;object-fit:cover;" + BackgroundRenderService.BuildFilterStyle(effects));
+        video.SetAttribute("src", url);
+        if (!string.IsNullOrWhiteSpace(poster))
+        {
+            video.SetAttribute("poster", poster);
+        }
+
+        return video;
+    }
+
+    private static void EnsureVideoSwapStyle(IDocument document, string dataKey, string pcSelector, string spSelector)
+    {
+        var head = document.Head;
+        if (head is null)
+        {
+            return;
+        }
+
+        var style = document.QuerySelector($"style[{dataKey}='true']") as IElement;
+        if (style is null)
+        {
+            style = document.CreateElement("style");
+            style.SetAttribute(dataKey, "true");
+            head.AppendChild(style);
+        }
+
+        style.TextContent = $@"
+{pcSelector} {{ display: block; }}
+{spSelector} {{ display: none; }}
+    @media (max-width: {BackgroundMobileBreakpoint}px) {{
+  {pcSelector} {{ display: none; }}
+  {spSelector} {{ display: block; }}
+}}";
+    }
+
+    private static void EnsureMobileImageStyle(IDocument document, string dataKey, string selector, string? imageUrlSp, BackgroundSetting setting)
+    {
+        var head = document.Head;
+        if (head is null)
+        {
+            return;
+        }
+
+        var style = document.QuerySelector($"style[{dataKey}='true']") as IElement;
+        if (string.IsNullOrWhiteSpace(imageUrlSp))
+        {
+            style?.Remove();
+            return;
+        }
+
+        if (style is null)
+        {
+            style = document.CreateElement("style");
+            style.SetAttribute(dataKey, "true");
+            head.AppendChild(style);
+        }
+
+        var position = BackgroundStyleService.ResolvePosition(setting);
+        var size = BackgroundStyleService.ResolveSize(setting);
+        var repeat = string.IsNullOrWhiteSpace(setting.Repeat) ? "no-repeat" : setting.Repeat;
+        var image = imageUrlSp.Replace("\\", "\\\\").Replace("\"", "\\\"");
+                style.TextContent = $@"
+            @media (max-width: {BackgroundMobileBreakpoint}px) {{
+    {selector} {{
+        background-image: url('{image}') !important;
+        background-position: {position} !important;
+        background-size: {size} !important;
+        background-repeat: {repeat} !important;
+    }}
+}}";
+    }
+
+    private static void RemoveMobileMediaStyle(IDocument document, string dataKey)
+    {
+        var style = document.QuerySelector($"style[{dataKey}='true']") as IElement;
+        style?.Remove();
     }
 
 
@@ -7086,11 +7187,16 @@ img, svg, video, canvas { max-width: 100% !important; height: auto !important; }
 
                 var size = SanitizeCountdownTextSize(content.Campaign.CountdownTextSize);
                 var dateSize = SanitizeCountdownTextSize(content.Campaign.CountdownDateTextSize);
+                var dateSizeSp = SanitizeCountdownTextSize(content.Campaign.CountdownDateTextSizeSp);
                 var timerSize = SanitizeCountdownTextSize(content.Campaign.CountdownTimerTextSize);
+                var timerSizeSp = SanitizeCountdownTextSize(content.Campaign.CountdownTimerTextSizeSp);
                 var dateColor = SanitizeCssColor(content.Campaign.CountdownDateTextColor);
                 var timerColor = SanitizeCssColor(content.Campaign.CountdownTimerTextColor);
+                var dateWeight = SanitizeCountdownFontWeight(content.Campaign.CountdownDateFontWeight);
+                var timerWeight = SanitizeCountdownFontWeight(content.Campaign.CountdownTimerFontWeight);
         var style = document.QuerySelector("style[data-countdown-text-size='true']") as IElement;
-                if (!size.HasValue && !dateSize.HasValue && !timerSize.HasValue && dateColor is null && timerColor is null)
+                if (!size.HasValue && !dateSize.HasValue && !dateSizeSp.HasValue && !timerSize.HasValue && !timerSizeSp.HasValue
+                    && dateColor is null && timerColor is null && !dateWeight.HasValue && !timerWeight.HasValue)
         {
             style?.Remove();
             return;
@@ -7131,6 +7237,19 @@ img, svg, video, canvas { max-width: 100% !important; height: auto !important; }
 }}");
                 }
 
+                if (dateSizeSp.HasValue)
+                {
+                        var px = dateSizeSp.Value;
+                        rules.AppendLine($@"@media (max-width: {BackgroundMobileBreakpoint}px) {{
+    .section-group[data-section='countdown'] .countdown-period,
+    .section-group[data-section='countdown'] .countdown-period__text,
+    .section-group[data-section='countdown'] .campaign-period,
+    .section-group[data-section='countdown'] .campaign__period {{
+        font-size: {px}px !important;
+    }}
+}}");
+                }
+
                 if (timerSize.HasValue)
                 {
                         var px = timerSize.Value;
@@ -7139,6 +7258,19 @@ img, svg, video, canvas { max-width: 100% !important; height: auto !important; }
 .section-group[data-section='countdown'] .countdown-timer,
 .section-group[data-section='countdown'] .countdown-timer * {{
     font-size: {px}px !important;
+}}");
+                }
+
+                if (timerSizeSp.HasValue)
+                {
+                        var px = timerSizeSp.Value;
+                        rules.AppendLine($@"@media (max-width: {BackgroundMobileBreakpoint}px) {{
+    .section-group[data-section='countdown'] .countdown,
+    .section-group[data-section='countdown'] .countdown *,
+    .section-group[data-section='countdown'] .countdown-timer,
+    .section-group[data-section='countdown'] .countdown-timer * {{
+        font-size: {px}px !important;
+    }}
 }}");
                 }
 
@@ -7152,6 +7284,16 @@ img, svg, video, canvas { max-width: 100% !important; height: auto !important; }
 }}");
                 }
 
+                if (dateWeight.HasValue)
+                {
+                    rules.AppendLine($@".section-group[data-section='countdown'] .countdown-period,
+        .section-group[data-section='countdown'] .countdown-period__text,
+        .section-group[data-section='countdown'] .campaign-period,
+        .section-group[data-section='countdown'] .campaign__period {{
+            font-weight: {dateWeight.Value} !important;
+        }}");
+                }
+
                 if (timerColor is not null)
                 {
                         rules.AppendLine($@".section-group[data-section='countdown'] .countdown,
@@ -7162,8 +7304,80 @@ img, svg, video, canvas { max-width: 100% !important; height: auto !important; }
 }}");
                 }
 
+                if (timerWeight.HasValue)
+                {
+                    rules.AppendLine($@".section-group[data-section='countdown'] .countdown,
+        .section-group[data-section='countdown'] .countdown *,
+        .section-group[data-section='countdown'] .countdown-timer,
+        .section-group[data-section='countdown'] .countdown-timer * {{
+            font-weight: {timerWeight.Value} !important;
+        }}");
+                }
+
                 style.TextContent = rules.ToString();
     }
+
+        private static void EnsureCountdownLayoutStyle(IDocument document)
+        {
+                var head = document.Head;
+                if (head is null || document.QuerySelector("style[data-countdown-layout='true']") is not null)
+                {
+                        return;
+                }
+
+                var style = document.CreateElement("style");
+                style.SetAttribute("data-countdown-layout", "true");
+                style.TextContent = $@"
+.section-group[data-section='countdown'] {{
+    width: min(100%, 1100px);
+    box-sizing: border-box;
+}}
+.section-group[data-section='countdown'] .countdown,
+.section-group[data-section='countdown'] .countdown-timer {{
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    row-gap: 8px;
+}}
+.section-group[data-section='countdown'] .countdown-period,
+.section-group[data-section='countdown'] .countdown-period__text,
+.section-group[data-section='countdown'] .campaign-period,
+.section-group[data-section='countdown'] .campaign__period {{
+    display: inline-block;
+    text-align: center;
+    white-space: nowrap;
+}}
+@media (max-width: {BackgroundMobileBreakpoint}px) {{
+    .section-group[data-section='countdown'] {{
+        width: 100%;
+        max-width: 100%;
+        margin-left: 0;
+        margin-right: 0;
+        border-radius: 12px;
+        padding-left: 16px;
+        padding-right: 16px;
+    }}
+    .section-group[data-section='countdown'] .countdown,
+    .section-group[data-section='countdown'] .countdown-timer {{
+        gap: 8px;
+    }}
+}}
+";
+                head.AppendChild(style);
+        }
+
+            private static int? SanitizeCountdownFontWeight(int? weight)
+            {
+                if (!weight.HasValue)
+                {
+                    return null;
+                }
+
+                var normalized = Math.Clamp(weight.Value, 100, 900);
+                return normalized / 100 * 100;
+            }
 
     private static void EnsureCouponPeriodTextSizeStyle(IDocument document, ContentModel content)
     {
