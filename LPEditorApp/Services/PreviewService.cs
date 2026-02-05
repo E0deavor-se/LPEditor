@@ -12,7 +12,7 @@ namespace LPEditorApp.Services;
 
 public class PreviewService
 {
-    private const bool DisableDecoImages = false;
+    private static readonly bool DisableDecoImages = false;
 
     public async Task<string> GenerateHtmlAsync(
         TemplateProject template,
@@ -86,6 +86,7 @@ public class PreviewService
 
         ApplyCampaignStyle(document, content);
         EnsureCountdownTextSizeStyle(document, content);
+        EnsureCouponPeriodTextSizeStyle(document, content);
         EnsureBackgroundImageOnPage(document, content);
         ApplySectionBackgrounds(document, content);
         ApplySectionStyles(document, content, editingSectionKey);
@@ -1966,7 +1967,8 @@ img[class*='decoration'] { z-index: 50 !important; }
 
                     var overrideStyle = FindFrameStyleOverrideByNormalizedKey(content, normalizedKey);
                     var baseStyle = ResolveFrameStyle(content, normalizedKey);
-                    var targets = (overrideStyle?.AnimationTargets?.Count ?? 0) > 0
+                    var hasOverrideTargets = (overrideStyle?.AnimationTargets?.Count ?? 0) > 0;
+                    var targets = hasOverrideTargets
                         ? overrideStyle!.AnimationTargets
                         : baseStyle.AnimationTargets;
                     ClearFrameAnimationTargets(section);
@@ -1978,7 +1980,7 @@ img[class*='decoration'] { z-index: 50 !important; }
 
                     foreach (var pair in targets)
                     {
-                        ApplyFrameAnimationToTargets(section, pair.Key, pair.Value);
+                        ApplyFrameAnimationToTargets(section, pair.Key, pair.Value, hasOverrideTargets);
                     }
                 }
             }
@@ -2021,17 +2023,25 @@ img[class*='decoration'] { z-index: 50 !important; }
                 {
                     ClearFrameAnimation(target);
                 }
+                ClearFrameAnimationHost(section);
             }
 
-            private static void ApplyFrameAnimationToTargets(IElement section, string targetKey, FrameAnimationTargetSetting setting)
+            private static void ApplyFrameAnimationToTargets(IElement section, string targetKey, FrameAnimationTargetSetting setting, bool isOverride)
             {
                 var elements = GetFrameAnimationElements(section, targetKey);
                 foreach (var element in elements)
                 {
                     ApplyFrameAnimationToElement(element, setting);
                 }
+                if (string.Equals(targetKey, "outer", StringComparison.OrdinalIgnoreCase)
+                    && setting is not null
+                    && setting.Enabled
+                    && (isOverride || (!string.IsNullOrWhiteSpace(setting.PresetId)
+                        && !string.Equals(setting.PresetId, "none", StringComparison.OrdinalIgnoreCase))))
+                {
+                    MarkFrameAnimationHost(section, "outer");
+                }
             }
-
             private static IEnumerable<IElement> GetFrameAnimationElements(IElement section, string targetKey)
             {
                 if (section is null)
@@ -2053,6 +2063,28 @@ img[class*='decoration'] { z-index: 50 !important; }
                     "tab" => section.QuerySelectorAll(".sticky-tabs__tab").OfType<IElement>().ToList(),
                     _ => Enumerable.Empty<IElement>()
                 };
+            }
+
+            private static void MarkFrameAnimationHost(IElement section, string target)
+            {
+                if (section is null)
+                {
+                    return;
+                }
+
+                section.SetAttribute("data-frame-anim-host", target);
+                section.ParentElement?.SetAttribute("data-frame-anim-host", target);
+            }
+
+            private static void ClearFrameAnimationHost(IElement section)
+            {
+                if (section is null)
+                {
+                    return;
+                }
+
+                section.RemoveAttribute("data-frame-anim-host");
+                section.ParentElement?.RemoveAttribute("data-frame-anim-host");
             }
 
             private static void ApplyFrameAnimationToElement(IElement element, FrameAnimationTargetSetting setting)
@@ -2131,13 +2163,14 @@ img[class*='decoration'] { z-index: 50 !important; }
                 style.SetAttribute("data-frame-anim-style", "true");
                 style.TextContent = @"
 .lp-frame-anim {
-  opacity: 0;
+    opacity: 1;
   animation-duration: var(--lp-frame-anim-duration, 600ms);
   animation-delay: var(--lp-frame-anim-delay, 0ms);
   animation-timing-function: var(--lp-frame-anim-easing, ease);
   animation-fill-mode: both;
   animation-iteration-count: var(--lp-frame-anim-iterations, 1);
-  animation-play-state: paused;
+    animation-play-state: paused;
+    animation-name: none;
   will-change: transform, opacity, filter;
 }
 .lp-frame-anim.is-inview { opacity: 1; animation-play-state: running; }
@@ -2145,29 +2178,83 @@ img[class*='decoration'] { z-index: 50 !important; }
 .lp-frame-anim[data-frame-anim-trigger='hover'] { opacity: 1; animation-play-state: paused; }
 .lp-frame-anim[data-frame-anim-trigger='hover']:hover { animation-play-state: running; }
 
-.anim-fade-in { animation-name: anim-fade-in; }
-.anim-fade-up { animation-name: anim-fade-up; }
-.anim-fade-down { animation-name: anim-fade-down; }
-.anim-fade-left { animation-name: anim-fade-left; }
-.anim-fade-right { animation-name: anim-fade-right; }
-.anim-slide-up { animation-name: anim-slide-up; }
-.anim-slide-left { animation-name: anim-slide-left; }
-.anim-slide-right { animation-name: anim-slide-right; }
-.anim-zoom-in { animation-name: anim-zoom-in; }
-.anim-blur-in { animation-name: anim-blur-in; }
-.anim-bounce-in { animation-name: anim-bounce-in; }
-.anim-pop { animation-name: anim-pop; }
-.anim-rubber { animation-name: anim-rubber; }
-.anim-swing { animation-name: anim-swing; }
-.anim-tada { animation-name: anim-tada; }
-.anim-flip { animation-name: anim-flip; }
-.anim-rotate-in { animation-name: anim-rotate-in; }
-.anim-skew { animation-name: anim-skew; }
-.anim-glow { animation-name: anim-glow; }
-.anim-shimmer { animation-name: anim-shimmer; }
-.anim-float { animation-name: anim-float; }
-.anim-breathe { animation-name: anim-breathe; }
-.anim-gentle-wiggle { animation-name: anim-gentle-wiggle; }
+/* prevent white base while animating frame body */
+.lp-frame-anim.lp-frame,
+.lp-frame-anim.lp-frame-body {
+    background: transparent !important;
+}
+
+.lp-frame-anim.is-inview.anim-fade-in,
+.lp-frame-anim[data-frame-anim-trigger='load'].anim-fade-in { animation-name: anim-fade-in; }
+.lp-frame-anim.is-inview.anim-fade-up,
+.lp-frame-anim[data-frame-anim-trigger='load'].anim-fade-up { animation-name: anim-fade-up; }
+.lp-frame-anim.is-inview.anim-fade-down,
+.lp-frame-anim[data-frame-anim-trigger='load'].anim-fade-down { animation-name: anim-fade-down; }
+.lp-frame-anim.is-inview.anim-fade-left,
+.lp-frame-anim[data-frame-anim-trigger='load'].anim-fade-left { animation-name: anim-fade-left; }
+.lp-frame-anim.is-inview.anim-fade-right,
+.lp-frame-anim[data-frame-anim-trigger='load'].anim-fade-right { animation-name: anim-fade-right; }
+.lp-frame-anim.is-inview.anim-slide-up,
+.lp-frame-anim[data-frame-anim-trigger='load'].anim-slide-up { animation-name: anim-slide-up; }
+.lp-frame-anim.is-inview.anim-slide-left,
+.lp-frame-anim[data-frame-anim-trigger='load'].anim-slide-left { animation-name: anim-slide-left; }
+.lp-frame-anim.is-inview.anim-slide-right,
+.lp-frame-anim[data-frame-anim-trigger='load'].anim-slide-right { animation-name: anim-slide-right; }
+.lp-frame-anim.is-inview.anim-zoom-in,
+.lp-frame-anim[data-frame-anim-trigger='load'].anim-zoom-in { animation-name: anim-zoom-in; }
+.lp-frame-anim.is-inview.anim-blur-in,
+.lp-frame-anim[data-frame-anim-trigger='load'].anim-blur-in { animation-name: anim-blur-in; }
+.lp-frame-anim.is-inview.anim-bounce-in,
+.lp-frame-anim[data-frame-anim-trigger='load'].anim-bounce-in { animation-name: anim-bounce-in; }
+.lp-frame-anim.is-inview.anim-pop,
+.lp-frame-anim[data-frame-anim-trigger='load'].anim-pop { animation-name: anim-pop; }
+.lp-frame-anim.is-inview.anim-rubber,
+.lp-frame-anim[data-frame-anim-trigger='load'].anim-rubber { animation-name: anim-rubber; }
+.lp-frame-anim.is-inview.anim-swing,
+.lp-frame-anim[data-frame-anim-trigger='load'].anim-swing { animation-name: anim-swing; }
+.lp-frame-anim.is-inview.anim-tada,
+.lp-frame-anim[data-frame-anim-trigger='load'].anim-tada { animation-name: anim-tada; }
+.lp-frame-anim.is-inview.anim-flip,
+.lp-frame-anim[data-frame-anim-trigger='load'].anim-flip { animation-name: anim-flip; }
+.lp-frame-anim.is-inview.anim-rotate-in,
+.lp-frame-anim[data-frame-anim-trigger='load'].anim-rotate-in { animation-name: anim-rotate-in; }
+.lp-frame-anim.is-inview.anim-skew,
+.lp-frame-anim[data-frame-anim-trigger='load'].anim-skew { animation-name: anim-skew; }
+.lp-frame-anim.is-inview.anim-glow,
+.lp-frame-anim[data-frame-anim-trigger='load'].anim-glow { animation-name: anim-glow; }
+.lp-frame-anim.is-inview.anim-shimmer,
+.lp-frame-anim[data-frame-anim-trigger='load'].anim-shimmer { animation-name: anim-shimmer; }
+.lp-frame-anim.is-inview.anim-float,
+.lp-frame-anim[data-frame-anim-trigger='load'].anim-float { animation-name: anim-float; }
+.lp-frame-anim.is-inview.anim-breathe,
+.lp-frame-anim[data-frame-anim-trigger='load'].anim-breathe { animation-name: anim-breathe; }
+.lp-frame-anim.is-inview.anim-gentle-wiggle,
+.lp-frame-anim[data-frame-anim-trigger='load'].anim-gentle-wiggle { animation-name: anim-gentle-wiggle; }
+
+.lp-canvas .section-group[data-frame-anim-host='outer'],
+.lp-canvas .section-group[data-frame-anim-host='outer'] > section,
+.lp-canvas .section-group[data-frame-anim-host='outer'] .lp-section-inner,
+.lp-canvas .lp-section[data-frame-anim-host='outer'] {
+    background-color: transparent !important;
+    background-image: none !important;
+}
+
+.lp-canvas .section-group[data-frame-anim-host='outer'],
+.lp-canvas .section-group[data-frame-anim-host='outer'] > section {
+    border: none !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+}
+
+.lp-canvas .section-group[data-frame-anim-host='outer']::before,
+.lp-canvas .section-group[data-frame-anim-host='outer']::after,
+.lp-canvas .section-group[data-frame-anim-host='outer'] > section::before,
+.lp-canvas .section-group[data-frame-anim-host='outer'] > section::after {
+    background: transparent !important;
+    box-shadow: none !important;
+    border: none !important;
+    border-radius: 0 !important;
+}
 
 @keyframes anim-fade-in { from { opacity: 0; } to { opacity: 1; } }
 @keyframes anim-fade-up { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
@@ -6847,6 +6934,38 @@ img, svg, video, canvas { max-width: 100% !important; height: auto !important; }
 .section-group[data-section='countdown'] .countdown *,
 .section-group[data-section='countdown'] .countdown-timer,
 .section-group[data-section='countdown'] .countdown-timer * {{
+  font-size: {px}px !important;
+}}";
+    }
+
+    private static void EnsureCouponPeriodTextSizeStyle(IDocument document, ContentModel content)
+    {
+        var head = document.Head;
+        if (head is null)
+        {
+            return;
+        }
+
+        var size = SanitizeFontSize(content.Sections.CouponPeriod.TextFontSize);
+        var style = document.QuerySelector("style[data-coupon-period-text-size='true']") as IElement;
+        if (!size.HasValue)
+        {
+            style?.Remove();
+            return;
+        }
+
+        if (style is null)
+        {
+            style = document.CreateElement("style");
+            style.SetAttribute("data-coupon-period-text-size", "true");
+            head.AppendChild(style);
+        }
+
+        var px = size.Value;
+        style.TextContent = $@"
+.section-group[data-section='coupon-period'] .campaign__text,
+.section-group[data-section='coupon-period'] .section-body,
+.section-group[data-section='coupon-period'] p {{
   font-size: {px}px !important;
 }}";
     }

@@ -99,6 +99,7 @@ public class CampaignContentModel
 
     [JsonPropertyName("textAlign")]
     public string? TextAlign { get; set; }
+
 }
 
 public class CampaignStyleModel
@@ -285,6 +286,9 @@ public class CouponNotesModel
 
     [JsonPropertyName("textAlign")]
     public string? TextAlign { get; set; }
+
+    [JsonPropertyName("textFontSize")]
+    public int? TextFontSize { get; set; }
 }
 
 public class CouponPeriodModel
@@ -312,6 +316,9 @@ public class CouponPeriodModel
 
     [JsonPropertyName("textAlign")]
     public string? TextAlign { get; set; }
+
+    [JsonPropertyName("textFontSize")]
+    public int? TextFontSize { get; set; }
 }
 
 public class CouponFlowSlideModel

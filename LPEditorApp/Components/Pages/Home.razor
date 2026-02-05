@@ -624,6 +624,16 @@
 													{
 														<textarea class="text" rows="2" @bind-value="State.Content.Sections.CouponPeriod.Text" @bind-value:event="oninput"></textarea>
 													}
+													<div class="field">
+														<label>テキストサイズ</label>
+														<select class="text" @onchange="OnCouponPeriodTextSizeChanged">
+															<option value="">自動</option>
+															@foreach (var size in FontSizeOptions)
+															{
+																<option value="@size" selected="@(State.Content.Sections.CouponPeriod.TextFontSize == size)">@size px</option>
+															}
+														</select>
+													</div>
 												</div>
 											}
 											else if (normalizedKey == "couponflow")
@@ -2640,6 +2650,21 @@
 	{
 		State.Content.Sections.CouponPeriod.EndDate = NormalizeDate(e?.Value?.ToString());
 		await OnCouponPeriodDateChanged();
+	}
+
+	private async Task OnCouponPeriodTextSizeChanged(ChangeEventArgs e)
+	{
+		var value = e?.Value?.ToString();
+		if (int.TryParse(value, out var size))
+		{
+			State.Content.Sections.CouponPeriod.TextFontSize = size;
+		}
+		else
+		{
+			State.Content.Sections.CouponPeriod.TextFontSize = null;
+		}
+
+		await UpdatePreviewAsync();
 	}
 
 	private async Task OnCountdownEndInputChanged(ChangeEventArgs e)
@@ -4770,6 +4795,16 @@
 	private void OnAnimationScopeChanged(string scope)
 	{
 		FrameAnimationScope = scope;
+		if (FrameAnimationScope == "per")
+		{
+			var style = GetCardThemeStyle();
+			if (style.AnimationTargets.Count > 0)
+			{
+				style.AnimationTargets.Clear();
+			}
+		}
+
+		ScheduleDesignPreview();
 	}
 
 	private void OnAnimationPreviewToggled(bool enabled)
