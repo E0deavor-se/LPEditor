@@ -88,6 +88,7 @@ public class PreviewService
         EnsureCountdownTextSizeStyle(document, content);
         EnsureCouponPeriodTextSizeStyle(document, content);
         EnsureBackgroundImageOnPage(document, content);
+        EnsureHeroBackground(document, content);
         ApplySectionBackgrounds(document, content);
         ApplySectionStyles(document, content, editingSectionKey);
         ApplySectionDecorations(document, content, template, imageOverrides, embedImages);
@@ -673,6 +674,16 @@ img[class*='decoration'] { z-index: 50 !important; }
             rules.AppendLine(wrapperRule);
         }
 
+        if (BackgroundRenderService.ResolveSourceType(setting) == "video")
+        {
+            rules.AppendLine("html, body, .lp-canvas, .page, .lp-wrapper, .l-wrapper { background: transparent !important; background-image: none !important; }");
+        }
+
+        if (content.MvBackgroundSync)
+        {
+            rules.AppendLine(".lp-canvas .mv, .lp-canvas .mv-wrap, .lp-canvas .mv__wrap, .lp-canvas .mv__wrapper, .lp-canvas .hero, .lp-canvas .hero-wrap, .lp-canvas .hero__wrap { background: inherit !important; }");
+        }
+
         if (IsPresetBackground(setting))
         {
             rules.AppendLine("html, body, .lp-canvas, .page, .lp-wrapper, .l-wrapper { background: transparent !important; }");
@@ -966,8 +977,10 @@ img[class*='decoration'] { z-index: 50 !important; }
         }
 
         var sourceType = BackgroundRenderService.ResolveSourceType(setting);
-        if (sourceType == "video" && !string.IsNullOrWhiteSpace(setting.VideoUrl))
+        var videoUrl = BackgroundRenderService.ResolveVideoUrl(setting);
+        if (sourceType == "video" && !string.IsNullOrWhiteSpace(videoUrl))
         {
+            media.SetAttribute("style", "position:absolute;inset:0;");
             var video = media.QuerySelector("video") as IElement;
             if (video is null)
             {
@@ -980,11 +993,12 @@ img[class*='decoration'] { z-index: 50 !important; }
                 video.SetAttribute("muted", string.Empty);
                 video.SetAttribute("loop", string.Empty);
                 video.SetAttribute("playsinline", string.Empty);
+                video.SetAttribute("preload", "auto");
                 media.AppendChild(video);
             }
 
             video.SetAttribute("style", "width:100%;height:100%;object-fit:cover;" + BackgroundRenderService.BuildFilterStyle(setting.Effects));
-            video.SetAttribute("src", setting.VideoUrl);
+            video.SetAttribute("src", videoUrl);
             if (!string.IsNullOrWhiteSpace(setting.VideoPoster))
             {
                 video.SetAttribute("poster", setting.VideoPoster);
@@ -1006,6 +1020,137 @@ img[class*='decoration'] { z-index: 50 !important; }
             wrapper.AppendChild(stage);
         }
     }
+
+    private static void EnsureHeroBackground(IDocument document, ContentModel content)
+    {
+        var head = document.Head;
+        if (head is null)
+        {
+            return;
+        }
+
+        var heroSelectors = new[] { ".mv", ".mv-wrap", ".mv__wrap", ".mv__wrapper", ".hero", ".hero-wrap", ".hero__wrap" };
+        IElement? hero = null;
+        foreach (var selector in heroSelectors)
+        {
+            hero = document.QuerySelector(selector) as IElement;
+            if (hero is not null)
+            {
+                break;
+            }
+        }
+
+        var styleTag = document.QuerySelector("style[data-mv-bg='true']") as IElement;
+        if (styleTag is null)
+        {
+            styleTag = document.CreateElement("style");
+            styleTag.SetAttribute("data-mv-bg", "true");
+            head.AppendChild(styleTag);
+        }
+
+        if (hero is null || content.MvBackgroundSync)
+        {
+            styleTag.TextContent = string.Empty;
+            hero?.QuerySelector(".mv-bg-stage")?.Remove();
+            return;
+        }
+
+        var setting = BackgroundSettingMapper.FromPage(content.MvBackground);
+        var includeMediaImage = !BackgroundRenderService.UseMediaLayer(setting);
+        var heroSelector = ".lp-canvas .mv, .lp-canvas .mv-wrap, .lp-canvas .mv__wrap, .lp-canvas .mv__wrapper, .lp-canvas .hero, .lp-canvas .hero-wrap, .lp-canvas .hero__wrap";
+        var rules = new StringBuilder();
+        var rule = BackgroundStyleService.BuildRule(setting, heroSelector, includeMediaImage);
+        if (!string.IsNullOrWhiteSpace(rule))
+        {
+            rules.AppendLine(rule);
+        }
+        if (BackgroundRenderService.ResolveSourceType(setting) == "video")
+        {
+            rules.AppendLine($"{heroSelector} {{ background: transparent !important; background-image: none !important; }}");
+        }
+        rules.AppendLine($"{heroSelector} {{ position: relative; overflow: hidden; }}");
+        rules.AppendLine($"{heroSelector} > .mv-bg-stage {{ position: absolute; inset: 0; z-index: 0; pointer-events: none; }}");
+        rules.AppendLine($"{heroSelector} > :not(.mv-bg-stage) {{ position: relative; z-index: 1; }}");
+        styleTag.TextContent = rules.ToString();
+
+        ApplyHeroBackgroundMediaLayers(document, hero, setting);
+    }
+
+    private static void ApplyHeroBackgroundMediaLayers(IDocument document, IElement wrapper, BackgroundSetting setting)
+    {
+        var existing = wrapper.QuerySelector(".mv-bg-stage") as IElement;
+        if (!BackgroundRenderService.UseMediaLayer(setting))
+        {
+            existing?.Remove();
+            return;
+        }
+
+        var stage = existing ?? document.CreateElement("div");
+        stage.ClassList.Add("mv-bg-stage");
+        stage.SetAttribute("style", "position:absolute;inset:0;z-index:0;overflow:hidden;");
+
+        var media = stage.QuerySelector(".mv-bg-media") as IElement;
+        var overlay = stage.QuerySelector(".mv-bg-overlay") as IElement;
+
+        if (media is null)
+        {
+            media = document.CreateElement("div");
+            media.ClassList.Add("mv-bg-media");
+            stage.AppendChild(media);
+        }
+
+        if (overlay is null)
+        {
+            overlay = document.CreateElement("div");
+            overlay.ClassList.Add("mv-bg-overlay");
+            stage.AppendChild(overlay);
+        }
+
+        var sourceType = BackgroundRenderService.ResolveSourceType(setting);
+        var videoUrl = BackgroundRenderService.ResolveVideoUrl(setting);
+        if (sourceType == "video" && !string.IsNullOrWhiteSpace(videoUrl))
+        {
+            media.SetAttribute("style", "position:absolute;inset:0;");
+            var video = media.QuerySelector("video") as IElement;
+            if (video is null)
+            {
+                foreach (var child in media.Children.ToList())
+                {
+                    child.Remove();
+                }
+                video = document.CreateElement("video");
+                video.SetAttribute("autoplay", string.Empty);
+                video.SetAttribute("muted", string.Empty);
+                video.SetAttribute("loop", string.Empty);
+                video.SetAttribute("playsinline", string.Empty);
+                video.SetAttribute("preload", "auto");
+                media.AppendChild(video);
+            }
+
+            video.SetAttribute("style", "width:100%;height:100%;object-fit:cover;" + BackgroundRenderService.BuildFilterStyle(setting.Effects));
+            video.SetAttribute("src", videoUrl);
+            if (!string.IsNullOrWhiteSpace(setting.VideoPoster))
+            {
+                video.SetAttribute("poster", setting.VideoPoster);
+            }
+        }
+        else
+        {
+            foreach (var child in media.Children.ToList())
+            {
+                child.Remove();
+            }
+            media.SetAttribute("style", "position:absolute;inset:0;" + BackgroundRenderService.BuildMediaStyle(setting) + BackgroundRenderService.BuildFilterStyle(setting.Effects));
+        }
+
+        overlay.SetAttribute("style", "position:absolute;inset:0;" + BackgroundRenderService.BuildOverlayStyle(setting.Effects));
+
+        if (existing is null)
+        {
+            wrapper.Prepend(stage);
+        }
+    }
+
 
     private static void ApplySectionBackgrounds(IDocument document, ContentModel content)
     {
@@ -1978,11 +2123,42 @@ img[class*='decoration'] { z-index: 50 !important; }
                         continue;
                     }
 
-                    foreach (var pair in targets)
+                    var setting = ResolveFrameAnimationSetting(targets);
+                    if (setting is null)
                     {
-                        ApplyFrameAnimationToTargets(section, pair.Key, pair.Value, hasOverrideTargets);
+                        continue;
+                    }
+
+                    var frame = section.QuerySelector(".lp-frame") as IElement;
+                    if (frame is not null)
+                    {
+                        ApplyFrameAnimationToElement(frame, setting);
+                    }
+
+                    if (hasOverrideTargets)
+                    {
+                        MarkFrameAnimationHost(section, "frame");
                     }
                 }
+            }
+
+            private static FrameAnimationTargetSetting? ResolveFrameAnimationSetting(Dictionary<string, FrameAnimationTargetSetting> targets)
+            {
+                if (targets is null || targets.Count == 0)
+                {
+                    return null;
+                }
+
+                string[] priority = { "frame", "outer", "band", "inner", "content", "corner-tl", "corner-tr", "corner-bl", "corner-br", "tab" };
+                foreach (var key in priority)
+                {
+                    if (targets.TryGetValue(key, out var setting) && setting is not null)
+                    {
+                        return setting;
+                    }
+                }
+
+                return targets.Values.FirstOrDefault(setting => setting is not null);
             }
 
             private static void ClearFrameAnimationTargets(IElement section)
@@ -2026,7 +2202,7 @@ img[class*='decoration'] { z-index: 50 !important; }
                 ClearFrameAnimationHost(section);
             }
 
-            private static void ApplyFrameAnimationToTargets(IElement section, string targetKey, FrameAnimationTargetSetting setting, bool isOverride)
+            private static void ApplyFrameAnimationToTargets(IElement section, string targetKey, FrameAnimationTargetSetting setting)
             {
                 var elements = GetFrameAnimationElements(section, targetKey);
                 foreach (var element in elements)
@@ -2036,8 +2212,8 @@ img[class*='decoration'] { z-index: 50 !important; }
                 if (string.Equals(targetKey, "outer", StringComparison.OrdinalIgnoreCase)
                     && setting is not null
                     && setting.Enabled
-                    && (isOverride || (!string.IsNullOrWhiteSpace(setting.PresetId)
-                        && !string.Equals(setting.PresetId, "none", StringComparison.OrdinalIgnoreCase))))
+                    && !string.IsNullOrWhiteSpace(setting.PresetId)
+                    && !string.Equals(setting.PresetId, "none", StringComparison.OrdinalIgnoreCase))
                 {
                     MarkFrameAnimationHost(section, "outer");
                 }
@@ -2163,26 +2339,20 @@ img[class*='decoration'] { z-index: 50 !important; }
                 style.SetAttribute("data-frame-anim-style", "true");
                 style.TextContent = @"
 .lp-frame-anim {
-    opacity: 1;
-  animation-duration: var(--lp-frame-anim-duration, 600ms);
-  animation-delay: var(--lp-frame-anim-delay, 0ms);
-  animation-timing-function: var(--lp-frame-anim-easing, ease);
-  animation-fill-mode: both;
-  animation-iteration-count: var(--lp-frame-anim-iterations, 1);
-    animation-play-state: paused;
-    animation-name: none;
-  will-change: transform, opacity, filter;
+        opacity: 1;
+    animation-duration: var(--lp-frame-anim-duration, 600ms);
+    animation-delay: var(--lp-frame-anim-delay, 0ms);
+    animation-timing-function: var(--lp-frame-anim-easing, ease);
+    animation-fill-mode: both;
+    animation-iteration-count: var(--lp-frame-anim-iterations, 1);
+        animation-play-state: paused;
+        animation-name: none;
+    will-change: transform, opacity, filter;
 }
 .lp-frame-anim.is-inview { opacity: 1; animation-play-state: running; }
 .lp-frame-anim[data-frame-anim-trigger='load'] { opacity: 1; animation-play-state: running; }
 .lp-frame-anim[data-frame-anim-trigger='hover'] { opacity: 1; animation-play-state: paused; }
 .lp-frame-anim[data-frame-anim-trigger='hover']:hover { animation-play-state: running; }
-
-/* prevent white base while animating frame body */
-.lp-frame-anim.lp-frame,
-.lp-frame-anim.lp-frame-body {
-    background: transparent !important;
-}
 
 .lp-frame-anim.is-inview.anim-fade-in,
 .lp-frame-anim[data-frame-anim-trigger='load'].anim-fade-in { animation-name: anim-fade-in; }
@@ -2231,25 +2401,25 @@ img[class*='decoration'] { z-index: 50 !important; }
 .lp-frame-anim.is-inview.anim-gentle-wiggle,
 .lp-frame-anim[data-frame-anim-trigger='load'].anim-gentle-wiggle { animation-name: anim-gentle-wiggle; }
 
-.lp-canvas .section-group[data-frame-anim-host='outer'],
-.lp-canvas .section-group[data-frame-anim-host='outer'] > section,
-.lp-canvas .section-group[data-frame-anim-host='outer'] .lp-section-inner,
-.lp-canvas .lp-section[data-frame-anim-host='outer'] {
+.lp-canvas .section-group[data-frame-anim-host='frame'],
+.lp-canvas .section-group[data-frame-anim-host='frame'] > section,
+.lp-canvas .section-group[data-frame-anim-host='frame'] .lp-section-inner,
+.lp-canvas .lp-section[data-frame-anim-host='frame'] {
     background-color: transparent !important;
     background-image: none !important;
 }
 
-.lp-canvas .section-group[data-frame-anim-host='outer'],
-.lp-canvas .section-group[data-frame-anim-host='outer'] > section {
+.lp-canvas .section-group[data-frame-anim-host='frame'],
+.lp-canvas .section-group[data-frame-anim-host='frame'] > section {
     border: none !important;
     box-shadow: none !important;
     border-radius: 0 !important;
 }
 
-.lp-canvas .section-group[data-frame-anim-host='outer']::before,
-.lp-canvas .section-group[data-frame-anim-host='outer']::after,
-.lp-canvas .section-group[data-frame-anim-host='outer'] > section::before,
-.lp-canvas .section-group[data-frame-anim-host='outer'] > section::after {
+.lp-canvas .section-group[data-frame-anim-host='frame']::before,
+.lp-canvas .section-group[data-frame-anim-host='frame']::after,
+.lp-canvas .section-group[data-frame-anim-host='frame'] > section::before,
+.lp-canvas .section-group[data-frame-anim-host='frame'] > section::after {
     background: transparent !important;
     box-shadow: none !important;
     border: none !important;
@@ -3883,12 +4053,12 @@ img, svg, video, canvas { max-width: 100% !important; height: auto !important; }
         var frameBorderColor = SanitizeCssColor(content.CampaignStyle.FrameBorderColor);
         var textColor = SanitizeCssColor(content.CampaignStyle.TextColor);
 
-        var mvFooterColor = SanitizeCssColor(content.CampaignStyle.MvFooterBackgroundColor);
-        if (mvFooterColor is null)
-        {
-            var frameStyle = content.FrameDefaultStyle ?? content.CardThemeStyle;
-            mvFooterColor = SanitizeCssColor(frameStyle?.HeaderBackgroundColor);
-        }
+        var baseFrameStyle = content.FrameDefaultStyle ?? content.CardThemeStyle ?? new FrameStyle();
+        var countdownOverride = FindFrameStyleOverrideByNormalizedKey(content, "countdown");
+        var countdownFrameStyle = MergeFrameStyle(baseFrameStyle, countdownOverride);
+        var mvFooterColor = SanitizeCssColor(countdownFrameStyle.HeaderBackgroundColor)
+            ?? SanitizeCssColor(content.CampaignStyle.MvFooterBackgroundColor);
+        var mvFooterTextColor = SanitizeCssColor(countdownFrameStyle.HeaderTextColor);
         var backgroundRules = BuildBackgroundPresetRules(content);
 
         if (boxColor is null && headingColor is null && headingBackgroundColor is null && frameBorderColor is null && textColor is null && mvFooterColor is null && string.IsNullOrWhiteSpace(backgroundRules))
@@ -3924,7 +4094,12 @@ img, svg, video, canvas { max-width: 100% !important; height: auto !important; }
 
         if (mvFooterColor is not null)
         {
-            rules.Add($".section-group[data-section='countdown'] .section-title {{ background-color: {mvFooterColor} !important; }}");
+            rules.Add($".section-group[data-section='countdown'], .section-group[data-section='countdown'] * {{ background-color: {mvFooterColor} !important; background-image: none !important; }}");
+        }
+
+        if (mvFooterTextColor is not null)
+        {
+            rules.Add($".section-group[data-section='countdown'], .section-group[data-section='countdown'] * {{ color: {mvFooterTextColor} !important; }}");
         }
 
         if (!string.IsNullOrWhiteSpace(backgroundRules))
@@ -4089,6 +4264,7 @@ img, svg, video, canvas { max-width: 100% !important; height: auto !important; }
                         }
                 }
         }
+
     }
 
     private static void ApplySections(
@@ -6900,7 +7076,7 @@ img, svg, video, canvas { max-width: 100% !important; height: auto !important; }
         head.AppendChild(style);
     }
 
-    private static void EnsureCountdownTextSizeStyle(IDocument document, ContentModel content)
+        private static void EnsureCountdownTextSizeStyle(IDocument document, ContentModel content)
     {
         var head = document.Head;
         if (head is null)
@@ -6908,9 +7084,13 @@ img, svg, video, canvas { max-width: 100% !important; height: auto !important; }
             return;
         }
 
-        var size = SanitizeCountdownTextSize(content.Campaign.CountdownTextSize);
+                var size = SanitizeCountdownTextSize(content.Campaign.CountdownTextSize);
+                var dateSize = SanitizeCountdownTextSize(content.Campaign.CountdownDateTextSize);
+                var timerSize = SanitizeCountdownTextSize(content.Campaign.CountdownTimerTextSize);
+                var dateColor = SanitizeCssColor(content.Campaign.CountdownDateTextColor);
+                var timerColor = SanitizeCssColor(content.Campaign.CountdownTimerTextColor);
         var style = document.QuerySelector("style[data-countdown-text-size='true']") as IElement;
-        if (!size.HasValue)
+                if (!size.HasValue && !dateSize.HasValue && !timerSize.HasValue && dateColor is null && timerColor is null)
         {
             style?.Remove();
             return;
@@ -6923,9 +7103,11 @@ img, svg, video, canvas { max-width: 100% !important; height: auto !important; }
             head.AppendChild(style);
         }
 
-        var px = size.Value;
-        style.TextContent = $@"
-.section-group[data-section='countdown'],
+                var rules = new StringBuilder();
+                if (size.HasValue)
+                {
+                        var px = size.Value;
+                        rules.AppendLine($@".section-group[data-section='countdown'],
 .section-group[data-section='countdown'] .countdown-period,
 .section-group[data-section='countdown'] .countdown-period__text,
 .section-group[data-section='countdown'] .campaign-period,
@@ -6934,8 +7116,53 @@ img, svg, video, canvas { max-width: 100% !important; height: auto !important; }
 .section-group[data-section='countdown'] .countdown *,
 .section-group[data-section='countdown'] .countdown-timer,
 .section-group[data-section='countdown'] .countdown-timer * {{
-  font-size: {px}px !important;
-}}";
+    font-size: {px}px !important;
+}}");
+                }
+
+                if (dateSize.HasValue)
+                {
+                        var px = dateSize.Value;
+                        rules.AppendLine($@".section-group[data-section='countdown'] .countdown-period,
+.section-group[data-section='countdown'] .countdown-period__text,
+.section-group[data-section='countdown'] .campaign-period,
+.section-group[data-section='countdown'] .campaign__period {{
+    font-size: {px}px !important;
+}}");
+                }
+
+                if (timerSize.HasValue)
+                {
+                        var px = timerSize.Value;
+                        rules.AppendLine($@".section-group[data-section='countdown'] .countdown,
+.section-group[data-section='countdown'] .countdown *,
+.section-group[data-section='countdown'] .countdown-timer,
+.section-group[data-section='countdown'] .countdown-timer * {{
+    font-size: {px}px !important;
+}}");
+                }
+
+                if (dateColor is not null)
+                {
+                        rules.AppendLine($@".section-group[data-section='countdown'] .countdown-period,
+.section-group[data-section='countdown'] .countdown-period__text,
+.section-group[data-section='countdown'] .campaign-period,
+.section-group[data-section='countdown'] .campaign__period {{
+    color: {dateColor} !important;
+}}");
+                }
+
+                if (timerColor is not null)
+                {
+                        rules.AppendLine($@".section-group[data-section='countdown'] .countdown,
+.section-group[data-section='countdown'] .countdown *,
+.section-group[data-section='countdown'] .countdown-timer,
+.section-group[data-section='countdown'] .countdown-timer * {{
+    color: {timerColor} !important;
+}}");
+                }
+
+                style.TextContent = rules.ToString();
     }
 
     private static void EnsureCouponPeriodTextSizeStyle(IDocument document, ContentModel content)

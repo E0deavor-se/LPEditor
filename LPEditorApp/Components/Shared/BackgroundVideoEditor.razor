@@ -3,8 +3,9 @@
 
 <div class="bg-video-editor">
     <div class="field">
-        <label>動画URL</label>
-        <input class="text" placeholder="https://... (mp4 / webm)" value="@Setting.VideoUrl" @oninput="OnVideoUrlChanged" />
+        <label>動画ファイルを選択</label>
+        <InputFile OnChange="OnVideoFileSelected" accept="video/*" />
+        <div class="hint">ローカル動画は埋め込み(data URL)として保存されます。</div>
     </div>
     <div class="field">
         <label>ポスター画像URL（任意）</label>
@@ -24,12 +25,6 @@
 @code {
     [Parameter] public BackgroundSetting Setting { get; set; } = new();
     [Parameter] public EventCallback OnChanged { get; set; }
-
-    private async Task OnVideoUrlChanged(ChangeEventArgs args)
-    {
-        Setting.VideoUrl = args.Value?.ToString() ?? string.Empty;
-        await OnChanged.InvokeAsync();
-    }
 
     private async Task OnPosterChanged(ChangeEventArgs args)
     {
@@ -57,6 +52,24 @@
         var base64 = Convert.ToBase64String(ms.ToArray());
         var dataUrl = $"data:{file.ContentType};base64,{base64}";
         Setting.VideoPoster = dataUrl;
+        await OnChanged.InvokeAsync();
+    }
+
+    private async Task OnVideoFileSelected(InputFileChangeEventArgs args)
+    {
+        var file = args.File;
+        if (file is null)
+        {
+            return;
+        }
+
+        var maxSize = 100 * 1024 * 1024;
+        await using var stream = file.OpenReadStream(maxSize);
+        using var ms = new MemoryStream();
+        await stream.CopyToAsync(ms);
+        var base64 = Convert.ToBase64String(ms.ToArray());
+        var dataUrl = $"data:{file.ContentType};base64,{base64}";
+        Setting.VideoUrl = dataUrl;
         await OnChanged.InvokeAsync();
     }
 }

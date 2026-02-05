@@ -36,6 +36,18 @@ public class CampaignModel
 
     [JsonPropertyName("countdownTextSize")]
     public int? CountdownTextSize { get; set; }
+
+    [JsonPropertyName("countdownDateTextSize")]
+    public int? CountdownDateTextSize { get; set; }
+
+    [JsonPropertyName("countdownTimerTextSize")]
+    public int? CountdownTimerTextSize { get; set; }
+
+    [JsonPropertyName("countdownDateTextColor")]
+    public string? CountdownDateTextColor { get; set; }
+
+    [JsonPropertyName("countdownTimerTextColor")]
+    public string? CountdownTimerTextColor { get; set; }
 }
 
 public class HeaderModel
@@ -1080,6 +1092,12 @@ public class ContentModel
 
     [JsonPropertyName("lpBackground")]
     public LpBackgroundModel LpBackground { get; set; } = new();
+
+    [JsonPropertyName("mvBackground")]
+    public LpBackgroundModel MvBackground { get; set; } = new();
+
+    [JsonPropertyName("mvBackgroundSync")]
+    public bool MvBackgroundSync { get; set; } = true;
 
     [JsonPropertyName("sectionBackgrounds")]
     public Dictionary<string, SectionBackgroundSettings> SectionBackgrounds { get; set; } = new(StringComparer.OrdinalIgnoreCase);

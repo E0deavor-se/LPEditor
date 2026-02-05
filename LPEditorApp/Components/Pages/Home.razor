@@ -28,6 +28,7 @@
 			<button class="btn @(ActiveTab == "content" ? "primary" : "")" type="button" @onclick='() => SetTab("content")'>入力</button>
 			<button class="btn @(ActiveTab == "images" ? "primary" : "")" type="button" @onclick='() => SetTab("images")'>画像</button>
 			<button class="btn @(ActiveTab == "design" ? "primary" : "")" type="button" @onclick='() => SetTab("design")'>デザイン/背景</button>
+			<button class="btn @(ActiveTab == "mv-background" ? "primary" : "")" type="button" @onclick='() => SetTab("mv-background")'>MV背景</button>
 		</div>
 		<StepNavigator Steps="GetStepItems()" OnStepSelected="OnStepSelected" />
 
@@ -357,6 +358,46 @@
 							OnAnimationScopeChanged="OnAnimationScopeChanged"
 							AnimationPreviewEnabled="@State.Content.AnimationPreviewEnabled"
 							OnAnimationPreviewToggled="OnAnimationPreviewToggled" />
+					}
+				</section>
+			</div>
+		}
+
+		@if (ActiveTab == "mv-background")
+		{
+			<div class="tab-content mv-background-tab">
+				<section class="panel mv-bg-panel">
+					<div class="sub-header">
+						<strong>MV背景</strong>
+						<button type="button" class="accordion-toggle @(IsSectionOpen("mv-background") ? "is-open" : "")" @onclick='() => ToggleSection("mv-background")'>@(IsSectionOpen("mv-background") ? "閉じる" : "開く")</button>
+					</div>
+					@if (IsSectionOpen("mv-background"))
+					{
+						<div class="mv-bg-hero">
+							<div class="mv-bg-title">Main Visual Background</div>
+							<div class="mv-bg-actions">
+								<label class="mv-bg-toggle">
+									<input type="checkbox" @bind="State.Content.MvBackgroundSync" @bind:after="OnMvBackgroundSyncChanged" />
+									<span>LP全体と背景を合わせる</span>
+								</label>
+								<div class="mv-bg-buttons">
+									<button class="btn" type="button" @onclick="CopyPageBackgroundToMv" disabled="@State.Content.MvBackgroundSync">LP背景をコピー</button>
+									<button class="btn" type="button" @onclick="ResetMvBackground" disabled="@State.Content.MvBackgroundSync">リセット</button>
+								</div>
+							</div>
+							<div class="mv-bg-hint">同期OFFで、動画・グラデ・画像・パターンなどをMVだけに適用できます。</div>
+						</div>
+
+						<div class="mv-bg-editor @(State.Content.MvBackgroundSync ? "is-disabled" : "")">
+							<BackgroundSettingEditor Setting="MvBackgroundSetting"
+							                       OnChanged="OnMvBackgroundChanged"
+							                       PreviewLabel="MV背景"
+							                       PreviewCaption="MV/ヒーローに反映されます"
+							                       ShowPreset="true" />
+							<PageBackgroundPresetEditor Selection="MvBackgroundSetting.Preset"
+							                           Presets="BackgroundPresets"
+							                           OnChanged="OnMvBackgroundChanged" />
+						</div>
 					}
 				</section>
 			</div>
@@ -971,6 +1012,40 @@
 															}
 														</select>
 													</div>
+													<div class="field">
+														<label>日付テキストサイズ</label>
+														<select class="text" @onchange="OnCountdownDateTextSizeChanged">
+															<option value="">自動</option>
+															@foreach (var size in FontSizeOptions)
+															{
+																<option value="@size" selected="@(State.Content.Campaign.CountdownDateTextSize == size)">@size px</option>
+															}
+														</select>
+													</div>
+													<div class="field">
+														<label>日付テキスト色</label>
+														<div class="input-row">
+															<input class="text" @bind-value="State.Content.Campaign.CountdownDateTextColor" @bind-value:event="oninput" @bind-value:after="OnAnyInputAfter" placeholder="#ffffff" />
+															<input type="color" value="@ToColorPickerValue(State.Content.Campaign.CountdownDateTextColor)" @oninput="(e) => SetCountdownDateTextColor(e?.Value?.ToString())" />
+														</div>
+													</div>
+													<div class="field">
+														<label>カウントダウン文字サイズ</label>
+														<select class="text" @onchange="OnCountdownTimerTextSizeChanged">
+															<option value="">自動</option>
+															@foreach (var size in FontSizeOptions)
+															{
+																<option value="@size" selected="@(State.Content.Campaign.CountdownTimerTextSize == size)">@size px</option>
+															}
+														</select>
+													</div>
+													<div class="field">
+														<label>カウントダウン文字色</label>
+														<div class="input-row">
+															<input class="text" @bind-value="State.Content.Campaign.CountdownTimerTextColor" @bind-value:event="oninput" @bind-value:after="OnAnyInputAfter" placeholder="#ffffff" />
+															<input type="color" value="@ToColorPickerValue(State.Content.Campaign.CountdownTimerTextColor)" @oninput="(e) => SetCountdownTimerTextColor(e?.Value?.ToString())" />
+														</div>
+													</div>
 												@if (State.Content.Campaign.ShowCountdown)
 												{
 													<div class="field">
@@ -1248,6 +1323,7 @@
 	private double ResponsiveDpr = 1;
 	private string SelectedResponsiveDevice = string.Empty;
 	private BackgroundSetting PageBackgroundSetting = new();
+	private BackgroundSetting MvBackgroundSetting = new();
 	private bool UseViewportSizing;
 	private bool HasPreviewModeSelection;
 	private const int PcPreviewWidth = 1280;
@@ -1315,6 +1391,7 @@
 		EnsureFrameDefaultStyle();
 		CleanFrameOverrideData();
 		SyncPageBackgroundSetting();
+		SyncMvBackgroundSetting();
 		RegisterHighlightListener();
 		BackgroundPresets = await BackgroundPresetService.GetPresetsAsync();
 	}
@@ -2094,6 +2171,7 @@
 			EnsureFrameDefaultStyle();
 			CleanFrameOverrideData();
 			SyncPageBackgroundSetting();
+			SyncMvBackgroundSetting();
 			SetupEditContext();
 			await UpdatePreviewAsync();
 		}
@@ -2457,6 +2535,7 @@
 			EnsureFrameDefaultStyle();
 			CleanFrameOverrideData();
 			SyncPageBackgroundSetting();
+			SyncMvBackgroundSetting();
 			SetupEditContext();
 			await UpdatePreviewAsync();
 		}
@@ -2471,6 +2550,7 @@
 		State.Content.SectionGroups ??= new List<SectionGroupModel>();
 		State.Content.CustomSections ??= new List<CustomSectionModel>();
 		State.Content.Sections ??= new SectionsModel();
+		State.Content.MvBackground ??= new LpBackgroundModel();
 	}
 
 	private async Task OnSaveContent()
@@ -2692,6 +2772,50 @@
 	{
 		State.Content.Sections.CouponPeriod.Text = FormatDateRange(State.Content.Sections.CouponPeriod.StartDate, State.Content.Sections.CouponPeriod.EndDate);
 		await UpdatePreviewAsync();
+	}
+
+	private Task OnCountdownDateTextSizeChanged(ChangeEventArgs e)
+	{
+		if (int.TryParse(e?.Value?.ToString(), out var size))
+		{
+			State.Content.Campaign.CountdownDateTextSize = size;
+		}
+		else
+		{
+			State.Content.Campaign.CountdownDateTextSize = null;
+		}
+
+		OnAnyInputAfter();
+		return Task.CompletedTask;
+	}
+
+	private Task OnCountdownTimerTextSizeChanged(ChangeEventArgs e)
+	{
+		if (int.TryParse(e?.Value?.ToString(), out var size))
+		{
+			State.Content.Campaign.CountdownTimerTextSize = size;
+		}
+		else
+		{
+			State.Content.Campaign.CountdownTimerTextSize = null;
+		}
+
+		OnAnyInputAfter();
+		return Task.CompletedTask;
+	}
+
+	private Task SetCountdownDateTextColor(string? color)
+	{
+		State.Content.Campaign.CountdownDateTextColor = color;
+		OnAnyInputAfter();
+		return Task.CompletedTask;
+	}
+
+	private Task SetCountdownTimerTextColor(string? color)
+	{
+		State.Content.Campaign.CountdownTimerTextColor = color;
+		OnAnyInputAfter();
+		return Task.CompletedTask;
 	}
 
 	private async Task OnCouponPeriodModeChanged(ChangeEventArgs e)
@@ -5126,6 +5250,11 @@
 		PageBackgroundSetting = BackgroundSettingMapper.FromPage(State.Content.LpBackground);
 	}
 
+	private void SyncMvBackgroundSetting()
+	{
+		MvBackgroundSetting = BackgroundSettingMapper.FromPage(State.Content.MvBackground);
+	}
+
 	private async Task OnPageBackgroundChanged()
 	{
 		if (!string.IsNullOrWhiteSpace(PageBackgroundSetting?.Preset?.PresetKey))
@@ -5136,6 +5265,41 @@
 		BackgroundSettingMapper.ApplyToPage(PageBackgroundSetting!, State.Content.LpBackground);
 		await NotifyChanged();
 		await TriggerHighlightAsync(string.Empty, "background");
+	}
+
+	private async Task OnMvBackgroundChanged()
+	{
+		if (!string.IsNullOrWhiteSpace(MvBackgroundSetting?.Preset?.PresetKey))
+		{
+			MvBackgroundSetting.SourceType = "preset";
+			MvBackgroundSetting.Mode = "preset";
+		}
+		BackgroundSettingMapper.ApplyToPage(MvBackgroundSetting!, State.Content.MvBackground);
+		await NotifyChanged();
+		await TriggerHighlightAsync(string.Empty, "mv");
+	}
+
+	private async Task OnMvBackgroundSyncChanged()
+	{
+		await NotifyChanged();
+		await TriggerHighlightAsync(string.Empty, "mv");
+	}
+
+	private async Task CopyPageBackgroundToMv()
+	{
+		MvBackgroundSetting = BackgroundSettingMapper.FromPage(State.Content.LpBackground);
+		BackgroundSettingMapper.ApplyToPage(MvBackgroundSetting, State.Content.MvBackground);
+		State.Content.MvBackgroundSync = false;
+		await NotifyChanged();
+		await TriggerHighlightAsync(string.Empty, "mv");
+	}
+
+	private async Task ResetMvBackground()
+	{
+		State.Content.MvBackground = new LpBackgroundModel();
+		MvBackgroundSetting = BackgroundSettingMapper.FromPage(State.Content.MvBackground);
+		await NotifyChanged();
+		await TriggerHighlightAsync(string.Empty, "mv");
 	}
 
 

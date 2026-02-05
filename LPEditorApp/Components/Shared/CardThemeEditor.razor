@@ -90,7 +90,7 @@
             <div class="anim-panel-header">
                 <div>
                     <div class="anim-panel-title">アニメーションプリセット</div>
-                    <div class="anim-panel-sub">対象を選んでアニメを適用</div>
+                    <div class="anim-panel-sub">フレーム全体にアニメを適用</div>
                 </div>
                 <div class="anim-panel-actions">
                     <label class="lp-toggle">
@@ -102,16 +102,6 @@
             </div>
 
             <div class="anim-panel-row">
-                <div class="lp-form-row">
-                    <label>適用対象</label>
-                    <select class="lp-select" @bind="SelectedAnimTarget" @bind:after="OnAnimTargetChanged">
-                        @foreach (var target in AnimationTargetOptions)
-                        {
-                            <option value="@target.Key">@target.Value</option>
-                        }
-                    </select>
-                </div>
-
                 @if (ShowAnimationScopeToggle)
                 {
                     <div class="lp-form-row">

@@ -65,9 +65,14 @@ public partial class CardThemeEditor : ComponentBase
     private IReadOnlyList<AnimationPreset> AnimPresets = Array.Empty<AnimationPreset>();
     private string AnimSearch = string.Empty;
     private string SelectedAnimCategory = "all";
-    private string SelectedAnimTarget = "outer";
     private string? AnimLoadError;
     private string ActiveEditorTab = "design";
+
+    private const string FrameAnimationKey = "frame";
+    private static readonly string[] LegacyAnimationKeys =
+    {
+        FrameAnimationKey, "outer", "band", "inner", "content", "corner-tl", "corner-tr", "corner-bl", "corner-br", "tab"
+    };
 
     private static readonly Dictionary<string, string> AnimCategoryLabels = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -75,19 +80,6 @@ public partial class CardThemeEditor : ComponentBase
         ["pop"] = "ポップ",
         ["stylish"] = "スタイリッシュ",
         ["soft"] = "やわらかい"
-    };
-
-    private static readonly IReadOnlyList<KeyValuePair<string, string>> AnimationTargetOptions = new[]
-    {
-        new KeyValuePair<string, string>("outer", "FrameOuter（外枠）"),
-        new KeyValuePair<string, string>("band", "FrameBand（帯/ヘッダー）"),
-        new KeyValuePair<string, string>("inner", "FrameInner（内枠）"),
-        new KeyValuePair<string, string>("content", "FrameContent（本文）"),
-        new KeyValuePair<string, string>("corner-tl", "Corner TL（左上装飾）"),
-        new KeyValuePair<string, string>("corner-tr", "Corner TR（右上装飾）"),
-        new KeyValuePair<string, string>("corner-bl", "Corner BL（左下装飾）"),
-        new KeyValuePair<string, string>("corner-br", "Corner BR（右下装飾）"),
-        new KeyValuePair<string, string>("tab", "TabSticker（付箋タブ）")
     };
 
     private static readonly IReadOnlyList<KeyValuePair<string, string>> AnimEasingOptions = new[]
@@ -135,7 +127,7 @@ public partial class CardThemeEditor : ComponentBase
 
     private FrameStyle ActiveAnimationStyle => AnimationStyle ?? Style;
 
-    private FrameAnimationTargetSetting ActiveAnimSetting => EnsureAnimSetting(SelectedAnimTarget);
+    private FrameAnimationTargetSetting ActiveAnimSetting => EnsureAnimSetting();
 
     private int AnimDuration
     {
@@ -376,11 +368,6 @@ public partial class CardThemeEditor : ComponentBase
         }
     }
 
-    private void OnAnimTargetChanged()
-    {
-        EnsureAnimSetting(SelectedAnimTarget);
-    }
-
     private async Task SetAnimationScope(string scope)
     {
         await OnAnimationScopeChanged.InvokeAsync(scope);
@@ -440,7 +427,7 @@ public partial class CardThemeEditor : ComponentBase
 
     private async Task ApplyAnimPresetAsync(AnimationPreset preset)
     {
-        var setting = EnsureAnimSetting(SelectedAnimTarget);
+        var setting = EnsureAnimSetting();
         setting.PresetId = preset.Id;
         setting.DurationMs = preset.DefaultDurationMs;
         setting.DelayMs = preset.DefaultDelayMs;
@@ -463,21 +450,39 @@ public partial class CardThemeEditor : ComponentBase
 
     private async Task ResetAnimationTarget()
     {
-        if (ActiveAnimationStyle.AnimationTargets.ContainsKey(SelectedAnimTarget))
-        {
-            ActiveAnimationStyle.AnimationTargets.Remove(SelectedAnimTarget);
-            await OnChanged.InvokeAsync();
-        }
+        var setting = EnsureAnimSetting();
+        setting.PresetId = "none";
+        setting.Enabled = false;
+        await OnChanged.InvokeAsync();
     }
 
-    private FrameAnimationTargetSetting EnsureAnimSetting(string target)
+    private FrameAnimationTargetSetting EnsureAnimSetting()
     {
-        if (!ActiveAnimationStyle.AnimationTargets.TryGetValue(target, out var setting) || setting is null)
+        var targets = ActiveAnimationStyle.AnimationTargets;
+        if (targets.TryGetValue(FrameAnimationKey, out var setting) && setting is not null)
         {
-            setting = new FrameAnimationTargetSetting();
-            ActiveAnimationStyle.AnimationTargets[target] = setting;
+            if (targets.Count > 1)
+            {
+                targets.Clear();
+                targets[FrameAnimationKey] = setting;
+            }
+
+            return setting;
         }
 
+        foreach (var key in LegacyAnimationKeys)
+        {
+            if (targets.TryGetValue(key, out var legacy) && legacy is not null)
+            {
+                targets.Clear();
+                targets[FrameAnimationKey] = legacy;
+                return legacy;
+            }
+        }
+
+        setting = new FrameAnimationTargetSetting();
+        targets.Clear();
+        targets[FrameAnimationKey] = setting;
         return setting;
     }
 
